@@ -6,27 +6,7 @@ time(0..max_time).
 % but for now we leave it "small"
 #const max_time = 10.
 
-name(amanda; rob; taylor; courtney; neha; pratik; steph; felix).
-% name(a; b; c; d; e; f; g; h).
-
-chair(amanda, 0).
-chair(rob, 1).
-chair(taylor, 2).
-chair(courtney, 3).
-chair(steph, 4).
-chair(felix, 5).
-chair(neha, 6).
-chair(pratik, 7).
-
 player(P) :- name(P), chair(P,C), C < player_count.
-
-tb_townsfolk(washerwoman; librarian; investigator; chef; empath; fortune_teller; undertaker; monk; ravenkeeper; virgin; slayer; soldier; mayor).
-tb_outsider(butler; drunk; recluse; saint).
-
-tb_minion(poisoner; spy; scarlet_woman; baron).
-tb_demon(imp).
-
-causes_outsider_mod(baron, 2).
 
 % outsider_adjustment(A) :- A = #sum { N, R: causes_outsider_mod(R, N), distrib(R) }.
 outsider_adjustment(A) :- A = #sum { N, R: causes_outsider_mod(R, N), assigned(0, _, R) }.
@@ -45,11 +25,6 @@ adjusted_townsfolk(B + A) :- base_townsfolk(B), townsfolk_adjustment(A).
 adjusted_outsider(B + A) :- base_outsider(B), outsider_adjustment(A).
 adjusted_minion(B + A) :- base_minion(B), minion_adjustment(A).
 adjusted_demon(B + A) :- base_demon(B), demon_adjustment(A).
-
-townsfolk(X) :- tb_townsfolk(X).
-outsider(X) :- tb_outsider(X).
-minion(X) :- tb_minion(X).
-demon(X) :- tb_demon(X).
 
 role(X) :- townsfolk(X).
 role(X) :- outsider(X).
@@ -92,19 +67,13 @@ distrib(R) :- assigned(0, _, R).
 % belt+suspenders: the number of distributed roles must equal player count
 %:- not {distrib(X)} = player_count.
 
-% most roles can be in the bag...
-{bag(X) : role(X), not_received(X)} = player_count.
-
-not_received(X) :- role(X), X != drunk, X != marionette.
+% most roles can be in the bag (except things like drunk, marionette).
+{bag(X) : role(X), not never_in_bag(X)} = player_count.
 
 % each player receives exactly one token from the bag.
-{received(P, X) : player(P), bag(X)} = player_count.
-T1 = T2 :- received(P, T1), received(P, T2).
+{received(P, X) : bag(X)} = 1 :- player(P).
 % a token is not received by multiple players
-T1 != T2 :- received(P1, T1), received(P2, T2), P1 != P2.
-
-% ... but the only roles that have been received can be in the bag.
-:- received(P, X), player(P), not bag(X).
+:- received(P1, X), received(P2, X), P1 != P2.
 
 % each player is assigned exactly one unique role
 { assigned(0, P, R) : role(R) } = 1 :- player(P).
@@ -114,10 +83,10 @@ R1 != R2 :- assigned(0, P1, R1), assigned(0, P2, R2), P1 != P2.
 %R1 = R2 :- assigned(0, P, R1), assigned(0, P, R2).
 %R1 != R2 :- assigned(0, P1, R1), assigned(0, P2, R2), P1 != P2.
 
-thinks_it_is(X, X) :- role(X), X != drunk, X != lunatic, X != marionette.
-thinks_it_is(drunk, Y) :- townsfolk(Y).
-thinks_it_is(lunatic, Y) :- demon(Y).
-thinks_it_is(marionette, Y) :- townsfolk(Y).
+thinks_it_is(X, X) :- role(X), not mistaken_identity(X, _).
+thinks_it_is(R, Y) :- mistaken_identity(R, townsfolk), townsfolk(Y).
+thinks_it_is(R, Y) :- mistaken_identity(R, demon), demon(Y).
+thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 
 % the role assigned is one that "thinks it is the" token received.
 :- received(P, T), assigned(_, P, R), not thinks_it_is(R, T).

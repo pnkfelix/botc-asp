@@ -1,3 +1,7 @@
+#include "botc.lp".
+#include "tb.lp".
+#include "players.lp".
+
 #const player_count = 7.
 assigned(0, felix, drunk).
 
