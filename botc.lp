@@ -1,12 +1,81 @@
-% night+day are represented by time steps
-% 0 is night 1, 1 is day 1, 2 is night 2, 3 is day 2, etc
-time(0..max_time).
+% Time points for the game
+% We use structured time: night(N, RoleOrder, Substep)
+% night(1, 0, 0) is the setup state before any role acts
+% night(1, R, S) is substep S of the role at position R in the night order
 
-% in principle we may need this to be O(#players), e.g. 30 or so,
-% but for now we leave it "small"
-#const max_time = 10.
+time(night(1, 0, 0)).  % setup state before any actions on night 1
+time(night(1, RoleOrd, S)) :-
+    first_night_role_order(Role, RoleOrd),
+    first_night_substep(Role, S, _),
+    assigned(0, _, Role).
+
+% Which role is acting at a given time point
+acting_role(night(1, RoleOrd, S), Role) :-
+    first_night_role_order(Role, RoleOrd),
+    first_night_substep(Role, S, _),
+    assigned(0, _, Role).
+
+% Ordering: next(T1, T2) means T2 immediately follows T1
+% Ordering is just numeric comparison on (RoleOrder, Substep)
+next(T1, T2) :-
+    time(T1), time(T2),
+    T1 = night(1, R1, S1),
+    T2 = night(1, R2, S2),
+    (R1, S1) < (R2, S2),
+    not between(T1, T2).
+
+% between(T1, T2) is true if there's some T3 strictly between T1 and T2
+between(T1, T2) :-
+    time(T1), time(T2), time(T3),
+    T1 = night(1, R1, S1),
+    T2 = night(1, R2, S2),
+    T3 = night(1, R3, S3),
+    (R1, S1) < (R3, S3),
+    (R3, S3) < (R2, S2).
 
 player(P) :- name(P), chair(P,C), C < player_count.
+
+% Reminder token inertia: once placed, tokens persist to the next time point
+reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2).
+
+% A player is impaired at time T if they have a token that causes impairment
+impaired(P, T) :- reminder_on(Token, P, T), causes_impairment(Token).
+
+% A player's ability is "functioning" if they're not impaired
+functioning(P, T) :- player(P), time(T), not impaired(P, T).
+
+% Categories for registration (role type and alignment)
+category(townsfolk).
+category(outsider).
+category(minion).
+category(demon).
+category(good).
+category(evil).
+
+% Actual categories of a player based on their assigned role
+actual_category(P, townsfolk) :- assigned(0, P, R), townsfolk(R).
+actual_category(P, outsider) :- assigned(0, P, R), outsider(R).
+actual_category(P, minion) :- assigned(0, P, R), minion(R).
+actual_category(P, demon) :- assigned(0, P, R), demon(R).
+actual_category(P, good) :- assigned(0, P, R), townsfolk(R).
+actual_category(P, good) :- assigned(0, P, R), outsider(R).
+actual_category(P, evil) :- assigned(0, P, R), minion(R).
+actual_category(P, evil) :- assigned(0, P, R), demon(R).
+
+% Default: register as what you actually are (for players who can't mis-register)
+registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
+
+% If a player may mis-register, ST chooses for each category they may register as
+{ registers_as(P, C, T) } :- may_register_as(P, C), time(T).
+
+% Players who can mis-register must still register as at least one role category
+:- player(P), time(T), may_mis_register(P),
+   not registers_as(P, townsfolk, T), not registers_as(P, outsider, T),
+   not registers_as(P, minion, T), not registers_as(P, demon, T).
+
+% Players who can mis-register must still register as at least one alignment
+:- player(P), time(T), may_mis_register(P),
+   not registers_as(P, good, T), not registers_as(P, evil, T).
 
 % outsider_adjustment(A) :- A = #sum { N, R: causes_outsider_mod(R, N), distrib(R) }.
 outsider_adjustment(A) :- A = #sum { N, R: causes_outsider_mod(R, N), assigned(0, _, R) }.
