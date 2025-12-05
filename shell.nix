@@ -1,4 +1,5 @@
-{ pkgs ? import <nixpkgs> {} }:
+# Pin to local nixpkgs to avoid network fetches
+{ pkgs ? import /nix/store/ibbb1fi5gm4f1d79xqadajzjazpmc484-source {} }:
 pkgs.mkShell {
   buildInputs = [
     pkgs.clingo
