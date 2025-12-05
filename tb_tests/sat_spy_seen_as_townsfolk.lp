@@ -5,7 +5,7 @@ assigned(0, amanda, spy).
 assigned(0, rob, washerwoman).
 
 % Washerwoman must not be poisoned (so they're functioning)
-:- reminder_on(poisoner_poisoned, rob, _).
+:- reminder_on(poi_poisoned, rob, _).
 
 % Assert: washerwoman CAN see amanda (spy) as the townsfolk
-:- not reminder_on(washerwoman_townsfolk, amanda, _).
+:- not reminder_on(ww_townsfolk, amanda, _).

@@ -37,42 +37,42 @@ first_night_substep(poisoner, 3, st_places(poisoned)).
 
 % Poisoner reminder token placement
 % At substep 3, ST places poisoned token on whoever the poisoner chose
-{ reminder_on(poisoner_poisoned, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
+{ reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
     first_night_role_order(poisoner, RoleOrd),
     assigned(0, _, poisoner).
 
 % The poisoner's token causes impairment
-causes_impairment(poisoner_poisoned).
+causes_impairment(poi_poisoned).
 
 % Washerwoman: ST places tokens then tells info
-first_night_substep(washerwoman, 1, st_places(washerwoman_townsfolk)).
-first_night_substep(washerwoman, 2, st_places(washerwoman_wrong)).
-first_night_substep(washerwoman, 3, st_tells(washerwoman_info)).
+first_night_substep(washerwoman, 1, st_places(ww_townsfolk)).
+first_night_substep(washerwoman, 2, st_places(ww_wrong)).
+first_night_substep(washerwoman, 3, st_tells(ww_info)).
 
 % Washerwoman reminder token placement
 % At substep 1, ST chooses a player to put the "townsfolk" token on
 % At substep 2, ST chooses a different player to put the "wrong" token on
 
 % The storyteller chooses where to place these tokens
-{ reminder_on(washerwoman_townsfolk, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
+{ reminder_on(ww_townsfolk, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(washerwoman, RoleOrd),
     assigned(0, _, washerwoman).
 
-{ reminder_on(washerwoman_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
+{ reminder_on(ww_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(washerwoman, RoleOrd),
     assigned(0, _, washerwoman).
 
 % The two tokens must be on different players
-:- reminder_on(washerwoman_townsfolk, P, T1),
-   reminder_on(washerwoman_wrong, P, T2).
+:- reminder_on(ww_townsfolk, P, T1),
+   reminder_on(ww_wrong, P, T2).
 
 % Washerwoman validity constraint:
 % If washerwoman is functioning, the townsfolk token must be on someone
 % who registers as townsfolk at that time
 % FIXME: Due to reminder token inertia, this constraint applies at ALL times
 % the token exists, not just when the washerwoman receives info. We probably
-% only care about the time when st_tells(washerwoman_info) occurs.
-:- reminder_on(washerwoman_townsfolk, P, T),
+% only care about the time when st_tells(ww_info) occurs.
+:- reminder_on(ww_townsfolk, P, T),
    assigned(0, WasherwomanPlayer, washerwoman),
    functioning(WasherwomanPlayer, T),
    not registers_as(P, townsfolk, T).
@@ -80,26 +80,26 @@ first_night_substep(washerwoman, 3, st_tells(washerwoman_info)).
 % ===========================================================================
 % Librarian: like Washerwoman but for outsiders
 % ===========================================================================
-first_night_substep(librarian, 1, st_places(librarian_outsider)).
-first_night_substep(librarian, 2, st_places(librarian_wrong)).
-first_night_substep(librarian, 3, st_tells(librarian_info)).
+first_night_substep(librarian, 1, st_places(lib_outsider)).
+first_night_substep(librarian, 2, st_places(lib_wrong)).
+first_night_substep(librarian, 3, st_tells(lib_info)).
 
-{ reminder_on(librarian_outsider, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
+{ reminder_on(lib_outsider, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(librarian, RoleOrd),
     assigned(0, _, librarian).
 
-{ reminder_on(librarian_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
+{ reminder_on(lib_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(librarian, RoleOrd),
     assigned(0, _, librarian).
 
 % The two tokens must be on different players
-:- reminder_on(librarian_outsider, P, _),
-   reminder_on(librarian_wrong, P, _).
+:- reminder_on(lib_outsider, P, _),
+   reminder_on(lib_wrong, P, _).
 
 % If librarian is functioning, the outsider token must be on someone
 % who registers as outsider at that time
 % FIXME: Same issue as washerwoman - applies at all times, not just info time
-:- reminder_on(librarian_outsider, P, T),
+:- reminder_on(lib_outsider, P, T),
    assigned(0, LibrarianPlayer, librarian),
    functioning(LibrarianPlayer, T),
    not registers_as(P, outsider, T).
@@ -107,26 +107,26 @@ first_night_substep(librarian, 3, st_tells(librarian_info)).
 % ===========================================================================
 % Investigator: like Washerwoman but for minions
 % ===========================================================================
-first_night_substep(investigator, 1, st_places(investigator_minion)).
-first_night_substep(investigator, 2, st_places(investigator_wrong)).
-first_night_substep(investigator, 3, st_tells(investigator_info)).
+first_night_substep(investigator, 1, st_places(inv_minion)).
+first_night_substep(investigator, 2, st_places(inv_wrong)).
+first_night_substep(investigator, 3, st_tells(inv_info)).
 
-{ reminder_on(investigator_minion, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
+{ reminder_on(inv_minion, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(investigator, RoleOrd),
     assigned(0, _, investigator).
 
-{ reminder_on(investigator_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
+{ reminder_on(inv_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(investigator, RoleOrd),
     assigned(0, _, investigator).
 
 % The two tokens must be on different players
-:- reminder_on(investigator_minion, P, _),
-   reminder_on(investigator_wrong, P, _).
+:- reminder_on(inv_minion, P, _),
+   reminder_on(inv_wrong, P, _).
 
 % If investigator is functioning, the minion token must be on someone
 % who registers as minion at that time
 % FIXME: Same issue as washerwoman - applies at all times, not just info time
-:- reminder_on(investigator_minion, P, T),
+:- reminder_on(inv_minion, P, T),
    assigned(0, InvestigatorPlayer, investigator),
    functioning(InvestigatorPlayer, T),
    not registers_as(P, minion, T).
@@ -158,16 +158,16 @@ first_night_substep(fortune_teller, 3, st_tells(fortune_teller_info)).
 % This is placed during setup, not during the fortune teller's turn
 % For now, we'll model this as a reminder token placed at time 0
 
-{ reminder_on(fortune_teller_red_herring, P, night(1, 0, 0)) : player(P) } = 1 :-
+{ reminder_on(ft_red_herring, P, night(1, 0, 0)) : player(P) } = 1 :-
     assigned(0, _, fortune_teller).
 
 % Red herring cannot be on the actual demon
-:- reminder_on(fortune_teller_red_herring, P, _),
+:- reminder_on(ft_red_herring, P, _),
    assigned(0, P, R),
    demon(R).
 
 % Red herring must be on a good player (townsfolk or outsider)
-:- reminder_on(fortune_teller_red_herring, P, T),
+:- reminder_on(ft_red_herring, P, T),
    not registers_as(P, good, T).
 
 % ===========================================================================
@@ -175,14 +175,14 @@ first_night_substep(fortune_teller, 3, st_tells(fortune_teller_info)).
 % ===========================================================================
 first_night_substep(butler, 1, st_asks(choose_master)).
 first_night_substep(butler, 2, player_chooses(master)).
-first_night_substep(butler, 3, st_places(butler_master)).
+first_night_substep(butler, 3, st_places(but_master)).
 
-{ reminder_on(butler_master, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
+{ reminder_on(but_master, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
     first_night_role_order(butler, RoleOrd),
     assigned(0, _, butler).
 
 % Butler cannot choose themselves as master
-:- reminder_on(butler_master, P, _),
+:- reminder_on(but_master, P, _),
    assigned(0, P, butler).
 
 % ===========================================================================
