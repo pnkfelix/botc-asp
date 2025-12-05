@@ -3,6 +3,7 @@
 pkgs.mkShell {
   buildInputs = [
     pkgs.clingo
+    (pkgs.python3.withPackages (ps: [ ps.rich ]))
   ];
   CLINGO_LIBRARY_PATH = "${pkgs.clingo}/lib";
   LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.clingo pkgs.stdenv.cc.cc.lib ]}";

@@ -75,6 +75,117 @@ first_night_substep(washerwoman, 3, st_tells(washerwoman_info)).
    not registers_as(P, townsfolk, T).
 
 % ===========================================================================
+% Librarian: like Washerwoman but for outsiders
+% ===========================================================================
+first_night_substep(librarian, 1, st_places(librarian_outsider)).
+first_night_substep(librarian, 2, st_places(librarian_wrong)).
+first_night_substep(librarian, 3, st_tells(librarian_info)).
+
+{ reminder_on(librarian_outsider, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, _, librarian).
+
+{ reminder_on(librarian_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, _, librarian).
+
+% The two tokens must be on different players
+:- reminder_on(librarian_outsider, P, _),
+   reminder_on(librarian_wrong, P, _).
+
+% If librarian is functioning, the outsider token must be on someone
+% who registers as outsider at that time
+:- reminder_on(librarian_outsider, P, T),
+   assigned(0, LibrarianPlayer, librarian),
+   functioning(LibrarianPlayer, T),
+   not registers_as(P, outsider, T).
+
+% ===========================================================================
+% Investigator: like Washerwoman but for minions
+% ===========================================================================
+first_night_substep(investigator, 1, st_places(investigator_minion)).
+first_night_substep(investigator, 2, st_places(investigator_wrong)).
+first_night_substep(investigator, 3, st_tells(investigator_info)).
+
+{ reminder_on(investigator_minion, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, _, investigator).
+
+{ reminder_on(investigator_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, _, investigator).
+
+% The two tokens must be on different players
+:- reminder_on(investigator_minion, P, _),
+   reminder_on(investigator_wrong, P, _).
+
+% If investigator is functioning, the minion token must be on someone
+% who registers as minion at that time
+:- reminder_on(investigator_minion, P, T),
+   assigned(0, InvestigatorPlayer, investigator),
+   functioning(InvestigatorPlayer, T),
+   not registers_as(P, minion, T).
+
+% ===========================================================================
+% Chef: learns how many pairs of evil players are neighbors
+% ===========================================================================
+first_night_substep(chef, 1, st_tells(chef_info)).
+
+% Chef info is derived from grimoire state, no reminder tokens needed
+% The ST tells the chef a number; if functioning, it must be accurate
+
+% ===========================================================================
+% Empath: learns how many of their alive neighbors are evil
+% ===========================================================================
+first_night_substep(empath, 1, st_tells(empath_info)).
+
+% Empath info is derived from grimoire state, no reminder tokens needed
+% The ST tells the empath a number; if functioning, it must be accurate
+
+% ===========================================================================
+% Fortune Teller: chooses 2 players, learns if either is the demon
+% ===========================================================================
+first_night_substep(fortune_teller, 1, st_asks(choose_two)).
+first_night_substep(fortune_teller, 2, player_chooses(two_players)).
+first_night_substep(fortune_teller, 3, st_tells(fortune_teller_info)).
+
+% Fortune teller has a "red herring" - one player who always registers as demon to them
+% This is placed during setup, not during the fortune teller's turn
+% For now, we'll model this as a reminder token placed at time 0
+
+{ reminder_on(fortune_teller_red_herring, P, night(1, 0, 0)) : player(P) } = 1 :-
+    assigned(0, _, fortune_teller).
+
+% Red herring cannot be on the actual demon
+:- reminder_on(fortune_teller_red_herring, P, _),
+   assigned(0, P, R),
+   demon(R).
+
+% Red herring must be on a good player (townsfolk or outsider)
+:- reminder_on(fortune_teller_red_herring, P, T),
+   not registers_as(P, good, T).
+
+% ===========================================================================
+% Butler: chooses a master, can only vote when master votes
+% ===========================================================================
+first_night_substep(butler, 1, st_asks(choose_master)).
+first_night_substep(butler, 2, player_chooses(master)).
+first_night_substep(butler, 3, st_places(butler_master)).
+
+{ reminder_on(butler_master, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
+    first_night_role_order(butler, RoleOrd),
+    assigned(0, _, butler).
+
+% Butler cannot choose themselves as master
+:- reminder_on(butler_master, P, _),
+   assigned(0, P, butler).
+
+% ===========================================================================
+% Spy: sees the grimoire (no mechanical effect to model here)
+% ===========================================================================
+first_night_substep(spy, 1, st_shows(grimoire)).
+
+% ===========================================================================
 % Spy and Recluse mis-registration
 % ===========================================================================
 

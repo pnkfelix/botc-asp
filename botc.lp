@@ -164,3 +164,5 @@ thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 :- adjusted_outsider(N), #count { R : assigned(0, _, R), outsider(R) } != N.
 :- adjusted_minion(N), #count { R : assigned(0, _, R), minion(R) } != N.
 :- adjusted_demon(N), #count { R : assigned(0, _, R), demon(R) } != N.
+
+#include "types.lp".
