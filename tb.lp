@@ -69,6 +69,9 @@ first_night_substep(washerwoman, 3, st_tells(washerwoman_info)).
 % Washerwoman validity constraint:
 % If washerwoman is functioning, the townsfolk token must be on someone
 % who registers as townsfolk at that time
+% FIXME: Due to reminder token inertia, this constraint applies at ALL times
+% the token exists, not just when the washerwoman receives info. We probably
+% only care about the time when st_tells(washerwoman_info) occurs.
 :- reminder_on(washerwoman_townsfolk, P, T),
    assigned(0, WasherwomanPlayer, washerwoman),
    functioning(WasherwomanPlayer, T),
@@ -95,6 +98,7 @@ first_night_substep(librarian, 3, st_tells(librarian_info)).
 
 % If librarian is functioning, the outsider token must be on someone
 % who registers as outsider at that time
+% FIXME: Same issue as washerwoman - applies at all times, not just info time
 :- reminder_on(librarian_outsider, P, T),
    assigned(0, LibrarianPlayer, librarian),
    functioning(LibrarianPlayer, T),
@@ -121,6 +125,7 @@ first_night_substep(investigator, 3, st_tells(investigator_info)).
 
 % If investigator is functioning, the minion token must be on someone
 % who registers as minion at that time
+% FIXME: Same issue as washerwoman - applies at all times, not just info time
 :- reminder_on(investigator_minion, P, T),
    assigned(0, InvestigatorPlayer, investigator),
    functioning(InvestigatorPlayer, T),
