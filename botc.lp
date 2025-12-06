@@ -44,6 +44,31 @@ impaired(P, T) :- reminder_on(Token, P, T), causes_impairment(Token).
 % A player's ability is "functioning" if they're not impaired
 functioning(P, T) :- player(P), time(T), not impaired(P, T).
 
+% ===========================================================================
+% Night communication vocabulary
+% These are the signals available for ST <-> player communication at night
+% ===========================================================================
+
+% Binary signals
+signal(yes).
+signal(no).
+
+% Alignment signals
+signal(good).
+signal(evil).
+
+% Numeric counts (0 through max possible)
+signal(count(N)) :- N = 0..player_count.
+
+% Pointing to a player
+signal(point(P)) :- player(P).
+
+% Pointing to a role on the script
+signal(point(R)) :- role(R).
+
+% st_tells(Role, Player, Message, T) - ST communicates Message to Player
+% as part of Role's ability at time T
+
 % Categories for registration (role type and alignment)
 category(townsfolk).
 category(outsider).
@@ -65,8 +90,12 @@ actual_category(P, evil) :- assigned(0, P, R), demon(R).
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
-% If a player may mis-register, ST chooses for each category they may register as
-{ registers_as(P, C, T) } :- may_register_as(P, C), time(T).
+% If a player may mis-register, ST chooses for each category they may misregister as
+{ registers_as(P, C, T) } :- may_misregister_as(P, C), time(T).
+
+% Players who can mis-register can also choose to register as their actual category
+% (this is not misregistration, just being truthful)
+{ registers_as(P, C, T) } :- actual_category(P, C), time(T), may_mis_register(P).
 
 % Players who can mis-register must still register as at least one role category
 :- player(P), time(T), may_mis_register(P),

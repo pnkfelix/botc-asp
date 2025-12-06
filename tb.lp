@@ -77,6 +77,54 @@ first_night_substep(washerwoman, 3, st_tells(ww_info)).
    functioning(WasherwomanPlayer, T),
    not registers_as(P, townsfolk, T).
 
+% Washerwoman st_tells: ST points to two players and a role
+% The two players are derived from the reminder tokens
+st_tells(washerwoman, WW, point(P1), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(washerwoman, RoleOrd),
+    assigned(0, WW, washerwoman),
+    reminder_on(ww_townsfolk, P1, T).
+
+st_tells(washerwoman, WW, point(P2), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(washerwoman, RoleOrd),
+    assigned(0, WW, washerwoman),
+    reminder_on(ww_wrong, P2, T).
+
+% The role shown depends on whether washerwoman is functioning
+% If functioning: must be a townsfolk role the ww_townsfolk player can register as
+% If malfunctioning: can be any townsfolk role
+
+% A player can register as role R if:
+% - R is their actual assigned role, OR
+% - They can misregister as R's category (spy/recluse only)
+
+% Everyone can register as their actual role
+may_register_as_role(P, R, T) :-
+    assigned(0, P, R),
+    time(T).
+
+% Spy/Recluse can register as any role in a category they may misregister as
+may_register_as_role(P, R, T) :-
+    townsfolk(R),
+    may_misregister_as(P, townsfolk),
+    time(T).
+
+% When functioning, role must match what ww_townsfolk player can register as
+{ st_tells(washerwoman, WW, point(R), T) : may_register_as_role(P, R, T) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(washerwoman, RoleOrd),
+    assigned(0, WW, washerwoman),
+    reminder_on(ww_townsfolk, P, T),
+    functioning(WW, T).
+
+% When malfunctioning, ST can say any townsfolk role
+{ st_tells(washerwoman, WW, point(R), T) : townsfolk(R) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(washerwoman, RoleOrd),
+    assigned(0, WW, washerwoman),
+    not functioning(WW, T).
+
 % ===========================================================================
 % Librarian: like Washerwoman but for outsiders
 % ===========================================================================
@@ -104,6 +152,40 @@ first_night_substep(librarian, 3, st_tells(lib_info)).
    functioning(LibrarianPlayer, T),
    not registers_as(P, outsider, T).
 
+% Librarian st_tells: ST points to two players and a role
+st_tells(librarian, LIB, point(P1), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, LIB, librarian),
+    reminder_on(lib_outsider, P1, T).
+
+st_tells(librarian, LIB, point(P2), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, LIB, librarian),
+    reminder_on(lib_wrong, P2, T).
+
+% Spy/Recluse can register as any outsider role
+may_register_as_role(P, R, T) :-
+    outsider(R),
+    may_misregister_as(P, outsider),
+    time(T).
+
+% When functioning, role must match what lib_outsider player can register as
+{ st_tells(librarian, LIB, point(R), T) : may_register_as_role(P, R, T) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, LIB, librarian),
+    reminder_on(lib_outsider, P, T),
+    functioning(LIB, T).
+
+% When malfunctioning, ST can say any outsider role
+{ st_tells(librarian, LIB, point(R), T) : outsider(R) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(librarian, RoleOrd),
+    assigned(0, LIB, librarian),
+    not functioning(LIB, T).
+
 % ===========================================================================
 % Investigator: like Washerwoman but for minions
 % ===========================================================================
@@ -130,6 +212,40 @@ first_night_substep(investigator, 3, st_tells(inv_info)).
    assigned(0, InvestigatorPlayer, investigator),
    functioning(InvestigatorPlayer, T),
    not registers_as(P, minion, T).
+
+% Investigator st_tells: ST points to two players and a role
+st_tells(investigator, INV, point(P1), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, INV, investigator),
+    reminder_on(inv_minion, P1, T).
+
+st_tells(investigator, INV, point(P2), T) :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, INV, investigator),
+    reminder_on(inv_wrong, P2, T).
+
+% Recluse can register as any minion role
+may_register_as_role(P, R, T) :-
+    minion(R),
+    may_misregister_as(P, minion),
+    time(T).
+
+% When functioning, role must match what inv_minion player can register as
+{ st_tells(investigator, INV, point(R), T) : may_register_as_role(P, R, T) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, INV, investigator),
+    reminder_on(inv_minion, P, T),
+    functioning(INV, T).
+
+% When malfunctioning, ST can say any minion role
+{ st_tells(investigator, INV, point(R), T) : minion(R) } = 1 :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(investigator, RoleOrd),
+    assigned(0, INV, investigator),
+    not functioning(INV, T).
 
 % ===========================================================================
 % Chef: learns how many pairs of evil players are neighbors
@@ -195,18 +311,16 @@ first_night_substep(spy, 1, st_shows(grimoire)).
 % ===========================================================================
 
 % Spy can register as good and/or as townsfolk/outsider
+% (Spy is already evil and a minion, so no misregistration needed for those)
 may_mis_register(P) :- assigned(0, P, spy).
-may_register_as(P, good) :- assigned(0, P, spy).
-may_register_as(P, evil) :- assigned(0, P, spy).
-may_register_as(P, townsfolk) :- assigned(0, P, spy).
-may_register_as(P, outsider) :- assigned(0, P, spy).
-may_register_as(P, minion) :- assigned(0, P, spy).
+may_misregister_as(P, good) :- assigned(0, P, spy).
+may_misregister_as(P, townsfolk) :- assigned(0, P, spy).
+may_misregister_as(P, outsider) :- assigned(0, P, spy).
 
 % Recluse can register as evil and/or as minion/demon
+% (Recluse is already good and an outsider, so no misregistration needed for those)
 may_mis_register(P) :- assigned(0, P, recluse).
-may_register_as(P, good) :- assigned(0, P, recluse).
-may_register_as(P, evil) :- assigned(0, P, recluse).
-may_register_as(P, outsider) :- assigned(0, P, recluse).
-may_register_as(P, minion) :- assigned(0, P, recluse).
-may_register_as(P, demon) :- assigned(0, P, recluse).
+may_misregister_as(P, evil) :- assigned(0, P, recluse).
+may_misregister_as(P, minion) :- assigned(0, P, recluse).
+may_misregister_as(P, demon) :- assigned(0, P, recluse).
 
