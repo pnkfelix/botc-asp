@@ -224,4 +224,155 @@ thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 :- adjusted_minion(N), #count { R : assigned(0, _, R), minion(R) } != N.
 :- adjusted_demon(N), #count { R : assigned(0, _, R), demon(R) } != N.
 
+% ===========================================================================
+% Day Phase - Nominations, Voting, and Execution
+% ===========================================================================
+
+% day_number/1 defines which days we're modeling (like night_number)
+% By default, we model day 1 (which follows night 1)
+day_number(1).
+
+% Everyone is alive at the start of the game
+alive(P, night(1, 0, 0)) :- player(P).
+
+% Alive status persists through night unless killed
+alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1).
+
+% Alive at start of day = alive at end of preceding night
+alive(P, day(N, 0)) :- alive(P, T), final_night_time(N, T).
+
+% Helper: find the final time point of a night
+final_night_time(N, T) :-
+    time(T), T = night(N, _, _),
+    not next(T, T2) : time(T2), T2 = night(N, _, _).
+
+% ===========================================================================
+% Day Time Structure
+% day(N, Phase) where Phase is:
+%   0 = start of day (pre-nomination)
+%   nom(K) = nomination phase, K nominations have occurred
+%   vote(K) = voting on nomination K
+%   exec = execution phase (end of day)
+% ===========================================================================
+
+day_time(day(N, 0)) :- day_number(N).
+day_time(day(N, nom(K))) :- nomination(_, _, N, K).
+day_time(day(N, vote(K))) :- nomination(_, _, N, K).
+day_time(day(N, exec)) :- day_number(N), day_ends(N).
+
+% ST declares end of day - this triggers execution resolution
+% st_ends_day(N) is input from the scenario
+day_ends(N) :- st_ends_day(N).
+
+% Time includes day times
+time(T) :- day_time(T).
+
+% Alive status persists through day unless executed or killed
+alive(P, day(N, nom(K))) :- alive(P, day(N, 0)), nomination(_, _, N, K),
+    not executed(P, N) : K2 < K, nomination(_, _, N, K2),
+    not died(P, day(N, 0)).
+alive(P, day(N, vote(K))) :- alive(P, day(N, nom(K))), not died(P, day(N, nom(K))).
+alive(P, day(N, exec)) :- alive(P, day(N, 0)), not executed(P, N), not died_during_day(P, N).
+
+% Helper: died during day N at any point (other than execution)
+died_during_day(P, N) :- died(P, day(N, _)).
+
+% ===========================================================================
+% Nominations
+% nomination(Nominator, Nominee, Day, NomNumber)
+% Nominations are INPUT - tests/scenarios specify them, we validate constraints
+% ===========================================================================
+
+% Validate: nominator must be alive at start of day
+:- nomination(Nominator, _, N, _), not alive(Nominator, day(N, 0)).
+
+% Validate: nominee must be alive at start of day
+:- nomination(_, Nominee, N, _), not alive(Nominee, day(N, 0)).
+
+% Validate: can't nominate yourself
+:- nomination(P, P, _, _).
+
+% If nomination K exists, nomination K-1 must also exist (no gaps)
+:- nomination(_, _, N, K), K > 1, not nomination(_, _, N, K-1).
+
+% Each player can only nominate once per day
+:- nomination(P, _, N, K1), nomination(P, _, N, K2), K1 != K2.
+
+% Each player can only be nominated once per day
+:- nomination(_, P, N, K1), nomination(_, P, N, K2), K1 != K2.
+
+% ===========================================================================
+% Voting
+% vote(Voter, Day, NomNumber) - Voter voted yes on this nomination
+% Votes are INPUT - tests/scenarios specify them, we validate constraints
+% ===========================================================================
+
+% Validate: voter must be alive during voting
+:- vote(P, N, K), not alive(P, day(N, vote(K))).
+
+% Validate: can only vote on nominations that exist
+:- vote(_, N, K), not nomination(_, _, N, K).
+
+% Vote count for a nomination
+vote_count(N, K, Count) :-
+    nomination(_, _, N, K),
+    Count = #count { P : vote(P, N, K) }.
+
+% ===========================================================================
+% Execution
+% A nomination "goes on the block" if it has majority votes
+% The player with the most votes (if majority) gets executed
+% ===========================================================================
+
+% Majority threshold = more than half of alive players
+majority_threshold(N, Threshold) :-
+    day_number(N),
+    AliveCount = #count { P : alive(P, day(N, 0)) },
+    Threshold = AliveCount / 2 + 1.
+
+% A nomination reaches majority
+has_majority(N, K) :-
+    vote_count(N, K, Count),
+    majority_threshold(N, Threshold),
+    Count >= Threshold.
+
+% A nomination has the highest vote count (among those with majority)
+highest_vote(N, K) :-
+    has_majority(N, K),
+    vote_count(N, K, Count),
+    not higher_vote_exists(N, K).
+
+higher_vote_exists(N, K1) :-
+    has_majority(N, K1),
+    has_majority(N, K2),
+    vote_count(N, K1, C1),
+    vote_count(N, K2, C2),
+    C2 > C1.
+
+% Tie: multiple nominations have the same highest count
+vote_tie(N) :-
+    has_majority(N, K1),
+    has_majority(N, K2),
+    K1 != K2,
+    vote_count(N, K1, C),
+    vote_count(N, K2, C),
+    not higher_vote_exists(N, K1).
+
+% Execution happens when ST ends day, to nominee of highest-voted nomination
+% (unless there's a tie, in which case no one is executed)
+executed(Nominee, N) :-
+    st_ends_day(N),
+    highest_vote(N, K),
+    nomination(_, Nominee, N, K),
+    not vote_tie(N),
+    not execution_prevented(Nominee, N).
+
+% No execution if ST ends day but no majority was reached or there's a tie
+no_execution(N) :-
+    st_ends_day(N),
+    not executed(_, N).
+
+% A player dies when executed
+died(P, day(N, exec)) :- executed(P, N).
+
 #include "types.lp".

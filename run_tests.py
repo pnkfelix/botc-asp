@@ -135,11 +135,11 @@ def build_table(results: list, current_test: str | None = None, current_idx: int
     table.add_column("History", style="dim")
 
     for name, expected, actual, elapsed, passed, history_str, is_outlier in results:
-        # Show actual result, highlighted red if it doesn't match expected
+        # Show actual result, highlighted red with !!! if it doesn't match expected
         if passed:
             result_str = f"[green]{actual}[/green]"
         else:
-            result_str = f"[bold red]{actual} (expected {expected})[/bold red]"
+            result_str = f"[bold red]{actual} (!!!)[/bold red]"
 
         time_str = f"{elapsed:.2f}s" if elapsed is not None else "-"
         if is_outlier:
@@ -227,7 +227,7 @@ def run_tests_plain(test_files: list[Path]) -> int:
             print(f"PASS ({time_info})")
             pass_count += 1
         else:
-            print(f"FAIL ({time_info}) - expected {expected}, got {actual}")
+            print(f"FAIL {actual} (!!!) ({time_info})")
             fail_count += 1
 
     print()
