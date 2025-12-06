@@ -35,6 +35,16 @@ between(T1, T2) :-
 
 player(P) :- name(P), chair(P,C), C < player_count.
 
+% Circular seating adjacency
+% Two players are neighbors if their chairs are adjacent (mod player_count)
+neighbor(P1, P2) :-
+    player(P1), player(P2),
+    chair(P1, C1), chair(P2, C2),
+    C2 = (C1 + 1) \ player_count.
+
+% neighbor is symmetric
+neighbor(P1, P2) :- neighbor(P2, P1).
+
 % Reminder token inertia: once placed, tokens persist to the next time point
 reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2).
 

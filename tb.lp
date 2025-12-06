@@ -255,6 +255,35 @@ first_night_substep(chef, 1, st_tells(chef_info)).
 % Chef info is derived from grimoire state, no reminder tokens needed
 % The ST tells the chef a number; if functioning, it must be accurate
 
+% An "evil pair" is two neighboring players who both register as evil
+% We count ordered pairs where P1 < P2 (by chair) to avoid double-counting
+evil_pair(P1, P2, T) :-
+    neighbor(P1, P2),
+    chair(P1, C1), chair(P2, C2), C1 < C2,
+    registers_as(P1, evil, T),
+    registers_as(P2, evil, T).
+
+% Count the number of evil pairs at time T
+evil_pair_count(N, T) :-
+    time(T),
+    N = #count { P1, P2 : evil_pair(P1, P2, T) }.
+
+% Chef st_tells: ST tells the chef a count
+% When functioning, the count must match the actual evil_pair_count
+st_tells(chef, Chef, count(N), T) :-
+    T = night(1, RoleOrd, 1),
+    first_night_role_order(chef, RoleOrd),
+    assigned(0, Chef, chef),
+    functioning(Chef, T),
+    evil_pair_count(N, T).
+
+% When malfunctioning, ST can tell any count from 0 to player_count/2
+{ st_tells(chef, Chef, count(N), T) : N = 0..player_count/2 } = 1 :-
+    T = night(1, RoleOrd, 1),
+    first_night_role_order(chef, RoleOrd),
+    assigned(0, Chef, chef),
+    not functioning(Chef, T).
+
 % ===========================================================================
 % Empath: learns how many of their alive neighbors are evil
 % ===========================================================================
@@ -262,6 +291,29 @@ first_night_substep(empath, 1, st_tells(empath_info)).
 
 % Empath info is derived from grimoire state, no reminder tokens needed
 % The ST tells the empath a number; if functioning, it must be accurate
+
+% Count how many of the empath's neighbors register as evil
+% Note: On night 1, everyone is alive, so we don't need to check alive status yet
+empath_evil_neighbor_count(Empath, N, T) :-
+    assigned(0, Empath, empath),
+    time(T),
+    N = #count { P : neighbor(Empath, P), registers_as(P, evil, T) }.
+
+% Empath st_tells: ST tells the empath a count (0, 1, or 2)
+% When functioning, the count must match the actual neighbor evil count
+st_tells(empath, Empath, count(N), T) :-
+    T = night(1, RoleOrd, 1),
+    first_night_role_order(empath, RoleOrd),
+    assigned(0, Empath, empath),
+    functioning(Empath, T),
+    empath_evil_neighbor_count(Empath, N, T).
+
+% When malfunctioning, ST can tell any count from 0 to 2
+{ st_tells(empath, Empath, count(N), T) : N = 0..2 } = 1 :-
+    T = night(1, RoleOrd, 1),
+    first_night_role_order(empath, RoleOrd),
+    assigned(0, Empath, empath),
+    not functioning(Empath, T).
 
 % ===========================================================================
 % Fortune Teller: chooses 2 players, learns if either is the demon
