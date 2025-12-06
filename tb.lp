@@ -35,11 +35,16 @@ first_night_substep(poisoner, 1, st_asks(choose_target)).
 first_night_substep(poisoner, 2, player_chooses(target)).
 first_night_substep(poisoner, 3, st_places(poisoned)).
 
-% Poisoner reminder token placement
-% At substep 3, ST places poisoned token on whoever the poisoner chose
-{ reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
+% Poisoner player choice: choose any other player to poison
+{ player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
+    T = night(1, RoleOrd, 2),
     first_night_role_order(poisoner, RoleOrd),
-    assigned(0, _, poisoner).
+    assigned(0, Poisoner, poisoner).
+
+% Poisoner reminder token placement: ST places token on the chosen player
+reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) :-
+    first_night_role_order(poisoner, RoleOrd),
+    player_chooses(poisoner, _, point(P), night(1, RoleOrd, 2)).
 
 % The poisoner's token causes impairment
 causes_impairment(poi_poisoned).
@@ -317,14 +322,31 @@ st_tells(empath, Empath, count(N), T) :-
 
 % ===========================================================================
 % Fortune Teller: chooses 2 players, learns if either is the demon
+% Acts on first night and every other night
 % ===========================================================================
 first_night_substep(fortune_teller, 1, st_asks(choose_two)).
 first_night_substep(fortune_teller, 2, player_chooses(two_players)).
-first_night_substep(fortune_teller, 3, st_tells(fortune_teller_info)).
+first_night_substep(fortune_teller, 3, st_tells(ft_info)).
+
+other_night_substep(fortune_teller, 1, st_asks(choose_two)).
+other_night_substep(fortune_teller, 2, player_chooses(two_players)).
+other_night_substep(fortune_teller, 3, st_tells(ft_info)).
+
+% Other Night Order for Trouble Brewing
+% Role order determines which role acts when (on nights 2+)
+other_night_role_order(poisoner, 1).
+other_night_role_order(monk, 2).
+other_night_role_order(scarlet_woman, 3).
+other_night_role_order(imp, 4).
+other_night_role_order(ravenkeeper, 5).
+other_night_role_order(empath, 6).
+other_night_role_order(fortune_teller, 7).
+other_night_role_order(undertaker, 8).
+other_night_role_order(butler, 9).
+other_night_role_order(spy, 10).
 
 % Fortune teller has a "red herring" - one player who always registers as demon to them
 % This is placed during setup, not during the fortune teller's turn
-% For now, we'll model this as a reminder token placed at time 0
 
 { reminder_on(ft_red_herring, P, night(1, 0, 0)) : player(P) } = 1 :-
     assigned(0, _, fortune_teller).
@@ -338,6 +360,52 @@ first_night_substep(fortune_teller, 3, st_tells(fortune_teller_info)).
 :- reminder_on(ft_red_herring, P, T),
    not registers_as(P, good, T).
 
+% Fortune teller chooses 2 different players (unordered set)
+% ft_choice(FT, P, T) means FT chose player P at time T
+{ ft_choice(FT, P, T) : player(P) } = 2 :-
+    assigned(0, FT, fortune_teller),
+    acting_role(T, fortune_teller).
+
+% Convert to player_chooses signals (one for each chosen player)
+player_chooses(fortune_teller, FT, point(P), T) :-
+    ft_choice(FT, P, T).
+
+% A player "pings as demon" to the fortune teller if:
+% - They are the actual demon, OR
+% - They have the red herring token
+ft_pings_as_demon(P, T) :-
+    assigned(0, P, R),
+    demon(R),
+    time(T).
+
+ft_pings_as_demon(P, T) :-
+    reminder_on(ft_red_herring, P, T).
+
+% Helper: FT got a ping if any chosen player pings
+ft_got_ping(FT, T) :-
+    ft_choice(FT, P, T),
+    ft_pings_as_demon(P, T).
+
+% Fortune teller st_tells: yes if either chosen player pings as demon
+% When functioning: answer must be accurate
+st_tells(fortune_teller, FT, yes, T) :-
+    acting_role(T, fortune_teller),
+    assigned(0, FT, fortune_teller),
+    functioning(FT, T),
+    ft_got_ping(FT, T).
+
+st_tells(fortune_teller, FT, no, T) :-
+    acting_role(T, fortune_teller),
+    assigned(0, FT, fortune_teller),
+    functioning(FT, T),
+    not ft_got_ping(FT, T).
+
+% When malfunctioning: ST can say yes or no
+{ st_tells(fortune_teller, FT, yes, T) ; st_tells(fortune_teller, FT, no, T) } = 1 :-
+    acting_role(T, fortune_teller),
+    assigned(0, FT, fortune_teller),
+    not functioning(FT, T).
+
 % ===========================================================================
 % Butler: chooses a master, can only vote when master votes
 % ===========================================================================
@@ -345,13 +413,16 @@ first_night_substep(butler, 1, st_asks(choose_master)).
 first_night_substep(butler, 2, player_chooses(master)).
 first_night_substep(butler, 3, st_places(but_master)).
 
-{ reminder_on(but_master, P, night(1, RoleOrd, 3)) : player(P) } = 1 :-
+% Butler player choice: choose any other player as master
+{ player_chooses(butler, Butler, point(P), T) : player(P), P != Butler } = 1 :-
+    T = night(1, RoleOrd, 2),
     first_night_role_order(butler, RoleOrd),
-    assigned(0, _, butler).
+    assigned(0, Butler, butler).
 
-% Butler cannot choose themselves as master
-:- reminder_on(but_master, P, _),
-   assigned(0, P, butler).
+% Butler reminder token placement: ST places token on the chosen master
+reminder_on(but_master, P, night(1, RoleOrd, 3)) :-
+    first_night_role_order(butler, RoleOrd),
+    player_chooses(butler, _, point(P), night(1, RoleOrd, 2)).
 
 % ===========================================================================
 % Spy: sees the grimoire (no mechanical effect to model here)

@@ -9,27 +9,44 @@ time(night(1, RoleOrd, S)) :-
     first_night_substep(Role, S, _),
     assigned(0, _, Role).
 
+% Other nights (2+) use other_night_role_order and other_night_substep
+% night_number/1 defines which nights we're modeling
+night_number(1).  % always model night 1
+
+time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
+time(night(N, RoleOrd, S)) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    assigned(0, _, Role).
+
 % Which role is acting at a given time point
 acting_role(night(1, RoleOrd, S), Role) :-
     first_night_role_order(Role, RoleOrd),
     first_night_substep(Role, S, _),
     assigned(0, _, Role).
 
+acting_role(night(N, RoleOrd, S), Role) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    assigned(0, _, Role).
+
 % Ordering: next(T1, T2) means T2 immediately follows T1
-% Ordering is just numeric comparison on (RoleOrder, Substep)
+% Ordering is just numeric comparison on (RoleOrder, Substep) within same night
 next(T1, T2) :-
     time(T1), time(T2),
-    T1 = night(1, R1, S1),
-    T2 = night(1, R2, S2),
+    T1 = night(N, R1, S1),
+    T2 = night(N, R2, S2),
     (R1, S1) < (R2, S2),
     not between(T1, T2).
 
 % between(T1, T2) is true if there's some T3 strictly between T1 and T2
 between(T1, T2) :-
     time(T1), time(T2), time(T3),
-    T1 = night(1, R1, S1),
-    T2 = night(1, R2, S2),
-    T3 = night(1, R3, S3),
+    T1 = night(N, R1, S1),
+    T2 = night(N, R2, S2),
+    T3 = night(N, R3, S3),
     (R1, S1) < (R3, S3),
     (R3, S3) < (R2, S2).
 
@@ -78,6 +95,9 @@ signal(point(R)) :- role(R).
 
 % st_tells(Role, Player, Message, T) - ST communicates Message to Player
 % as part of Role's ability at time T
+
+% player_chooses(Role, Player, Choice, T) - Player communicates Choice to ST
+% as part of Role's ability at time T (in response to ST's request)
 
 % Categories for registration (role type and alignment)
 category(townsfolk).
