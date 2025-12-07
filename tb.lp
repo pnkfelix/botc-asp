@@ -407,7 +407,7 @@ st_tells(fortune_teller, FT, no, T) :-
     not functioning(FT, T).
 
 % ===========================================================================
-% Butler: chooses a master, can only vote when master votes
+% Butler: chooses a master each night
 % ===========================================================================
 first_night_substep(butler, 1, st_asks(choose_master)).
 first_night_substep(butler, 2, player_chooses(master)).
@@ -424,46 +424,8 @@ reminder_on(but_master, P, night(1, RoleOrd, 3)) :-
     first_night_role_order(butler, RoleOrd),
     player_chooses(butler, _, point(P), night(1, RoleOrd, 2)).
 
-% Butler voting restriction: Butler can only vote when master votes
-% This is a constraint that makes scenarios UNSAT if butler votes without master
-:- assigned(0, Butler, butler),
-   vote(Butler, N, K),
-   reminder_on(but_master, Master, _),
-   not vote(Master, N, K).
-
 % ===========================================================================
-% Virgin: if a Townsfolk nominates the Virgin, that Townsfolk is executed
-% ===========================================================================
-
-% Virgin ability triggers when:
-% 1. Virgin is functioning
-% 2. Nominator registers as Townsfolk
-% The nominator dies immediately and the day ends
-virgin_triggered(Nominator, N, K) :-
-    nomination(Nominator, Virgin, N, K),
-    assigned(0, Virgin, virgin),
-    functioning(Virgin, day(N, nom(K))),
-    registers_as(Nominator, townsfolk, day(N, nom(K))).
-
-% The nominator is executed when virgin is triggered
-executed(Nominator, N) :- virgin_triggered(Nominator, N, K).
-
-% Virgin triggering ends the day (counts as execution for day ending purposes)
-day_ends(N) :- virgin_triggered(_, N, _).
-
-% Virgin ability is used up after first trigger (one-shot ability)
-% Mark with reminder token so it can't trigger again
-reminder_on(vir_no_ability, Virgin, day(N, nom(K))) :-
-    virgin_triggered(_, N, K),
-    assigned(0, Virgin, virgin).
-
-% Virgin doesn't trigger if ability already used
-:- virgin_triggered(_, N1, K1),
-   virgin_triggered(_, N2, K2),
-   (N1, K1) != (N2, K2).
-
-% ===========================================================================
-% Slayer: once per game, publicly chooses a player; if demon, they die
+% Slayer: once per game, publicly chooses a player; if registers as demon, they die
 % ===========================================================================
 
 % slayer_shot(Slayer, Target, Day) - Slayer uses ability on Target during Day
@@ -472,22 +434,26 @@ reminder_on(vir_no_ability, Virgin, day(N, nom(K))) :-
 % Validate: Slayer must be assigned the slayer role
 :- slayer_shot(Slayer, _, _), not assigned(0, Slayer, slayer).
 
-% Validate: Both must be alive
+% Validate: Both must be alive at start of day
 :- slayer_shot(Slayer, _, N), not alive(Slayer, day(N, 0)).
 :- slayer_shot(_, Target, N), not alive(Target, day(N, 0)).
 
-% Slayer ability works if Slayer is functioning and target is the demon
-slayer_kills(Slayer, Target, N) :-
+% Slayer gets "no ability" token when they use their shot (regardless of functioning)
+% This happens even if drunk/poisoned - the shot is still "used"
+reminder_on(sla_no_ability, Slayer, day(N, 0)) :- slayer_shot(Slayer, _, N).
+
+% Slayer can only use ability once (enforced by reminder token)
+:- slayer_shot(Slayer, _, N),
+   reminder_on(sla_no_ability, Slayer, T),
+   T = day(N2, _), N2 < N.
+
+% Slayer ability: if Slayer is functioning AND target registers as demon, target dies
+% Note: For Recluse, registers_as(recluse, demon, T) is a CHOICE - ST decides
+% So Recluse CAN die (if ST chooses demon registration) but doesn't HAVE to
+died(Target, day(N, 0)) :-
     slayer_shot(Slayer, Target, N),
     functioning(Slayer, day(N, 0)),
-    assigned(0, Target, R),
-    demon(R).
-
-% Target dies if slayer ability works
-died(Target, day(N, 0)) :- slayer_kills(_, Target, N).
-
-% Slayer can only use ability once per game
-:- slayer_shot(S, _, N1), slayer_shot(S, _, N2), N1 != N2.
+    registers_as(Target, demon, day(N, 0)).
 
 % ===========================================================================
 % Spy: sees the grimoire (no mechanical effect to model here)

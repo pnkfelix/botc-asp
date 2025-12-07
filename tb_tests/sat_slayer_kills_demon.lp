@@ -1,4 +1,4 @@
-% Test: Slayer kills the demon when shooting them
+% Test: Functioning Slayer kills the demon when shooting them
 #include "base.lp".
 
 assigned(0, amanda, slayer).
@@ -13,10 +13,8 @@ assigned(0, felix, poisoner).
 % Day 1: amanda (slayer) shoots steph (demon)
 slayer_shot(amanda, steph, 1).
 
-st_ends_day(1).
+% Assert: steph (demon) should die
+:- not died(steph, day(1, 0)).
 
-% Assert: slayer ability worked
-:- not slayer_kills(amanda, steph, 1).
-
-% Assert: steph (demon) is dead
-:- alive(steph, day(1, exec)).
+% Assert: slayer gets "no ability" token
+:- not reminder_on(sla_no_ability, amanda, day(1, 0)).

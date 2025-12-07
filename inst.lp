@@ -6,12 +6,8 @@
 assigned(0, felix, drunk).
 assigned(0, amanda, poisoner).
 assigned(0, rob, washerwoman).
-
-% Force poisoner to poison felix (not the washerwoman)
-reminder_on(poisoner_poisoned, felix, night(1, 1, 3)).
-
-% Try to force the washerwoman to see the poisoner as the townsfolk (should be UNSAT)
-reminder_on(washerwoman_townsfolk, amanda, night(1, 2, 1)).
+assigned(0, taylor, librarian).
+assigned(0, courtney, investigator).
 
 #show distrib/1.
 #show assigned/3.
