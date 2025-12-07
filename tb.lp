@@ -35,16 +35,45 @@ first_night_substep(poisoner, 1, st_asks(choose_target)).
 first_night_substep(poisoner, 2, player_chooses(target)).
 first_night_substep(poisoner, 3, st_places(poisoned)).
 
-% Poisoner player choice: choose any other player to poison
+other_night_substep(poisoner, 1, st_asks(choose_target)).
+other_night_substep(poisoner, 2, player_chooses(target)).
+other_night_substep(poisoner, 3, st_places(poisoned)).
+
+% Poisoner player choice: choose any other player to poison (night 1)
 { player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
     T = night(1, RoleOrd, 2),
     first_night_role_order(poisoner, RoleOrd),
     assigned(0, Poisoner, poisoner).
 
-% Poisoner reminder token placement: ST places token on the chosen player
+% Poisoner player choice: choose any other player to poison (other nights)
+% Poisoner must be alive to act
+{ player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
+    T = night(N, RoleOrd, 2),
+    night_number(N), N > 1,
+    other_night_role_order(poisoner, RoleOrd),
+    assigned(0, Poisoner, poisoner),
+    alive(Poisoner, night(N, 0, 0)).
+
+% Poisoner reminder token placement: ST places token on the chosen player (night 1)
 reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) :-
     first_night_role_order(poisoner, RoleOrd),
     player_chooses(poisoner, _, point(P), night(1, RoleOrd, 2)).
+
+% Poisoner reminder token placement: ST places token on the chosen player (other nights)
+reminder_on(poi_poisoned, P, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(poisoner, RoleOrd),
+    player_chooses(poisoner, _, point(P), night(N, RoleOrd, 2)).
+
+% Remove old poison token at start of night when Poisoner picks new target
+% The new token placement overwrites this via the explicit rule above
+token_removed(poi_poisoned, P, night(N, 0, 0)) :-
+    night_number(N), N > 1,
+    reminder_on(poi_poisoned, P, day(N-1, exec)),
+    assigned(0, _, poisoner).
+
+% Token removal blocks inertia
+:- reminder_on(poi_poisoned, P, T), token_removed(poi_poisoned, P, T).
 
 % The poisoner's token causes impairment
 causes_impairment(poi_poisoned).
@@ -290,34 +319,35 @@ st_tells(chef, Chef, count(N), T) :-
     not functioning(Chef, T).
 
 % ===========================================================================
-% Empath: learns how many of their alive neighbors are evil
+% Empath: learns how many of their living neighbors are evil
+% Living neighbors = closest alive player in each direction (skips dead)
 % ===========================================================================
 first_night_substep(empath, 1, st_tells(empath_info)).
+other_night_substep(empath, 1, st_tells(empath_info)).
 
 % Empath info is derived from grimoire state, no reminder tokens needed
 % The ST tells the empath a number; if functioning, it must be accurate
 
-% Count how many of the empath's neighbors register as evil
-% Note: On night 1, everyone is alive, so we don't need to check alive status yet
+% Count how many of the empath's living neighbors register as evil
 empath_evil_neighbor_count(Empath, N, T) :-
     assigned(0, Empath, empath),
     time(T),
-    N = #count { P : neighbor(Empath, P), registers_as(P, evil, T) }.
+    N = #count { P : living_neighbor(Empath, P, T), registers_as(P, evil, T) }.
 
 % Empath st_tells: ST tells the empath a count (0, 1, or 2)
 % When functioning, the count must match the actual neighbor evil count
 st_tells(empath, Empath, count(N), T) :-
-    T = night(1, RoleOrd, 1),
-    first_night_role_order(empath, RoleOrd),
+    acting_role(T, empath),
     assigned(0, Empath, empath),
+    alive(Empath, T),
     functioning(Empath, T),
     empath_evil_neighbor_count(Empath, N, T).
 
 % When malfunctioning, ST can tell any count from 0 to 2
 { st_tells(empath, Empath, count(N), T) : N = 0..2 } = 1 :-
-    T = night(1, RoleOrd, 1),
-    first_night_role_order(empath, RoleOrd),
+    acting_role(T, empath),
     assigned(0, Empath, empath),
+    alive(Empath, T),
     not functioning(Empath, T).
 
 % ===========================================================================
@@ -454,6 +484,45 @@ died(Target, day(N, 0)) :-
     slayer_shot(Slayer, Target, N),
     functioning(Slayer, day(N, 0)),
     registers_as(Target, demon, day(N, 0)).
+
+% ===========================================================================
+% Imp: each night (except the first), chooses a player to kill
+% ===========================================================================
+other_night_substep(imp, 1, st_asks(choose_target)).
+other_night_substep(imp, 2, player_chooses(kill_target)).
+other_night_substep(imp, 3, st_places(imp_dead)).
+
+% Imp player choice: choose any player to kill (can choose self for starpass)
+% Imp must be alive to act
+{ player_chooses(imp, Imp, point(P), T) : player(P) } = 1 :-
+    T = night(N, RoleOrd, 2),
+    night_number(N), N > 1,
+    other_night_role_order(imp, RoleOrd),
+    assigned(0, Imp, imp),
+    alive(Imp, night(N, 0, 0)).
+
+% Imp places "dead" token on chosen target (if imp is functioning)
+% Token is placed regardless of protection - protection blocks the death, not the targeting
+% Token is NOT placed if imp is drunk/poisoned
+reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(imp, RoleOrd),
+    player_chooses(imp, Imp, point(Target), night(N, RoleOrd, 2)),
+    functioning(Imp, night(N, RoleOrd, 3)).
+
+% Player with imp_dead token is impaired (no ability, won't wake)
+% Exception roles like Ravenkeeper will have their own rules
+causes_impairment(imp_dead).
+
+% At dawn (end of night), the death becomes public - player dies
+% But only if not protected from demon
+died(P, T) :-
+    final_night_time(N, T),
+    reminder_on(imp_dead, P, T),
+    not protected_from_demon(P, T).
+
+% Placeholder for protection - will be implemented with Monk/Soldier
+% protected_from_demon(P, T) blocks demon kills
 
 % ===========================================================================
 % Spy: sees the grimoire (no mechanical effect to model here)

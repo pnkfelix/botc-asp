@@ -12,6 +12,7 @@ time(night(1, RoleOrd, S)) :-
 % Other nights (2+) use other_night_role_order and other_night_substep
 % night_number/1 defines which nights we're modeling
 night_number(1).  % always model night 1
+% night_number(2). % uncomment or add in test to model night 2
 
 time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
 time(night(N, RoleOrd, S)) :-
@@ -61,6 +62,66 @@ neighbor(P1, P2) :-
 
 % neighbor is symmetric
 neighbor(P1, P2) :- neighbor(P2, P1).
+
+% ===========================================================================
+% Alive vs Publicly Alive
+% ===========================================================================
+% alive(P, T) = true dead/alive state (what ST knows, used for game mechanics)
+% publicly_alive(P, T) = what players see (death shroud not yet placed)
+%
+% During the night, a player killed by the demon has imp_dead token.
+% They are dead (for ability purposes) but publicly_alive (shroud placed at dawn).
+
+% A player is dead (from ST perspective) if they have a "dead tonight" token
+dead(P, T) :- reminder_on(imp_dead, P, T).
+
+% publicly_alive = alive and not yet revealed as dead
+% (The public death shroud is placed at dawn, so during night they look alive)
+publicly_alive(P, T) :- alive(P, T).
+
+% ===========================================================================
+% Living neighbors: the closest alive player in each direction
+% Used by Empath and potentially other roles
+% These use `alive` (ST perspective) not `publicly_alive`
+% ===========================================================================
+
+% clockwise_distance(P1, P2, D) = going clockwise from P1, P2 is D seats away
+clockwise_distance(P1, P2, D) :-
+    player(P1), player(P2), P1 != P2,
+    chair(P1, C1), chair(P2, C2),
+    D = (C2 - C1 + player_count) \ player_count.
+
+% living_neighbor(P1, P2, T) means P2 is a living neighbor of P1 at time T
+% P2 is a living neighbor if they're alive (not dead) and no one closer is alive
+
+% Clockwise living neighbor: closest alive player going clockwise
+living_neighbor_clockwise(P1, P2, T) :-
+    player(P1), player(P2), P1 != P2,
+    time(T),
+    alive(P2, T),
+    not dead(P2, T),
+    clockwise_distance(P1, P2, D),
+    not closer_alive_clockwise(P1, P2, D, T).
+
+% There's a closer alive (and not dead) player clockwise
+closer_alive_clockwise(P1, P2, D, T) :-
+    player(P1), player(P2), player(P3),
+    P1 != P2, P1 != P3, P2 != P3,
+    time(T),
+    alive(P3, T),
+    not dead(P3, T),
+    clockwise_distance(P1, P2, D),
+    clockwise_distance(P1, P3, D3),
+    D3 < D.
+
+% Counter-clockwise living neighbor: closest alive player going counter-clockwise
+% This is equivalent to clockwise with reversed direction
+living_neighbor_counterclockwise(P1, P2, T) :-
+    living_neighbor_clockwise(P2, P1, T).
+
+% A player's living neighbors are the closest alive player in each direction
+living_neighbor(P1, P2, T) :- living_neighbor_clockwise(P1, P2, T).
+living_neighbor(P1, P2, T) :- living_neighbor_counterclockwise(P1, P2, T).
 
 % Reminder token inertia: once placed, tokens persist to the next time point
 reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2).
@@ -247,6 +308,9 @@ alive(P, day(N, 0)) :- alive(P, T), final_night_time(N, T).
 final_night_time(N, T) :-
     time(T), T = night(N, _, _),
     not next(T, T2) : time(T2), T2 = night(N, _, _).
+
+% Alive at start of night N+1 = alive at end of day N
+alive(P, night(N+1, 0, 0)) :- alive(P, day(N, exec)), night_number(N+1).
 
 % ===========================================================================
 % Day Time Structure (simplified)
