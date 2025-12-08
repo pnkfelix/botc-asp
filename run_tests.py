@@ -255,6 +255,12 @@ def main():
         action="store_true",
         help="Don't save timing data (useful for in-development tests)"
     )
+    parser.add_argument(
+        "--format",
+        choices=["rich", "plain"],
+        default=None,
+        help="Output format (default: rich if available, else plain)"
+    )
     args = parser.parse_args()
 
     root_dir = Path(__file__).parent
@@ -280,11 +286,18 @@ def main():
             print("No test files found (sat_*.lp or unsat_*.lp)")
         return 0
 
-    if RICH_AVAILABLE:
+    use_rich = (args.format == "rich") or (args.format is None and RICH_AVAILABLE)
+
+    if use_rich and not RICH_AVAILABLE:
+        print("Error: --format=rich requires the 'rich' package (pip install rich)")
+        return 1
+
+    if use_rich:
         fail_count = run_tests_rich(test_files, save_timings=not args.no_save_timing_data)
     else:
-        print("(Install 'rich' for nicer output: pip install rich)")
-        print()
+        if not RICH_AVAILABLE and args.format is None:
+            print("(Install 'rich' for nicer output: pip install rich)")
+            print()
         fail_count = run_tests_plain(test_files, save_timings=not args.no_save_timing_data)
 
     return 1 if fail_count > 0 else 0
