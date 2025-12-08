@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Test runner for Blood on the Clocktower ASP tests."""
 
+import argparse
 import fcntl
 import json
+import re
 import socket
 import statistics
 import subprocess
@@ -239,6 +241,15 @@ def run_tests_plain(test_files: list[Path]) -> int:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run Blood on the Clocktower ASP tests")
+    parser.add_argument(
+        "pattern",
+        nargs="?",
+        default=None,
+        help="Regex pattern to filter test names (e.g., 'night2', 'empath')"
+    )
+    args = parser.parse_args()
+
     root_dir = Path(__file__).parent
 
     # Find all test files in *_tests/ subdirectories
@@ -246,8 +257,20 @@ def main():
         list(root_dir.glob("*_tests/sat_*.lp")) + list(root_dir.glob("*_tests/unsat_*.lp"))
     )
 
+    # Filter by regex pattern if provided
+    if args.pattern:
+        try:
+            pattern = re.compile(args.pattern, re.IGNORECASE)
+            test_files = [f for f in test_files if pattern.search(f.name)]
+        except re.error as e:
+            print(f"Invalid regex pattern: {e}")
+            return 1
+
     if not test_files:
-        print("No test files found (sat_*.lp or unsat_*.lp)")
+        if args.pattern:
+            print(f"No test files matching '{args.pattern}'")
+        else:
+            print("No test files found (sat_*.lp or unsat_*.lp)")
         return 0
 
     if RICH_AVAILABLE:
