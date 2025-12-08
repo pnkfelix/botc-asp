@@ -351,6 +351,40 @@ st_tells(empath, Empath, count(N), T) :-
     not functioning(Empath, T).
 
 % ===========================================================================
+% Undertaker: learns the role of the player executed the previous day
+% Acts on other nights only (not night 1)
+% ===========================================================================
+other_night_substep(undertaker, 1, st_tells(undertaker_info)).
+
+% Helper: who was executed on the previous day
+executed_previous_day(P, N) :-
+    night_number(N), N > 1,
+    executed(P, N-1).
+
+% When functioning, ST tells the undertaker the executed player's role
+% (or a role they could register as, for Spy/Recluse)
+st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
+    night_number(N), N > 1,
+    other_night_role_order(undertaker, RoleOrd),
+    assigned(0, UT, undertaker),
+    alive(UT, night(N, 0, 0)),
+    functioning(UT, night(N, RoleOrd, 1)),
+    executed_previous_day(P, N),
+    may_register_as_role(P, R, night(N, RoleOrd, 1)).
+
+% When malfunctioning, ST can say any role
+{ st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) : role(R) } = 1 :-
+    night_number(N), N > 1,
+    other_night_role_order(undertaker, RoleOrd),
+    assigned(0, UT, undertaker),
+    alive(UT, night(N, 0, 0)),
+    not functioning(UT, night(N, RoleOrd, 1)),
+    executed_previous_day(_, N).
+
+% If no one was executed the previous day, undertaker gets no info
+% (no st_tells is generated)
+
+% ===========================================================================
 % Fortune Teller: chooses 2 players, learns if either is the demon
 % Acts on first night and every other night
 % ===========================================================================
