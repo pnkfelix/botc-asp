@@ -343,4 +343,6 @@ died(P, day(N, exec)) :- executed(P, N).
 % Validate: executed player must have been alive at start of day
 :- executed(P, N), not alive(P, day(N, 0)).
 
+% DEBUG TIP: If you hit an unexpected UNSAT, try commenting out the line below
+% to rule out domain constraint violations (e.g., typos in player/role names).
 #include "types.lp".
