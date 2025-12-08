@@ -151,7 +151,7 @@ def build_table(results: list, current_test: str | None = None, current_idx: int
     return table
 
 
-def run_tests_rich(test_files: list[Path]) -> int:
+def run_tests_rich(test_files: list[Path], save_timings: bool = True) -> int:
     """Run tests with rich output."""
     console = Console()
     results = []
@@ -170,9 +170,10 @@ def run_tests_rich(test_files: list[Path]) -> int:
             actual, elapsed = run_clingo(test_file)
             passed = (expected == actual)
 
-            # Calculate timing summary and save new timing
+            # Calculate timing summary and optionally save new timing
             history_str, is_outlier = timing_summary(timings, elapsed)
-            save_timing(timing_file, timings, elapsed)
+            if save_timings:
+                save_timing(timing_file, timings, elapsed)
 
             results.append((test_file.name, expected, actual, elapsed, passed, history_str, is_outlier))
             live.update(build_table(results, test_file.name if idx < total else None, idx, total))
@@ -193,7 +194,7 @@ def run_tests_rich(test_files: list[Path]) -> int:
     return fail_count
 
 
-def run_tests_plain(test_files: list[Path]) -> int:
+def run_tests_plain(test_files: list[Path], save_timings: bool = True) -> int:
     """Run tests with plain output (no rich)."""
     pass_count = 0
     fail_count = 0
@@ -212,9 +213,10 @@ def run_tests_plain(test_files: list[Path]) -> int:
         actual, elapsed = run_clingo(test_file)
         passed = (expected == actual)
 
-        # Calculate timing summary and save new timing
+        # Calculate timing summary and optionally save new timing
         history_str, is_outlier = timing_summary(timings, elapsed)
-        save_timing(timing_file, timings, elapsed)
+        if save_timings:
+            save_timing(timing_file, timings, elapsed)
 
         if is_outlier:
             outlier_count += 1
@@ -248,6 +250,11 @@ def main():
         default=None,
         help="Regex pattern to filter test names (e.g., 'night2', 'empath')"
     )
+    parser.add_argument(
+        "--no-save-timing-data",
+        action="store_true",
+        help="Don't save timing data (useful for in-development tests)"
+    )
     args = parser.parse_args()
 
     root_dir = Path(__file__).parent
@@ -274,11 +281,11 @@ def main():
         return 0
 
     if RICH_AVAILABLE:
-        fail_count = run_tests_rich(test_files)
+        fail_count = run_tests_rich(test_files, save_timings=not args.no_save_timing_data)
     else:
         print("(Install 'rich' for nicer output: pip install rich)")
         print()
-        fail_count = run_tests_plain(test_files)
+        fail_count = run_tests_plain(test_files, save_timings=not args.no_save_timing_data)
 
     return 1 if fail_count > 0 else 0
 
