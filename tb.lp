@@ -392,21 +392,34 @@ other_night_role_order(spy, 10).
 
 % Fortune teller chooses 2 different players (unordered set)
 % ft_choice(FT, P, T) means FT chose player P at time T
-{ ft_choice(FT, P, T) : player(P) } = 2 :-
+% Choice happens at substep 2 only
+{ ft_choice(FT, P, night(N, RoleOrd, 2)) : player(P) } = 2 :-
     assigned(0, FT, fortune_teller),
-    acting_role(T, fortune_teller).
+    first_night_role_order(fortune_teller, RoleOrd),
+    N = 1.
+
+{ ft_choice(FT, P, night(N, RoleOrd, 2)) : player(P) } = 2 :-
+    assigned(0, FT, fortune_teller),
+    other_night_role_order(fortune_teller, RoleOrd),
+    night_number(N), N > 1.
+
+% Choice persists from substep 2 to substep 3 (when ST tells result)
+ft_choice(FT, P, night(N, RoleOrd, 3)) :-
+    ft_choice(FT, P, night(N, RoleOrd, 2)).
+
+% ft_choice must include any players specified via player_chooses
+:- player_chooses(fortune_teller, FT, point(P), T),
+   not ft_choice(FT, P, T).
 
 % Convert to player_chooses signals (one for each chosen player)
 player_chooses(fortune_teller, FT, point(P), T) :-
     ft_choice(FT, P, T).
 
 % A player "pings as demon" to the fortune teller if:
-% - They are the actual demon, OR
+% - They register as demon (actual demon or Recluse), OR
 % - They have the red herring token
 ft_pings_as_demon(P, T) :-
-    assigned(0, P, R),
-    demon(R),
-    time(T).
+    registers_as(P, demon, T).
 
 ft_pings_as_demon(P, T) :-
     reminder_on(ft_red_herring, P, T).
@@ -521,8 +534,47 @@ died(P, T) :-
     reminder_on(imp_dead, P, T),
     not protected_from_demon(P, T).
 
-% Placeholder for protection - will be implemented with Monk/Soldier
-% protected_from_demon(P, T) blocks demon kills
+% ===========================================================================
+% Monk: protects a player from the demon (other nights only)
+% ===========================================================================
+other_night_substep(monk, 1, st_asks(choose_target)).
+other_night_substep(monk, 2, player_chooses(target)).
+other_night_substep(monk, 3, st_places(monk_protected)).
+
+% Monk chooses a player to protect (cannot choose self)
+{ player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)) : player(P), P != Monk } = 1 :-
+    night_number(N), N > 1,
+    other_night_role_order(monk, RoleOrd),
+    assigned(0, Monk, monk),
+    alive(Monk, night(N, 0, 0)),
+    functioning(Monk, night(N, RoleOrd, 2)).
+
+% If monk is drunk/poisoned, they still choose but it has no effect
+% (we still need them to choose so the game flow continues)
+{ player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)) : player(P), P != Monk } = 1 :-
+    night_number(N), N > 1,
+    other_night_role_order(monk, RoleOrd),
+    assigned(0, Monk, monk),
+    alive(Monk, night(N, 0, 0)),
+    not functioning(Monk, night(N, RoleOrd, 2)).
+
+% Monk reminder token placement
+reminder_on(monk_protected, P, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(monk, RoleOrd),
+    player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)),
+    assigned(0, Monk, monk),
+    functioning(Monk, night(N, RoleOrd, 2)).
+
+% Protection only lasts for the night - remove at start of next night
+token_removed(monk_protected, P, night(N, 0, 0)) :-
+    night_number(N), N > 1,
+    reminder_on(monk_protected, P, day(N-1, exec)).
+
+:- reminder_on(monk_protected, P, T), token_removed(monk_protected, P, T).
+
+% A player with the monk_protected token is protected from demon kills
+protected_from_demon(P, T) :- reminder_on(monk_protected, P, T).
 
 % ===========================================================================
 % Spy: sees the grimoire (no mechanical effect to model here)

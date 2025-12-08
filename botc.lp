@@ -4,10 +4,19 @@
 % night(1, R, S) is substep S of the role at position R in the night order
 
 time(night(1, 0, 0)).  % setup state before any actions on night 1
+
+% Generate time for roles that are actually assigned
 time(night(1, RoleOrd, S)) :-
     first_night_role_order(Role, RoleOrd),
     first_night_substep(Role, S, _),
     assigned(0, _, Role).
+
+% Also generate time for roles that players THINK they are (e.g., Drunk thinks they're Empath)
+% This is needed because the ST still "wakes" them and gives them (fake) info
+time(night(1, RoleOrd, S)) :-
+    first_night_role_order(Role, RoleOrd),
+    first_night_substep(Role, S, _),
+    received(_, Role).
 
 % Other nights (2+) use other_night_role_order and other_night_substep
 % night_number/1 defines which nights we're modeling
@@ -15,23 +24,42 @@ night_number(1).  % always model night 1
 % night_number(2). % uncomment or add in test to model night 2
 
 time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
+
 time(night(N, RoleOrd, S)) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
     assigned(0, _, Role).
 
+time(night(N, RoleOrd, S)) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    received(_, Role).
+
 % Which role is acting at a given time point
+% Includes both assigned roles and roles players think they are (received tokens)
 acting_role(night(1, RoleOrd, S), Role) :-
     first_night_role_order(Role, RoleOrd),
     first_night_substep(Role, S, _),
     assigned(0, _, Role).
+
+acting_role(night(1, RoleOrd, S), Role) :-
+    first_night_role_order(Role, RoleOrd),
+    first_night_substep(Role, S, _),
+    received(_, Role).
 
 acting_role(night(N, RoleOrd, S), Role) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
     assigned(0, _, Role).
+
+acting_role(night(N, RoleOrd, S), Role) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    received(_, Role).
 
 % Ordering: next(T1, T2) means T2 immediately follows T1
 % Ordering is just numeric comparison on (RoleOrder, Substep) within same night
