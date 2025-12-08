@@ -10,6 +10,7 @@ import statistics
 import subprocess
 import sys
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 try:
@@ -156,15 +157,48 @@ def build_table(results: list, current_test: str | None = None, current_idx: int
     return table
 
 
-def run_tests_rich(test_files: list[Path], save_timings: bool = True, show_history: bool = True) -> int:
-    """Run tests with rich output."""
-    console = Console()
+def run_tests(test_files: list[Path], save_timings: bool = True, show_history: bool = True, use_rich: bool = True) -> int:
+    """Run tests with either rich or plain output."""
     results = []
     total = len(test_files)
 
-    with Live(build_table(results, None, 0, total, show_history=show_history), console=console, refresh_per_second=4) as live:
+    # Set up display functions based on output mode
+    if use_rich:
+        console = Console()
+        live_ctx = Live(build_table(results, None, 0, total, show_history=show_history), console=console, refresh_per_second=4)
+
+        def on_test_start(idx, test_file):
+            live_ctx.update(build_table(results, test_file.name, idx, total, show_history=show_history))
+
+        def on_test_end(idx, test_file, result):
+            results.append(result)
+            live_ctx.update(build_table(results, test_file.name if idx < total else None, idx, total, show_history=show_history))
+    else:
+        live_ctx = nullcontext()
+
+        def on_test_start(idx, test_file):
+            print(f"[{idx}/{total}] Testing {test_file.name}...", end=" ", flush=True)
+
+        def on_test_end(idx, test_file, result):
+            name, expected, actual, elapsed, passed, history_str, is_outlier = result
+            results.append(result)
+
+            time_info = f"{elapsed:.2f}s"
+            if show_history:
+                if is_outlier:
+                    time_info += " (!)"
+                if history_str:
+                    time_info += f" {history_str}"
+
+            if passed:
+                print(f"PASS ({time_info})")
+            else:
+                print(f"FAIL {actual} (!!!) ({time_info})")
+
+    # Main test loop
+    with live_ctx:
         for idx, test_file in enumerate(test_files, 1):
-            live.update(build_table(results, test_file.name, idx, total, show_history=show_history))
+            on_test_start(idx, test_file)
 
             # Load historical timings
             timing_file = get_timing_file(test_file)
@@ -180,71 +214,30 @@ def run_tests_rich(test_files: list[Path], save_timings: bool = True, show_histo
             if save_timings:
                 save_timing(timing_file, timings, elapsed)
 
-            results.append((test_file.name, expected, actual, elapsed, passed, history_str, is_outlier))
-            live.update(build_table(results, test_file.name if idx < total else None, idx, total, show_history=show_history))
+            result = (test_file.name, expected, actual, elapsed, passed, history_str, is_outlier)
+            on_test_end(idx, test_file, result)
 
+    # Print summary
     pass_count = sum(1 for r in results if r[4])
     fail_count = len(results) - pass_count
     outlier_count = sum(1 for r in results if r[6])
 
-    console.print()
-    if fail_count == 0:
-        msg = f"[green bold]All {pass_count} tests passed![/green bold]"
-        if show_history and outlier_count > 0:
-            msg += f" [yellow]({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})[/yellow]"
-        console.print(msg)
-    else:
-        console.print(f"[red bold]{fail_count} failed[/red bold], [green]{pass_count} passed[/green]")
-
-    return fail_count
-
-
-def run_tests_plain(test_files: list[Path], save_timings: bool = True, show_history: bool = True) -> int:
-    """Run tests with plain output (no rich)."""
-    pass_count = 0
-    fail_count = 0
-    outlier_count = 0
-    total = len(test_files)
-
-    for idx, test_file in enumerate(test_files, 1):
-        print(f"[{idx}/{total}] Testing {test_file.name}...", end=" ", flush=True)
-
-        # Load historical timings
-        timing_file = get_timing_file(test_file)
-        timings = load_timings(timing_file)
-
-        # Run test
-        expected = get_expected(test_file)
-        actual, elapsed = run_clingo(test_file)
-        passed = (expected == actual)
-
-        # Calculate timing summary and optionally save new timing
-        history_str, is_outlier = timing_summary(timings, elapsed)
-        if save_timings:
-            save_timing(timing_file, timings, elapsed)
-
-        if is_outlier:
-            outlier_count += 1
-
-        time_info = f"{elapsed:.2f}s"
-        if show_history:
-            if is_outlier:
-                time_info += " (!)"
-            if history_str:
-                time_info += f" {history_str}"
-
-        if passed:
-            print(f"PASS ({time_info})")
-            pass_count += 1
+    if use_rich:
+        console.print()
+        if fail_count == 0:
+            msg = f"[green bold]All {pass_count} tests passed![/green bold]"
+            if show_history and outlier_count > 0:
+                msg += f" [yellow]({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})[/yellow]"
+            console.print(msg)
         else:
-            print(f"FAIL {actual} (!!!) ({time_info})")
-            fail_count += 1
+            console.print(f"[red bold]{fail_count} failed[/red bold], [green]{pass_count} passed[/green]")
+    else:
+        print()
+        msg = f"Results: {pass_count} passed, {fail_count} failed"
+        if show_history and outlier_count > 0:
+            msg += f" ({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})"
+        print(msg)
 
-    print()
-    msg = f"Results: {pass_count} passed, {fail_count} failed"
-    if show_history and outlier_count > 0:
-        msg += f" ({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})"
-    print(msg)
     return fail_count
 
 
@@ -303,13 +296,16 @@ def main():
         print("Error: --format=rich requires the 'rich' package (pip install rich)")
         return 1
 
-    if use_rich:
-        fail_count = run_tests_rich(test_files, save_timings=not args.no_save_timing_data, show_history=not args.hide_timing_history)
-    else:
-        if not RICH_AVAILABLE and args.format is None:
-            print("(Install 'rich' for nicer output: pip install rich)")
-            print()
-        fail_count = run_tests_plain(test_files, save_timings=not args.no_save_timing_data, show_history=not args.hide_timing_history)
+    if not use_rich and not RICH_AVAILABLE and args.format is None:
+        print("(Install 'rich' for nicer output: pip install rich)")
+        print()
+
+    fail_count = run_tests(
+        test_files,
+        save_timings=not args.no_save_timing_data,
+        show_history=not args.hide_timing_history,
+        use_rich=use_rich
+    )
 
     return 1 if fail_count > 0 else 0
 
