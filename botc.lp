@@ -326,11 +326,12 @@ day_number(1).
 % Everyone is alive at the start of the game
 alive(P, night(1, 0, 0)) :- player(P).
 
-% Alive status persists through night unless killed
-alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1).
+% Alive status persists through night unless killed or dead
+alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1), not dead(P, T2).
 
 % Alive at start of day = alive at end of preceding night (unless they died that night)
-alive(P, day(N, 0)) :- alive(P, T), final_night_time(N, T), not died(P, T).
+% Note: dead(P, T) handles imp_dead token deaths during the night
+alive(P, day(N, 0)) :- alive(P, T), final_night_time(N, T), not died(P, T), not dead(P, T).
 
 % Helper: find the final time point of a night
 final_night_time(N, T) :-
