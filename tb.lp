@@ -266,6 +266,12 @@ may_register_as_role(P, R, T) :-
     may_misregister_as(P, minion),
     time(T).
 
+% Recluse can register as any demon role
+may_register_as_role(P, R, T) :-
+    demon(R),
+    may_misregister_as(P, demon),
+    time(T).
+
 % When functioning, role must match what inv_minion player can register as
 { st_tells(investigator, INV, point(R), T) : may_register_as_role(P, R, T) } = 1 :-
     T = night(1, RoleOrd, 3),
@@ -361,9 +367,8 @@ executed_previous_day(P, N) :-
     night_number(N), N > 1,
     executed(P, N-1).
 
-% When functioning, ST tells the undertaker the executed player's role
-% (or a role they could register as, for Spy/Recluse)
-st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
+% When functioning, ST may tell any role the executed player registers as
+st_may_tell(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
     night_number(N), N > 1,
     other_night_role_order(undertaker, RoleOrd),
     assigned(0, UT, undertaker),
@@ -372,13 +377,23 @@ st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
     executed_previous_day(P, N),
     may_register_as_role(P, R, night(N, RoleOrd, 1)).
 
-% When malfunctioning, ST can say any role
-{ st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) : role(R) } = 1 :-
+% When malfunctioning, ST may tell any role
+st_may_tell(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
     night_number(N), N > 1,
     other_night_role_order(undertaker, RoleOrd),
     assigned(0, UT, undertaker),
     alive(UT, night(N, 0, 0)),
     not functioning(UT, night(N, RoleOrd, 1)),
+    executed_previous_day(_, N),
+    role(R).
+
+% ST picks exactly one from what they may tell
+{ st_tells(undertaker, UT, Msg, T) : st_may_tell(undertaker, UT, Msg, T) } = 1 :-
+    night_number(N), N > 1,
+    other_night_role_order(undertaker, RoleOrd),
+    T = night(N, RoleOrd, 1),
+    assigned(0, UT, undertaker),
+    alive(UT, night(N, 0, 0)),
     executed_previous_day(_, N).
 
 % If no one was executed the previous day, undertaker gets no info
@@ -516,24 +531,44 @@ ft_got_ping(FT, T) :-
     ft_pings_as_demon(P, T).
 
 % Fortune teller st_tells: yes if either chosen player pings as demon
+% Only at substep 3 (after player has chosen)
 % When functioning: answer must be accurate
-st_tells(fortune_teller, FT, yes, T) :-
-    acting_role(T, fortune_teller),
+st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
+    first_night_role_order(fortune_teller, RoleOrd), N = 1,
     assigned(0, FT, fortune_teller),
-    functioning(FT, T),
-    ft_got_ping(FT, T).
+    functioning(FT, night(N, RoleOrd, 3)),
+    ft_got_ping(FT, night(N, RoleOrd, 3)).
 
-st_tells(fortune_teller, FT, no, T) :-
-    acting_role(T, fortune_teller),
+st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
+    other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
     assigned(0, FT, fortune_teller),
-    functioning(FT, T),
-    not ft_got_ping(FT, T).
+    functioning(FT, night(N, RoleOrd, 3)),
+    ft_got_ping(FT, night(N, RoleOrd, 3)).
+
+st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
+    first_night_role_order(fortune_teller, RoleOrd), N = 1,
+    assigned(0, FT, fortune_teller),
+    functioning(FT, night(N, RoleOrd, 3)),
+    not ft_got_ping(FT, night(N, RoleOrd, 3)).
+
+st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
+    other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
+    assigned(0, FT, fortune_teller),
+    functioning(FT, night(N, RoleOrd, 3)),
+    not ft_got_ping(FT, night(N, RoleOrd, 3)).
 
 % When malfunctioning: ST can say yes or no
-{ st_tells(fortune_teller, FT, yes, T) ; st_tells(fortune_teller, FT, no, T) } = 1 :-
-    acting_role(T, fortune_teller),
+{ st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
+  st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
+    first_night_role_order(fortune_teller, RoleOrd), N = 1,
     assigned(0, FT, fortune_teller),
-    not functioning(FT, T).
+    not functioning(FT, night(N, RoleOrd, 3)).
+
+{ st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
+  st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
+    other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
+    assigned(0, FT, fortune_teller),
+    not functioning(FT, night(N, RoleOrd, 3)).
 
 % ===========================================================================
 % Butler: chooses a master each night
@@ -593,12 +628,35 @@ other_night_substep(imp, 3, st_places(imp_dead)).
 
 % Imp player choice: choose any player to kill (can choose self for starpass)
 % Imp must be alive to act
+% Note: We check current_demon to handle Scarlet Woman becoming the Imp
 { player_chooses(imp, Imp, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
-    assigned(0, Imp, imp),
+    current_demon(Imp, N),
     alive(Imp, night(N, 0, 0)).
+
+% Helper: who is the demon at the start of night N
+% By default, it's whoever was assigned at time 0
+current_demon(P, N) :-
+    night_number(N),
+    assigned(0, P, R),
+    demon(R),
+    not replaced_as_demon(P, N).
+
+% The original demon is replaced starting from night after Scarlet Woman triggers
+replaced_as_demon(P, N) :-
+    assigned(0, P, R),
+    demon(R),
+    sw_becomes_demon(_, TriggerDay),
+    night_number(N),
+    N > TriggerDay.
+
+% Scarlet Woman becomes the current demon starting from night after she triggers
+current_demon(SW, N) :-
+    sw_becomes_demon(SW, TriggerDay),
+    night_number(N),
+    N > TriggerDay.
 
 % Imp places "dead" token on chosen target (if imp is functioning)
 % Token is placed regardless of protection - protection blocks the death, not the targeting
@@ -613,12 +671,18 @@ reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
 % by checking `alive` in ability rules, not by impairment.
 % Ravenkeeper is special: their ability triggers because of imp_dead.
 
+% imp_kill_succeeds(P, T) is true when the imp's kill attempt actually takes effect
+% (i.e., they have imp_dead token AND are NOT protected)
+% This is defined AFTER protected_from_demon (see Monk section below)
+
 % At dawn (end of night), the death becomes public - player dies
 % But only if not protected from demon
 died(P, T) :-
     final_night_time(N, T),
-    reminder_on(imp_dead, P, T),
-    not protected_from_demon(P, T).
+    imp_kill_succeeds(P, T).
+
+% dead(P, T) for imp kills - defined after protected_from_demon
+% (see Monk section below for imp_kill_succeeds definition)
 
 % ===========================================================================
 % Monk: protects a player from the demon (other nights only)
@@ -662,6 +726,14 @@ token_removed(monk_protected, P, night(N, 0, 0)) :-
 % A player with the monk_protected token is protected from demon kills
 protected_from_demon(P, T) :- reminder_on(monk_protected, P, T).
 
+% imp_kill_succeeds: the imp's kill takes effect (target has imp_dead and is not protected)
+imp_kill_succeeds(P, T) :-
+    reminder_on(imp_dead, P, T),
+    not protected_from_demon(P, T).
+
+% A player is "dead" (for ST mechanics) during the night when imp kill succeeds
+dead(P, T) :- imp_kill_succeeds(P, T).
+
 % ===========================================================================
 % Spy: sees the grimoire (no mechanical effect to model here)
 % ===========================================================================
@@ -684,4 +756,28 @@ may_mis_register(P) :- assigned(0, P, recluse).
 may_misregister_as(P, evil) :- assigned(0, P, recluse).
 may_misregister_as(P, minion) :- assigned(0, P, recluse).
 may_misregister_as(P, demon) :- assigned(0, P, recluse).
+
+% ===========================================================================
+% Scarlet Woman: becomes the demon if demon is executed with 5+ alive
+% ===========================================================================
+
+% Count alive players at start of day (proxy for "at time of execution")
+% TODO: revisit when mid-day deaths are possible
+alive_count(N, C) :-
+    day_number(N),
+    C = #count { P : alive(P, day(N, 0)) }.
+
+% Scarlet Woman triggers when:
+% 1. The demon is executed
+% 2. 5+ players were alive
+% 3. Scarlet Woman is alive
+sw_becomes_demon(SW, N) :-
+    assigned(0, SW, scarlet_woman),
+    assigned(0, Demon, R), demon(R),
+    executed(Demon, N),
+    alive_count(N, C), C >= 5,
+    alive(SW, day(N, 0)).
+
+% When Scarlet Woman becomes demon, she gains the Imp role
+assigned(N, SW, imp) :- sw_becomes_demon(SW, N).
 

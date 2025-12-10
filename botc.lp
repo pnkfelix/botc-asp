@@ -101,7 +101,9 @@ neighbor(P1, P2) :- neighbor(P2, P1).
 % They are dead (for ability purposes) but publicly_alive (shroud placed at dawn).
 
 % A player is dead (from ST perspective) if they have a "dead tonight" token
-dead(P, T) :- reminder_on(imp_dead, P, T).
+% Note: imp_dead specifically is handled in tb.lp to account for protection
+% Other death tokens could be added here as needed
+% dead(P, T) :- reminder_on(some_other_death_token, P, T).
 
 % publicly_alive = alive and not yet revealed as dead
 % (The public death shroud is placed at dawn, so during night they look alive)
@@ -209,6 +211,15 @@ actual_category(P, evil) :- assigned(0, P, R), demon(R).
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
+% Mid-game role changes: register based on currently assigned role
+% If assigned a demon role at day N, register as demon for all times after day N
+registers_as(P, demon, T) :-
+    assigned(N, P, R), demon(R), N > 0,
+    time(T), T = night(N2, _, _), N2 > N.
+registers_as(P, demon, T) :-
+    assigned(N, P, R), demon(R), N > 0,
+    time(T), T = day(N2, _), N2 > N.
+
 % If a player may mis-register, ST chooses for each category they may misregister as
 { registers_as(P, C, T) } :- may_misregister_as(P, C), time(T).
 
@@ -306,7 +317,10 @@ thinks_it_is(R, Y) :- mistaken_identity(R, demon), demon(Y).
 thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 
 % the role assigned is one that "thinks it is the" token received.
-:- received(P, T), assigned(_, P, R), not thinks_it_is(R, T).
+% NOTE: Only checks initial assignment (time 0). Mid-game role changes like
+% Scarlet Woman becoming Imp are not constrained by this. If we need to track
+% current role at arbitrary times, we may need a current_role(P, R, T) fluent.
+:- received(P, T), assigned(0, P, R), not thinks_it_is(R, T).
 
 :- adjusted_townsfolk(N), #count { R : assigned(0, _, R), townsfolk(R) } != N.
 :- adjusted_outsider(N), #count { R : assigned(0, _, R), outsider(R) } != N.
