@@ -385,6 +385,58 @@ st_tells(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
 % (no st_tells is generated)
 
 % ===========================================================================
+% Ravenkeeper: If you die at night, choose a player to learn their role
+% Only wakes when killed by demon (has imp_dead token)
+% ===========================================================================
+other_night_substep(ravenkeeper, 1, st_asks(choose_player)).
+other_night_substep(ravenkeeper, 2, player_chooses(target)).
+other_night_substep(ravenkeeper, 3, st_tells(rk_info)).
+
+% Ravenkeeper only acts if they were killed tonight (have imp_dead token)
+rk_died_tonight(RK, N) :-
+    assigned(0, RK, ravenkeeper),
+    night_number(N), N > 1,
+    other_night_role_order(ravenkeeper, RoleOrd),
+    reminder_on(imp_dead, RK, night(N, RoleOrd, 1)).
+
+% Ravenkeeper chooses 1 player when dying
+{ rk_choice(RK, P, night(N, RoleOrd, 2)) : player(P) } = 1 :-
+    assigned(0, RK, ravenkeeper),
+    other_night_role_order(ravenkeeper, RoleOrd),
+    night_number(N), N > 1,
+    rk_died_tonight(RK, N).
+
+% Choice persists to substep 3
+rk_choice(RK, P, night(N, RoleOrd, 3)) :-
+    rk_choice(RK, P, night(N, RoleOrd, 2)).
+
+% rk_choice must include player specified via player_chooses
+:- player_chooses(ravenkeeper, RK, point(P), T),
+   not rk_choice(RK, P, T).
+
+% Convert to player_chooses signal
+player_chooses(ravenkeeper, RK, point(P), T) :-
+    rk_choice(RK, P, T).
+
+% When functioning, ST tells the ravenkeeper the chosen player's role
+st_tells(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(ravenkeeper, RoleOrd),
+    assigned(0, RK, ravenkeeper),
+    rk_died_tonight(RK, N),
+    functioning(RK, night(N, RoleOrd, 3)),
+    rk_choice(RK, P, night(N, RoleOrd, 3)),
+    may_register_as_role(P, R, night(N, RoleOrd, 3)).
+
+% When malfunctioning, ST can say any role
+{ st_tells(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) : role(R) } = 1 :-
+    night_number(N), N > 1,
+    other_night_role_order(ravenkeeper, RoleOrd),
+    assigned(0, RK, ravenkeeper),
+    rk_died_tonight(RK, N),
+    not functioning(RK, night(N, RoleOrd, 3)).
+
+% ===========================================================================
 % Fortune Teller: chooses 2 players, learns if either is the demon
 % Acts on first night and every other night
 % ===========================================================================
@@ -557,9 +609,9 @@ reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
     player_chooses(imp, Imp, point(Target), night(N, RoleOrd, 2)),
     functioning(Imp, night(N, RoleOrd, 3)).
 
-% Player with imp_dead token is impaired (no ability, won't wake)
-% Exception roles like Ravenkeeper will have their own rules
-causes_impairment(imp_dead).
+% Dead players (with imp_dead token) don't wake up, but this is handled
+% by checking `alive` in ability rules, not by impairment.
+% Ravenkeeper is special: their ability triggers because of imp_dead.
 
 % At dawn (end of night), the death becomes public - player dies
 % But only if not protected from demon
