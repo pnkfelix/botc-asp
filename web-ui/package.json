@@ -1,0 +1,22 @@
+{
+  "name": "botc-web-ui",
+  "version": "0.1.0",
+  "description": "Blood on the Clocktower ASP Explorer - PureScript + Halogen + clingo-wasm",
+  "type": "module",
+  "scripts": {
+    "build:purs": "spago build",
+    "bundle": "spago bundle --bundle-type app --platform browser --outfile dist/app.js",
+    "copy:wasm": "cp node_modules/clingo-wasm/dist/clingo.wasm dist/ && cp node_modules/clingo-wasm/dist/clingo.web.worker.js dist/",
+    "build": "npm run build:purs && npm run bundle && npm run copy:wasm",
+    "dev": "npm run build && npx serve dist",
+    "clean": "rm -rf output .spago"
+  },
+  "devDependencies": {
+    "purescript": "^0.15.15",
+    "spago": "^0.93.40",
+    "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "clingo-wasm": "^0.3.2"
+  }
+}

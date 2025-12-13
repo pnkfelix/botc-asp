@@ -1,0 +1,20 @@
+package:
+  name: botc-web-ui
+  dependencies:
+    - aff
+    - aff-promise
+    - arrays
+    - effect
+    - either
+    - foldable-traversable
+    - foreign
+    - halogen
+    - maybe
+    - prelude
+    - strings
+    - web-html
+
+workspace:
+  packageSet:
+    registry: 58.3.0
+  extraPackages: {}

@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+output/
+.spago/
+
+# Generated bundle files (keep index.html)
+dist/app.js
+dist/clingo.wasm
+dist/clingo.web.worker.js
+
+# IDE
+.idea/
+*.swp
+.vscode/
+
+# OS
+.DS_Store
