@@ -10,3 +10,9 @@ export const initImpl = (wasmUrl) => () => {
 
 export const runImpl = (program) => (numModels) => () =>
   clingo.run(program, numModels);
+
+export const restartImpl = (wasmUrl) => () => {
+  // Terminate the worker and re-initialize
+  const absoluteUrl = new URL(wasmUrl, window.location.origin).href;
+  return clingo.restart(absoluteUrl);
+};

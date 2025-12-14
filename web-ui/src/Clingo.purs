@@ -7,13 +7,12 @@ module Clingo
   , SolveResult(..)
   , run
   , init
+  , restart
   ) where
 
 import Prelude
 
 import Control.Promise (Promise, toAffE)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Foreign (Foreign, unsafeFromForeign)
@@ -65,10 +64,16 @@ data SolveResult
 -- | Foreign imports
 foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
+foreign import restartImpl :: String -> Effect (Promise Unit)
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
 init wasmUrl = toAffE (initImpl wasmUrl)
+
+-- | Restart clingo-wasm (terminates worker and re-initializes)
+-- | Use this to cancel a long-running solve
+restart :: String -> Aff Unit
+restart wasmUrl = toAffE (restartImpl wasmUrl)
 
 -- | Run a Clingo program
 run :: String -> Int -> Aff SolveResult

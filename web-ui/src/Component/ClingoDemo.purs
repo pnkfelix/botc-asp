@@ -4,16 +4,28 @@ import Prelude
 
 import Clingo as Clingo
 import Data.Array (intercalate, length, mapWithIndex)
-import Data.Maybe (Maybe(..))
+import Data.Int as Int
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (trim)
 import Effect.Aff.Class (class MonadAff)
+import EmbeddedPrograms as EP
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 
+-- | Which program panel is being edited
+data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
+
+derive instance eqProgramPanel :: Eq ProgramPanel
+
 -- | Component state
 type State =
-  { program :: String
+  { botcProgram :: String      -- Core game rules (botc.lp)
+  , tbProgram :: String        -- Trouble Brewing script (tb.lp)
+  , playersProgram :: String   -- Player configuration (players.lp)
+  , instanceProgram :: String  -- Instance/query for this run
+  , modelLimit :: String       -- Max models to return (empty = 0 = all)
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
@@ -28,37 +40,58 @@ data ResultDisplay
 -- | Component actions
 data Action
   = Initialize
-  | SetProgram String
+  | SetProgram ProgramPanel String
+  | SetModelLimit String
   | RunClingo
+  | CancelSolve
 
--- | Default ASP program demonstrating Blood on the Clocktower concepts
-defaultProgram :: String
-defaultProgram = """% Simple BotC-style example: Who could be the Demon?
-% Given: 3 players, one must be the Demon
-
-player(alice). player(bob). player(charlie).
-
-% Exactly one player is the demon
-{ demon(P) : player(P) } = 1.
-
-% The demon is evil
-evil(P) :- demon(P).
-
-% At least one player claims to be good
-claims_good(alice).
-claims_good(bob).
-
-#show demon/1.
-#show evil/1."""
-
--- | Initial state
+-- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { program: defaultProgram
+  { botcProgram: EP.botcLp
+  , tbProgram: EP.tbLp
+  , playersProgram: defaultPlayers  -- Use smaller player set for demo
+  , instanceProgram: defaultInstance
+  , modelLimit: ""  -- Empty = 0 = all models
   , result: Nothing
   , isLoading: false
   , isInitialized: false
   }
+
+-- | Smaller player configuration for demo (8 players instead of 16)
+defaultPlayers :: String
+defaultPlayers = """% Player names and seating (8 players for demo)
+name(amanda; rob; taylor; courtney; steph; felix; neha; pratik).
+
+chair(amanda, 0).
+chair(rob, 1).
+chair(taylor, 2).
+chair(courtney, 3).
+chair(steph, 4).
+chair(felix, 5).
+chair(neha, 6).
+chair(pratik, 7).
+
+% Number of players in the game
+#const player_count = 8.
+"""
+
+-- | Instance/demo fragment
+defaultInstance :: String
+defaultInstance = """% Instance: constraints and queries for this specific scenario
+% Edit this section to explore different game states
+
+% Example: Constrain who the demon might be
+% assigned(0, felix, imp).
+
+% Example: Constrain what the Chef learned
+% st_tells(chef, amanda, count(1), night(1, 5, 1)).
+
+% Show key derived facts
+#show assigned/3.
+#show received/2.
+#show st_tells/4.
+"""
 
 -- | The Halogen component
 component :: forall q i o m. MonadAff m => H.Component q i o m
@@ -76,31 +109,40 @@ component =
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
   HH.div
-    [ HP.style "font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px;" ]
+    [ HP.style "font-family: system-ui, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px;" ]
     [ HH.h1_ [ HH.text "Clingo WASM + PureScript Demo" ]
     , HH.p
         [ HP.style "color: #666;" ]
-        [ HH.text "Blood on the Clocktower ASP Explorer - FFI Spike" ]
+        [ HH.text "Blood on the Clocktower ASP Explorer" ]
 
-    -- Program input
+    -- Program panels in a 2x2 grid
     , HH.div
-        [ HP.style "margin: 20px 0;" ]
-        [ HH.label
-            [ HP.style "display: block; font-weight: bold; margin-bottom: 8px;" ]
-            [ HH.text "ASP Program:" ]
-        , HH.textarea
-            [ HP.style "width: 100%; height: 300px; font-family: monospace; font-size: 14px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;"
-            , HP.value state.program
-            , HE.onValueInput SetProgram
-            , HP.disabled state.isLoading
-            ]
+        [ HP.style "display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;" ]
+        [ renderProgramPanel "botc.lp (Core Rules)" BotcPanel state.botcProgram state.isLoading
+        , renderProgramPanel "tb.lp (Trouble Brewing)" TbPanel state.tbProgram state.isLoading
+        , renderProgramPanel "players.lp (Players)" PlayersPanel state.playersProgram state.isLoading
+        , renderProgramPanel "Instance (Query)" InstancePanel state.instanceProgram state.isLoading
         ]
 
-    -- Run button
+    -- Controls: model limit input, run button, cancel button
     , HH.div
-        [ HP.style "margin: 20px 0;" ]
-        [ HH.button
-            [ HP.style $ "padding: 10px 20px; font-size: 16px; cursor: pointer; "
+        [ HP.style "margin: 20px 0; text-align: center; display: flex; justify-content: center; align-items: center; gap: 15px;" ]
+        [ -- Model limit input
+          HH.label
+            [ HP.style "display: flex; align-items: center; gap: 8px;" ]
+            [ HH.text "Max models:"
+            , HH.input
+                [ HP.style "width: 80px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;"
+                , HP.type_ HP.InputNumber
+                , HP.placeholder "0 = all"
+                , HP.value state.modelLimit
+                , HE.onValueInput SetModelLimit
+                , HP.disabled state.isLoading
+                ]
+            ]
+        , -- Run button
+          HH.button
+            [ HP.style $ "padding: 12px 30px; font-size: 18px; cursor: pointer; "
                 <> "background: #4CAF50; color: white; border: none; border-radius: 4px;"
                 <> if state.isLoading then " opacity: 0.6;" else ""
             , HE.onClick \_ -> RunClingo
@@ -112,10 +154,36 @@ render state =
                   then "Run Clingo"
                   else "Initializing..."
             ]
+        , -- Cancel button (only shown when loading)
+          if state.isLoading
+            then HH.button
+              [ HP.style "padding: 12px 30px; font-size: 18px; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;"
+              , HE.onClick \_ -> CancelSolve
+              ]
+              [ HH.text "Cancel" ]
+            else HH.text ""
         ]
 
     -- Results display
     , renderResult state.result
+    ]
+
+-- | Render a single program panel with label and scrollable textarea
+renderProgramPanel :: forall cs m. String -> ProgramPanel -> String -> Boolean -> H.ComponentHTML Action cs m
+renderProgramPanel label panel value isLoading =
+  HH.div
+    [ HP.style "display: flex; flex-direction: column;" ]
+    [ HH.label
+        [ HP.style "font-weight: bold; margin-bottom: 8px; color: #333;" ]
+        [ HH.text label ]
+    , HH.textarea
+        [ HP.style $ "width: 100%; height: 300px; font-family: monospace; font-size: 12px; "
+            <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
+            <> "resize: vertical; overflow: auto;"
+        , HP.value value
+        , HE.onValueInput (SetProgram panel)
+        , HP.disabled isLoading
+        ]
     ]
 
 -- | Render the result section
@@ -127,7 +195,7 @@ renderResult Nothing =
 
 renderResult (Just (ResultError err)) =
   HH.div
-    [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace;" ]
+    [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace; white-space: pre-wrap;" ]
     [ HH.strong_ [ HH.text "Error: " ]
     , HH.text err
     ]
@@ -168,13 +236,27 @@ handleAction = case _ of
     H.liftAff $ Clingo.init "/clingo.wasm"
     H.modify_ \s -> s { isInitialized = true }
 
-  SetProgram prog ->
-    H.modify_ \s -> s { program = prog }
+  SetProgram panel prog ->
+    H.modify_ \s -> case panel of
+      BotcPanel -> s { botcProgram = prog }
+      TbPanel -> s { tbProgram = prog }
+      PlayersPanel -> s { playersProgram = prog }
+      InstancePanel -> s { instanceProgram = prog }
+
+  SetModelLimit limit ->
+    H.modify_ \s -> s { modelLimit = limit }
 
   RunClingo -> do
     H.modify_ \s -> s { isLoading = true, result = Nothing }
     state <- H.get
-    result <- H.liftAff $ Clingo.run state.program 0  -- 0 = all models
+    -- Parse model limit (empty or invalid = 0 = all models)
+    let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
+    -- Concatenate all programs
+    let fullProgram = state.botcProgram <> "\n\n"
+                   <> state.tbProgram <> "\n\n"
+                   <> state.playersProgram <> "\n\n"
+                   <> state.instanceProgram
+    result <- H.liftAff $ Clingo.run fullProgram numModels
     let display = case result of
           Clingo.Satisfiable res ->
             ResultSuccess $ extractWitnesses res
@@ -187,6 +269,11 @@ handleAction = case _ of
           Clingo.Error err ->
             ResultError err
     H.modify_ \s -> s { isLoading = false, result = Just display }
+
+  CancelSolve -> do
+    -- Restart the worker to cancel the current solve
+    H.liftAff $ Clingo.restart "/clingo.wasm"
+    H.modify_ \s -> s { isLoading = false, result = Just (ResultError "Solve cancelled by user") }
 
 -- | Extract witnesses from a Clingo result
 extractWitnesses :: Clingo.ClingoResult -> Array (Array String)
