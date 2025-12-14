@@ -13,4 +13,4 @@ assigned(0, courtney, investigator).
 
 % Assert: ST must tell the investigator that amanda is "the Poisoner"
 % (since amanda is a real minion, not a recluse who can misregister)
-:- not st_tells(investigator, courtney, point(poisoner), _).
+:- not st_tells(investigator, courtney, info(_, _, poisoner), _).

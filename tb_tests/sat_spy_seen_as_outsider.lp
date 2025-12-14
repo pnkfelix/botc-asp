@@ -13,4 +13,4 @@ assigned(0, taylor, librarian).
 
 % Assert: ST CAN tell the librarian that amanda is "the Drunk"
 % (because amanda is a Spy who can misregister as outsider)
-:- not st_tells(librarian, taylor, point(drunk), _).
+:- not st_tells(librarian, taylor, info(_, _, drunk), _).

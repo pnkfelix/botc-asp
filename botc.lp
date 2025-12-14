@@ -91,6 +91,11 @@ neighbor(P1, P2) :-
 % neighbor is symmetric
 neighbor(P1, P2) :- neighbor(P2, P1).
 
+% Order two players by chair number (smaller chair first)
+% Used to normalize player order in info tuples so position doesn't leak info
+chair_ordered(P1, P2, P1, P2) :- player(P1), player(P2), chair(P1, C1), chair(P2, C2), C1 < C2.
+chair_ordered(P1, P2, P2, P1) :- player(P1), player(P2), chair(P1, C1), chair(P2, C2), C1 > C2.
+
 % ===========================================================================
 % Alive vs Publicly Alive
 % ===========================================================================
@@ -186,6 +191,20 @@ signal(point(R)) :- role(R).
 
 % st_tells(Role, Player, Message, T) - ST communicates Message to Player
 % as part of Role's ability at time T
+
+% Constraint: st_tells for a role can only go to players who think they have
+% that role (i.e., received that role's token). This covers both:
+% 1. Players who actually have the role
+% 2. Players who think they have it (e.g., Drunk with chef token)
+% NOTE: This will need adjustment for Philosopher (gains another role's ability),
+% Pixie (gains ability after townsfolk dies), and Pit Hag (can change roles mid-game).
+:- st_tells(R, P, _, _), not received(P, R).
+
+% Constraint: a player can only receive one message from a role at a given time.
+% Roles that communicate multiple pieces of info (e.g., Washerwoman pointing to
+% two players and naming a role) use tuple values like info(P1, P2, Role).
+% Using aggregate instead of pairwise comparison to avoid grounding explosion.
+:- st_tells(R, P, _, T), #count { V : st_tells(R, P, V, T) } > 1.
 
 % player_chooses(Role, Player, Choice, T) - Player communicates Choice to ST
 % as part of Role's ability at time T (in response to ST's request)
