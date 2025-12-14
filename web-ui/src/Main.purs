@@ -11,4 +11,4 @@ import Halogen.VDom.Driver (runUI)
 main :: Effect Unit
 main = launchAff_ do
   body <- HA.awaitBody
-  runUI ClingoDemo.component unit body
+  void $ runUI ClingoDemo.component unit body

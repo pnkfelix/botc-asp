@@ -16,5 +16,5 @@ package:
 
 workspace:
   packageSet:
-    registry: 58.3.0
+    registry: 59.0.0
   extraPackages: {}

@@ -12,9 +12,10 @@
     "clean": "rm -rf output .spago"
   },
   "devDependencies": {
+    "esbuild": "^0.27.1",
     "purescript": "^0.15.15",
-    "spago": "^0.93.40",
-    "serve": "^14.2.0"
+    "serve": "^14.2.0",
+    "spago": "^0.93.40"
   },
   "dependencies": {
     "clingo-wasm": "^0.3.2"

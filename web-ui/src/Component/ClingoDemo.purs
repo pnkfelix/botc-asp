@@ -3,7 +3,7 @@ module Component.ClingoDemo where
 import Prelude
 
 import Clingo as Clingo
-import Data.Array (intercalate)
+import Data.Array (intercalate, length, mapWithIndex)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -148,8 +148,6 @@ renderResult (Just (ResultSuccess answerSets)) =
     , HH.div_ $ mapWithIndex renderAnswerSet answerSets
     ]
   where
-    length = Data.Array.length
-    mapWithIndex f arr = Data.Array.mapWithIndex f arr
 
     renderAnswerSet idx atoms =
       HH.div
@@ -167,7 +165,7 @@ handleAction :: forall cs o m. MonadAff m => Action -> H.HalogenM State Action c
 handleAction = case _ of
   Initialize -> do
     -- Initialize clingo-wasm
-    H.liftAff $ Clingo.init "./clingo.wasm"
+    H.liftAff $ Clingo.init "/clingo.wasm"
     H.modify_ \s -> s { isInitialized = true }
 
   SetProgram prog ->
