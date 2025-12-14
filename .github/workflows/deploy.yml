@@ -46,6 +46,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache spago build
+        uses: actions/cache@v4
+        with:
+          path: |
+            web-ui/output
+            web-ui/.spago
+          key: spago-${{ hashFiles('web-ui/spago.yaml', 'web-ui/spago.lock') }}
+
       - name: Embed .lp files
         run: npm run embed-lp
 
