@@ -232,8 +232,8 @@ renderResult (Just (ResultSuccess answerSets)) =
 handleAction :: forall cs o m. MonadAff m => Action -> H.HalogenM State Action cs o m Unit
 handleAction = case _ of
   Initialize -> do
-    -- Initialize clingo-wasm
-    H.liftAff $ Clingo.init "/clingo.wasm"
+    -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
+    H.liftAff $ Clingo.init "./clingo.wasm"
     H.modify_ \s -> s { isInitialized = true }
 
   SetProgram panel prog ->
@@ -272,7 +272,7 @@ handleAction = case _ of
 
   CancelSolve -> do
     -- Restart the worker to cancel the current solve
-    H.liftAff $ Clingo.restart "/clingo.wasm"
+    H.liftAff $ Clingo.restart "./clingo.wasm"
     H.modify_ \s -> s { isLoading = false, result = Just (ResultError "Solve cancelled by user") }
 
 -- | Extract witnesses from a Clingo result
