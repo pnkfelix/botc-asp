@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test runner for Blood on the Clocktower ASP tests."""
+from __future__ import annotations
 
 import argparse
 import fcntl
