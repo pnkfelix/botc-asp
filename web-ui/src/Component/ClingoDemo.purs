@@ -8,12 +8,14 @@ import Data.Array (intercalate, length, mapWithIndex, null)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (trim)
+import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import TextareaUtils as TU
 
 -- | Which program panel is being edited
 data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
@@ -51,6 +53,7 @@ data Action
   | TogglePredicateList
   | SelectPredicate ASP.Predicate
   | ClosePredicateModal
+  | JumpToReference String Int  -- sourceFile, lineNumber
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -215,11 +218,29 @@ renderProgramPanel label panel value isLoading =
         [ HP.style $ "width: 100%; height: 300px; font-family: monospace; font-size: 12px; "
             <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
             <> "resize: vertical; overflow: auto;"
+        , HP.id (panelToTextareaId panel)
         , HP.value value
         , HE.onValueInput (SetProgram panel)
         , HP.disabled isLoading
         ]
     ]
+
+-- | Convert a panel to its textarea element ID
+panelToTextareaId :: ProgramPanel -> String
+panelToTextareaId = case _ of
+  BotcPanel -> "textarea-botc"
+  TbPanel -> "textarea-tb"
+  PlayersPanel -> "textarea-players"
+  InstancePanel -> "textarea-instance"
+
+-- | Convert a source file name to textarea ID
+sourceFileToTextareaId :: String -> Maybe String
+sourceFileToTextareaId = case _ of
+  "botc.lp" -> Just "textarea-botc"
+  "tb.lp" -> Just "textarea-tb"
+  "players.lp" -> Just "textarea-players"
+  "instance" -> Just "textarea-instance"
+  _ -> Nothing
 
 -- | Render the result section
 renderResult :: forall cs m. Maybe ResultDisplay -> H.ComponentHTML Action cs m
@@ -350,11 +371,16 @@ renderPredicateModal (Just pred) sources findRefs =
     ]
   where
     renderReference (ASP.PredicateRef ref) =
-      HH.div
-        [ HP.style "margin: 8px 0; padding: 10px; background: #fafafa; border-left: 3px solid #2196F3; border-radius: 0 4px 4px 0;" ]
+      HH.button
+        [ HP.style $ "display: block; width: 100%; text-align: left; margin: 8px 0; padding: 10px; "
+            <> "background: #fafafa; border: none; border-left: 3px solid #2196F3; "
+            <> "border-radius: 0 4px 4px 0; cursor: pointer; "
+            <> "transition: background-color 0.2s;"
+        , HE.onClick \_ -> JumpToReference ref.sourceFile ref.lineNumber
+        ]
         [ HH.div
-            [ HP.style "font-size: 12px; color: #666; margin-bottom: 5px;" ]
-            [ HH.text $ ref.sourceFile <> " : line " <> show ref.lineNumber ]
+            [ HP.style "font-size: 12px; color: #2196F3; margin-bottom: 5px; font-weight: bold;" ]
+            [ HH.text $ ref.sourceFile <> " : line " <> show ref.lineNumber <> " (tap to go)" ]
         , HH.code
             [ HP.style "display: block; font-family: monospace; font-size: 13px; white-space: pre-wrap; color: #333;" ]
             [ HH.text ref.lineContent ]
@@ -415,6 +441,14 @@ handleAction = case _ of
 
   ClosePredicateModal ->
     H.modify_ \s -> s { selectedPredicate = Nothing }
+
+  JumpToReference sourceFile lineNumber -> do
+    -- Close modal and predicate panel
+    H.modify_ \s -> s { selectedPredicate = Nothing, showPredicateList = false }
+    -- Scroll to the line in the appropriate textarea
+    case sourceFileToTextareaId sourceFile of
+      Just textareaId -> liftEffect $ TU.scrollToLine textareaId lineNumber
+      Nothing -> pure unit
 
 -- | Extract witnesses from a Clingo result
 extractWitnesses :: Clingo.ClingoResult -> Array (Array String)
