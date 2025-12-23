@@ -9,9 +9,11 @@ package:
     - foldable-traversable
     - foreign
     - halogen
+    - integers
     - maybe
     - prelude
     - strings
+    - tuples
     - web-html
 
 workspace:

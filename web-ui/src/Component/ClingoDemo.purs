@@ -2,17 +2,20 @@ module Component.ClingoDemo where
 
 import Prelude
 
+import AspParser as ASP
 import Clingo as Clingo
-import Data.Array (intercalate, length, mapWithIndex)
+import Data.Array (intercalate, length, mapWithIndex, null)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (trim)
+import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import TextareaUtils as TU
 
 -- | Which program panel is being edited
 data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
@@ -29,6 +32,9 @@ type State =
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
+  -- Predicate navigator state
+  , showPredicateList :: Boolean
+  , selectedPredicate :: Maybe ASP.Predicate
   }
 
 -- | How to display results
@@ -44,6 +50,10 @@ data Action
   | SetModelLimit String
   | RunClingo
   | CancelSolve
+  | TogglePredicateList
+  | SelectPredicate ASP.Predicate
+  | ClosePredicateModal
+  | JumpToReference String Int  -- sourceFile, lineNumber
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -56,6 +66,8 @@ initialState =
   , result: Nothing
   , isLoading: false
   , isInitialized: false
+  , showPredicateList: false
+  , selectedPredicate: Nothing
   }
 
 -- | Smaller player configuration for demo (8 players instead of 16)
@@ -108,16 +120,36 @@ component =
 -- | Render the component
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
+  let
+    -- Parse all programs to get predicates
+    sources =
+      [ { name: "botc.lp", content: state.botcProgram }
+      , { name: "tb.lp", content: state.tbProgram }
+      , { name: "players.lp", content: state.playersProgram }
+      , { name: "instance", content: state.instanceProgram }
+      ]
+    parsed = ASP.parseProgram sources
+  in
   HH.div
-    [ HP.style "font-family: system-ui, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px;" ]
+    [ HP.style "font-family: system-ui, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px; position: relative;" ]
     [ HH.h1_ [ HH.text "Clingo WASM + PureScript Demo" ]
     , HH.p
         [ HP.style "color: #666;" ]
         [ HH.text "Blood on the Clocktower ASP Explorer" ]
 
-    -- Program panels in a 2x2 grid
+    -- Predicate navigator toggle button (mobile-friendly)
+    , HH.button
+        [ HP.style $ "position: fixed; bottom: 20px; right: 20px; z-index: 100; "
+            <> "padding: 12px 16px; font-size: 14px; cursor: pointer; "
+            <> "background: #2196F3; color: white; border: none; border-radius: 50px; "
+            <> "box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
+        , HE.onClick \_ -> TogglePredicateList
+        ]
+        [ HH.text $ if state.showPredicateList then "Hide Predicates" else "Show Predicates" ]
+
+    -- Program panels in a 2x2 grid (responsive)
     , HH.div
-        [ HP.style "display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;" ]
+        [ HP.style "display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0;" ]
         [ renderProgramPanel "botc.lp (Core Rules)" BotcPanel state.botcProgram state.isLoading
         , renderProgramPanel "tb.lp (Trouble Brewing)" TbPanel state.tbProgram state.isLoading
         , renderProgramPanel "players.lp (Players)" PlayersPanel state.playersProgram state.isLoading
@@ -126,7 +158,7 @@ render state =
 
     -- Controls: model limit input, run button, cancel button
     , HH.div
-        [ HP.style "margin: 20px 0; text-align: center; display: flex; justify-content: center; align-items: center; gap: 15px;" ]
+        [ HP.style "margin: 20px 0; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 15px;" ]
         [ -- Model limit input
           HH.label
             [ HP.style "display: flex; align-items: center; gap: 8px;" ]
@@ -166,6 +198,12 @@ render state =
 
     -- Results display
     , renderResult state.result
+
+    -- Predicate list panel (slide-in from right)
+    , renderPredicatePanel state.showPredicateList parsed.predicates
+
+    -- Modal for predicate references
+    , renderPredicateModal state.selectedPredicate sources parsed.references
     ]
 
 -- | Render a single program panel with label and scrollable textarea
@@ -180,11 +218,29 @@ renderProgramPanel label panel value isLoading =
         [ HP.style $ "width: 100%; height: 300px; font-family: monospace; font-size: 12px; "
             <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
             <> "resize: vertical; overflow: auto;"
+        , HP.id (panelToTextareaId panel)
         , HP.value value
         , HE.onValueInput (SetProgram panel)
         , HP.disabled isLoading
         ]
     ]
+
+-- | Convert a panel to its textarea element ID
+panelToTextareaId :: ProgramPanel -> String
+panelToTextareaId = case _ of
+  BotcPanel -> "textarea-botc"
+  TbPanel -> "textarea-tb"
+  PlayersPanel -> "textarea-players"
+  InstancePanel -> "textarea-instance"
+
+-- | Convert a source file name to textarea ID
+sourceFileToTextareaId :: String -> Maybe String
+sourceFileToTextareaId = case _ of
+  "botc.lp" -> Just "textarea-botc"
+  "tb.lp" -> Just "textarea-tb"
+  "players.lp" -> Just "textarea-players"
+  "instance" -> Just "textarea-instance"
+  _ -> Nothing
 
 -- | Render the result section
 renderResult :: forall cs m. Maybe ResultDisplay -> H.ComponentHTML Action cs m
@@ -226,6 +282,108 @@ renderResult (Just (ResultSuccess answerSets)) =
         , HH.code
             [ HP.style "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20;" ]
             [ HH.text $ intercalate " " atoms ]
+        ]
+
+-- | Render the predicate list panel (slide-in from right)
+renderPredicatePanel :: forall cs m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action cs m
+renderPredicatePanel isVisible predicates =
+  HH.div
+    [ HP.style $ "position: fixed; top: 0; right: 0; height: 100vh; width: 280px; "
+        <> "background: white; box-shadow: -2px 0 8px rgba(0,0,0,0.2); "
+        <> "transform: translateX(" <> (if isVisible then "0" else "100%") <> "); "
+        <> "transition: transform 0.3s ease; z-index: 99; "
+        <> "display: flex; flex-direction: column;"
+    ]
+    [ -- Header
+      HH.div
+        [ HP.style "padding: 15px; background: #2196F3; color: white; font-weight: bold;" ]
+        [ HH.text $ "Predicates (" <> show (length predicates) <> ")" ]
+    -- Scrollable list
+    , HH.div
+        [ HP.style "flex: 1; overflow-y: auto; padding: 10px;" ]
+        [ if null predicates
+          then HH.p
+            [ HP.style "color: #666; font-style: italic;" ]
+            [ HH.text "No predicates found" ]
+          else HH.div_ $ map renderPredicateItem predicates
+        ]
+    ]
+  where
+    renderPredicateItem pred =
+      HH.button
+        [ HP.style $ "display: block; width: 100%; text-align: left; "
+            <> "padding: 10px 12px; margin: 4px 0; "
+            <> "background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; "
+            <> "cursor: pointer; font-family: monospace; font-size: 14px;"
+        , HE.onClick \_ -> SelectPredicate pred
+        ]
+        [ HH.text $ pred.name <> "/" <> show pred.arity ]
+
+-- | Render the modal showing predicate references
+renderPredicateModal :: forall cs m.
+  Maybe ASP.Predicate ->
+  Array { name :: String, content :: String } ->
+  (ASP.Predicate -> Array ASP.PredicateRef) ->
+  H.ComponentHTML Action cs m
+renderPredicateModal Nothing _ _ = HH.text ""
+renderPredicateModal (Just pred) sources findRefs =
+  let refs = findRefs pred
+  in
+  HH.div
+    [ HP.style $ "position: fixed; top: 0; left: 0; right: 0; bottom: 0; "
+        <> "background: rgba(0,0,0,0.5); z-index: 200; "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "padding: 20px;"
+    , HE.onClick \_ -> ClosePredicateModal
+    ]
+    [ HH.div
+        [ HP.style $ "background: white; border-radius: 8px; "
+            <> "max-width: 800px; width: 100%; max-height: 80vh; "
+            <> "display: flex; flex-direction: column; "
+            <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
+        -- Stop click propagation on the modal content
+        , HE.onClick \e -> ClosePredicateModal  -- We'll handle this differently
+        ]
+        [ -- Modal header
+          HH.div
+            [ HP.style "padding: 15px 20px; background: #2196F3; color: white; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;" ]
+            [ HH.strong_ [ HH.text $ pred.name <> "/" <> show pred.arity ]
+            , HH.button
+                [ HP.style "background: transparent; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0 5px;"
+                , HE.onClick \_ -> ClosePredicateModal
+                ]
+                [ HH.text "×" ]
+            ]
+        -- Modal body with references
+        , HH.div
+            [ HP.style "flex: 1; overflow-y: auto; padding: 15px;" ]
+            [ if null refs
+              then HH.p
+                [ HP.style "color: #666; font-style: italic;" ]
+                [ HH.text "No references found" ]
+              else HH.div_ $ map renderReference refs
+            ]
+        -- Modal footer
+        , HH.div
+            [ HP.style "padding: 10px 20px; background: #f5f5f5; border-radius: 0 0 8px 8px; text-align: right;" ]
+            [ HH.text $ show (length refs) <> " reference(s) found" ]
+        ]
+    ]
+  where
+    renderReference (ASP.PredicateRef ref) =
+      HH.button
+        [ HP.style $ "display: block; width: 100%; text-align: left; margin: 8px 0; padding: 10px; "
+            <> "background: #fafafa; border: none; border-left: 3px solid #2196F3; "
+            <> "border-radius: 0 4px 4px 0; cursor: pointer; "
+            <> "transition: background-color 0.2s;"
+        , HE.onClick \_ -> JumpToReference ref.sourceFile ref.lineNumber
+        ]
+        [ HH.div
+            [ HP.style "font-size: 12px; color: #2196F3; margin-bottom: 5px; font-weight: bold;" ]
+            [ HH.text $ ref.sourceFile <> " : line " <> show ref.lineNumber <> " (tap to go)" ]
+        , HH.code
+            [ HP.style "display: block; font-family: monospace; font-size: 13px; white-space: pre-wrap; color: #333;" ]
+            [ HH.text ref.lineContent ]
         ]
 
 -- | Handle component actions
@@ -274,6 +432,23 @@ handleAction = case _ of
     -- Restart the worker to cancel the current solve
     H.liftAff $ Clingo.restart "./clingo.wasm"
     H.modify_ \s -> s { isLoading = false, result = Just (ResultError "Solve cancelled by user") }
+
+  TogglePredicateList ->
+    H.modify_ \s -> s { showPredicateList = not s.showPredicateList }
+
+  SelectPredicate pred ->
+    H.modify_ \s -> s { selectedPredicate = Just pred }
+
+  ClosePredicateModal ->
+    H.modify_ \s -> s { selectedPredicate = Nothing }
+
+  JumpToReference sourceFile lineNumber -> do
+    -- Close modal and predicate panel
+    H.modify_ \s -> s { selectedPredicate = Nothing, showPredicateList = false }
+    -- Scroll to the line in the appropriate textarea
+    case sourceFileToTextareaId sourceFile of
+      Just textareaId -> liftEffect $ TU.scrollToLine textareaId lineNumber
+      Nothing -> pure unit
 
 -- | Extract witnesses from a Clingo result
 extractWitnesses :: Clingo.ClingoResult -> Array (Array String)
