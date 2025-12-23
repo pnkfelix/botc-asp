@@ -54,6 +54,7 @@ data Action
   | SelectPredicate ASP.Predicate
   | ClosePredicateModal
   | JumpToReference String Int  -- sourceFile, lineNumber
+  | NoOp  -- Used to stop event propagation
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -284,28 +285,48 @@ renderResult (Just (ResultSuccess answerSets)) =
             [ HH.text $ intercalate " " atoms ]
         ]
 
--- | Render the predicate list panel (slide-in from right)
+-- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall cs m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action cs m
 renderPredicatePanel isVisible predicates =
-  HH.div
-    [ HP.style $ "position: fixed; top: 0; right: 0; height: 100vh; width: 280px; "
-        <> "background: white; box-shadow: -2px 0 8px rgba(0,0,0,0.2); "
-        <> "transform: translateX(" <> (if isVisible then "0" else "100%") <> "); "
-        <> "transition: transform 0.3s ease; z-index: 99; "
-        <> "display: flex; flex-direction: column;"
-    ]
-    [ -- Header
+  HH.div_
+    [ -- Backdrop (click to close)
       HH.div
-        [ HP.style "padding: 15px; background: #2196F3; color: white; font-weight: bold;" ]
-        [ HH.text $ "Predicates (" <> show (length predicates) <> ")" ]
-    -- Scrollable list
+        [ HP.style $ "position: fixed; top: 0; left: 0; right: 0; bottom: 0; "
+            <> "background: rgba(0,0,0,0.3); z-index: 98; "
+            <> "opacity: " <> (if isVisible then "1" else "0") <> "; "
+            <> "pointer-events: " <> (if isVisible then "auto" else "none") <> "; "
+            <> "transition: opacity 0.3s ease;"
+        , HE.onClick \_ -> TogglePredicateList
+        ]
+        []
+    -- Panel
     , HH.div
-        [ HP.style "flex: 1; overflow-y: auto; padding: 10px;" ]
-        [ if null predicates
-          then HH.p
-            [ HP.style "color: #666; font-style: italic;" ]
-            [ HH.text "No predicates found" ]
-          else HH.div_ $ map renderPredicateItem predicates
+        [ HP.style $ "position: fixed; top: 0; right: 0; height: 100vh; width: 280px; "
+            <> "background: white; box-shadow: -2px 0 8px rgba(0,0,0,0.2); "
+            <> "transform: translateX(" <> (if isVisible then "0" else "100%") <> "); "
+            <> "transition: transform 0.3s ease; z-index: 99; "
+            <> "display: flex; flex-direction: column;"
+        , HE.onClick \_ -> NoOp  -- Prevent clicks from closing via backdrop
+        ]
+        [ -- Header
+          HH.div
+            [ HP.style "padding: 15px; background: #2196F3; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center;" ]
+            [ HH.text $ "Predicates (" <> show (length predicates) <> ")"
+            , HH.button
+                [ HP.style "background: transparent; border: none; color: white; font-size: 20px; cursor: pointer; padding: 0 5px;"
+                , HE.onClick \_ -> TogglePredicateList
+                ]
+                [ HH.text "×" ]
+            ]
+        -- Scrollable list
+        , HH.div
+            [ HP.style "flex: 1; overflow-y: auto; padding: 10px;" ]
+            [ if null predicates
+              then HH.p
+                [ HP.style "color: #666; font-style: italic;" ]
+                [ HH.text "No predicates found" ]
+              else HH.div_ $ map renderPredicateItem predicates
+            ]
         ]
     ]
   where
@@ -341,8 +362,7 @@ renderPredicateModal (Just pred) sources findRefs =
             <> "max-width: 800px; width: 100%; max-height: 80vh; "
             <> "display: flex; flex-direction: column; "
             <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
-        -- Stop click propagation on the modal content
-        , HE.onClick \e -> ClosePredicateModal  -- We'll handle this differently
+        , HE.onClick \_ -> NoOp  -- Prevent clicks inside modal from closing it
         ]
         [ -- Modal header
           HH.div
@@ -449,6 +469,9 @@ handleAction = case _ of
     case sourceFileToTextareaId sourceFile of
       Just textareaId -> liftEffect $ TU.scrollToLine textareaId lineNumber
       Nothing -> pure unit
+
+  NoOp ->
+    pure unit  -- Do nothing, used to stop event propagation
 
 -- | Extract witnesses from a Clingo result
 extractWitnesses :: Clingo.ClingoResult -> Array (Array String)
