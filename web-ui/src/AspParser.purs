@@ -10,10 +10,11 @@ import Prelude
 
 import Data.Array (catMaybes, filter, nub, sortBy)
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), split, trim, contains)
 import Data.String.Regex (Regex, match, regex)
-import Data.String.Regex.Flags (global, noFlags)
+import Data.String.Regex.Flags (noFlags)
 import Data.Either (hush)
 import Data.Tuple (Tuple(..))
 import Data.Ord (comparing)
@@ -36,10 +37,6 @@ predicateCallRegex = hush $ regex "([a-z_][a-zA-Z0-9_]*)\\s*\\(" noFlags
 -- | Regex to match #show predicate/arity declarations
 showRegex :: Maybe Regex
 showRegex = hush $ regex "#show\\s+([a-z_][a-zA-Z0-9_]*)\\s*/\\s*(\\d+)" noFlags
-
--- | Regex to match predicate definitions (at start of rule head)
-headPredicateRegex :: Maybe Regex
-headPredicateRegex = hush $ regex "^\\s*([a-z_][a-zA-Z0-9_]*)\\s*\\(" noFlags
 
 -- | Extract all unique predicates from a program source
 extractPredicates :: String -> Array Predicate
@@ -101,7 +98,7 @@ extractPredicatesFromLine line =
 findPredicateCalls :: String -> Array Predicate
 findPredicateCalls line = case predicateCallRegex of
   Nothing -> []
-  Just rx ->
+  Just _ ->
     let
       -- Find all matches and extract predicate info
       parts = split (Pattern "(") line
@@ -182,7 +179,7 @@ findShowDeclarations line =
     Just rx -> case match rx line of
       Nothing -> []
       Just matches ->
-        case Array.index matches 1, Array.index matches 2 of
+        case NEA.index matches 1, NEA.index matches 2 of
           Just (Just name), Just (Just arityStr) ->
             case parseIntMaybe arityStr of
               Just arity -> [{ name, arity }]
