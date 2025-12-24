@@ -6,7 +6,7 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (filter, length, mapWithIndex, null, sortBy, nub, head, take)
+import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, take)
 import Data.Array as Array
 import Data.Foldable (fold, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -496,15 +496,19 @@ formatTimePoint (ASP.UnknownTime s) = s
 handleAction :: forall cs o m. Action -> H.HalogenM State Action cs o m Unit
 handleAction = case _ of
   ReceiveAtoms atomStrings -> do
+    currentState <- H.get
     let atoms = ASP.parseAnswerSet atomStrings
     let timeline = ASP.extractTimeline atoms
     let allTimes = getAllTimePoints atoms
-    let firstTime = head allTimes
+    -- Preserve selected time if it exists in the new model, otherwise use first time
+    let preservedTime = case currentState.selectedTime of
+          Just t | elem t allTimes -> Just t
+          _ -> head allTimes
     H.modify_ \s -> s
       { atoms = atoms
       , timeline = timeline
       , allTimePoints = allTimes
-      , selectedTime = firstTime
+      , selectedTime = preservedTime
       }
 
   SelectTimePoint t ->
