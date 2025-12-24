@@ -6,8 +6,9 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (filter, length, mapWithIndex, null, sortBy, nub, head, take, fold, intercalate)
+import Data.Array (filter, length, mapWithIndex, null, sortBy, nub, head, take)
 import Data.Array as Array
+import Data.Foldable (fold, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Void (Void)
 import Data.Int (toNumber)
