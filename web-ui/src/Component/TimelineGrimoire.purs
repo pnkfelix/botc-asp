@@ -215,7 +215,7 @@ renderGrimoire state =
                 [ SA.cx centerX
                 , SA.cy centerY
                 , SA.r radius
-                , SA.fill None
+                , SA.fill NoColor
                 , SA.stroke (Named "#ccc")
                 , SA.strokeWidth 1.0
                 , SA.strokeDashArray "4,4"
