@@ -9,7 +9,7 @@ import AnswerSetParser as ASP
 import Data.Array (filter, length, mapWithIndex, null, sortBy, nub, head, take, fold, intercalate)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Number as Number
+import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..), split, toUpper) as S
 import Data.String (length) as Str
@@ -246,7 +246,7 @@ renderPlayer :: forall cs m.
 renderPlayer centerX centerY radius playerCount reminders idx player =
   let
     -- Calculate position on circle (start from top, go clockwise)
-    angle = (Number.toNumber idx) * 2.0 * pi / (Number.toNumber playerCount) - pi / 2.0
+    angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
     x = centerX + radius * cos angle
     y = centerY + radius * sin angle
 
@@ -318,7 +318,7 @@ renderReminderToken total idx reminder =
     angleSpread = pi / 2.0  -- Spread over 90 degrees
     angle = if total == 1
       then pi / 2.0  -- Single token at bottom
-      else startAngle + (Number.toNumber idx) * angleSpread / (Number.toNumber (total - 1))
+      else startAngle + (toNumber idx) * angleSpread / (toNumber (total - 1))
     dist = 48.0  -- Distance from center
     rx = dist * cos angle
     ry = dist * sin angle
