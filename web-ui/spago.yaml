@@ -13,7 +13,6 @@ package:
     - math
     - maybe
     - numbers
-    - ordered-collections
     - prelude
     - strings
     - tuples
