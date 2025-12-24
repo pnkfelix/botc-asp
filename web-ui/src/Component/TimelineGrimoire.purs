@@ -271,7 +271,7 @@ renderPlayer :: forall cs m.
   Number ->  -- centerY
   Number ->  -- radius
   Int ->     -- total players
-  Array { token :: String, player :: String } ->  -- reminders
+  Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->  -- reminders (sorted by placedAt)
   Int ->     -- index
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
   H.ComponentHTML Action cs m
@@ -342,8 +342,8 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
 renderReminderToken :: forall cs m.
   Number -> -- angle toward center
   Int ->    -- total reminders for this player
-  Int ->    -- index
-  { token :: String, player :: String } ->
+  Int ->    -- index (0 = oldest/closest to role token)
+  { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   H.ComponentHTML Action cs m
 renderReminderToken angleToCenter _total idx reminder =
   let

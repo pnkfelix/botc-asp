@@ -12,7 +12,7 @@ module AnswerSetParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, sortBy, nub, head)
+import Data.Array (filter, mapMaybe, sortBy, nub, head, findIndex, index)
 import Data.Foldable (elem, all)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
@@ -99,7 +99,7 @@ derive instance eqTimelineEvent :: Eq TimelineEvent
 -- | Game state at a particular time point
 type GameState =
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean }
-  , reminders :: Array { token :: String, player :: String }
+  , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
   }
 
@@ -430,8 +430,17 @@ buildGameState atoms targetTime =
     deadAtoms = filter (isDeadAt targetTime) atoms
     deadPlayers = mapMaybe getDeadName deadAtoms
 
-    -- Get reminders at exact target time (leverage ASP fluent)
-    remindersAtTime = mapMaybe (getReminderAt targetTime) atoms
+    -- Get all reminder atoms to find placement times
+    allReminders = mapMaybe getReminder atoms
+
+    -- Get all time points in sorted order (the full timeline)
+    allTimePoints = nub $ sortBy compareTimePoints $ mapMaybe getTimeFromAtom atoms
+
+    -- Get reminders active at target time, with their placement time
+    -- (start of current continuous run, not earliest ever)
+    -- Sort by placement time (oldest first = closer to role token)
+    remindersAtTime = sortBy (comparing _.placedAt) $
+      mapMaybe (getReminderWithPlacement allReminders allTimePoints targetTime) atoms
 
     -- Build player list
     players = chairs # map \c ->
@@ -467,11 +476,55 @@ buildGameState atoms targetTime =
     getDeadName (Dead name _) = Just name
     getDeadName _ = Nothing
 
-    getReminderAt t (ReminderOn token player time) =
+    -- Extract all reminder atoms with their times
+    getReminder (ReminderOn token player time) = Just { token, player, time }
+    getReminder _ = Nothing
+
+    -- Extract time from various atom types
+    getTimeFromAtom (Time t) = Just t
+    getTimeFromAtom (StTells _ _ _ t) = Just t
+    getTimeFromAtom (PlayerChooses _ _ _ t) = Just t
+    getTimeFromAtom (ReminderOn _ _ t) = Just t
+    getTimeFromAtom (Alive _ t) = Just t
+    getTimeFromAtom (Dead _ t) = Just t
+    getTimeFromAtom (ActingRole t _) = Just t
+    getTimeFromAtom _ = Nothing
+
+    -- For a reminder active at target time, find its placement time
+    -- (start of current continuous run, handling gaps from removal/re-placement)
+    getReminderWithPlacement allRems timeline t (ReminderOn token player time) =
       if time == t
-        then Just { token, player }
+        then
+          let
+            -- Find all times this (token, player) pair appears
+            tokenTimes = map _.time $ filter (\r -> r.token == token && r.player == player) allRems
+            -- Find start of continuous run ending at t
+            placementTime = findRunStart tokenTimes timeline t
+          in Just { token, player, placedAt: placementTime }
         else Nothing
-    getReminderAt _ _ = Nothing
+    getReminderWithPlacement _ _ _ _ = Nothing
+
+    -- Find the start of a continuous run ending at targetTime
+    -- Walk backwards through the timeline; stop when we hit a gap
+    findRunStart :: Array TimePoint -> Array TimePoint -> TimePoint -> TimePoint
+    findRunStart tokenTimes timeline targetT =
+      let
+        -- Get index of target time in timeline
+        timelineArr = timeline
+        targetIdx = findIndex (\t -> t == targetT) timelineArr
+      in case targetIdx of
+        Nothing -> targetT
+        Just idx -> walkBackwards tokenTimes timelineArr idx targetT
+
+    walkBackwards :: Array TimePoint -> Array TimePoint -> Int -> TimePoint -> TimePoint
+    walkBackwards tokenTimes timeline idx currentStart =
+      if idx <= 0
+        then currentStart
+        else
+          let prevTime = fromMaybe currentStart (index timeline (idx - 1))
+          in if elem prevTime tokenTimes
+               then walkBackwards tokenTimes timeline (idx - 1) prevTime
+               else currentStart
 
     lookup key arr = map _.value $ head $ filter (\x -> x.key == key) arr
 
