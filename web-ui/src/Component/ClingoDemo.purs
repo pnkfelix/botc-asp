@@ -8,7 +8,7 @@ import Component.TimelineGrimoire as TG
 import Data.Array (intercalate, length, mapWithIndex, null, head)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Void (absurd)
+import Data.Void (Void, absurd)
 import Data.String (trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
@@ -26,7 +26,7 @@ data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
 derive instance eqProgramPanel :: Eq ProgramPanel
 
 -- | Child slots for embedded components
-type Slots = ( timelineGrimoire :: H.Slot TG.Query (Array String) Unit )
+type Slots = ( timelineGrimoire :: H.Slot TG.Query Void Unit )
 
 _timelineGrimoire :: Proxy "timelineGrimoire"
 _timelineGrimoire = Proxy
