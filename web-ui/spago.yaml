@@ -10,7 +10,10 @@ package:
     - foreign
     - halogen
     - integers
+    - math
     - maybe
+    - numbers
+    - ordered-collections
     - prelude
     - strings
     - tuples

@@ -9,7 +9,6 @@ import Data.Array (intercalate, length, mapWithIndex, null, head)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (trim)
-import Data.Symbol (SProxy(..))
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
