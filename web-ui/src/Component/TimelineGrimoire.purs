@@ -199,10 +199,12 @@ renderGrimoire state =
       [ -- SVG grimoire
         HH.element (HH.ElemName "svg")
           [ HP.attr (HH.AttrName "viewBox") ("0 0 " <> show width <> " " <> show height)
-          , HP.style "width: 100%; max-width: 500px; height: auto; display: block; margin: 0 auto;"
+          , HP.attr (HH.AttrName "width") (show width)
+          , HP.attr (HH.AttrName "height") (show height)
+          , HP.style "display: block; margin: 0 auto; max-width: 100%;"
           ]
           (
-            -- Draw lines connecting neighbors (circle)
+            -- Draw dashed circle showing table edge
             [ HH.element (HH.ElemName "circle")
                 [ HP.attr (HH.AttrName "cx") (show centerX)
                 , HP.attr (HH.AttrName "cy") (show centerY)
@@ -215,7 +217,16 @@ renderGrimoire state =
                 []
             ]
             -- Draw players
-            <> (mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders) gameState.players)
+            <> (if playerCount > 0
+                then mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders) gameState.players
+                else [ HH.element (HH.ElemName "text")
+                         [ HP.attr (HH.AttrName "x") (show centerX)
+                         , HP.attr (HH.AttrName "y") (show centerY)
+                         , HP.attr (HH.AttrName "text-anchor") "middle"
+                         , HP.attr (HH.AttrName "fill") "#999"
+                         ]
+                         [ HH.text "No player data - add #show chair/2." ]
+                     ])
           )
       -- Legend
       , HH.div
@@ -254,6 +265,9 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
 
     -- Player's reminders
     playerReminders = filter (\r -> r.player == player.name) reminders
+
+    -- Direction toward center (angle + pi points inward)
+    angleToCenter = angle + pi
 
     -- Colors
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
@@ -303,27 +317,26 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
             ]
             [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
           else HH.text ""
-      -- Reminder tokens (small circles around the main token)
-      ] <> mapWithIndex (renderReminderToken (length playerReminders)) playerReminders
+      -- Reminder tokens positioned toward center
+      ] <> mapWithIndex (renderReminderToken angleToCenter (length playerReminders)) playerReminders
       )
 
 -- | Render a reminder token
 renderReminderToken :: forall cs m.
-  Int ->   -- total reminders for this player
-  Int ->   -- index
+  Number -> -- angle toward center
+  Int ->    -- total reminders for this player
+  Int ->    -- index
   { token :: String, player :: String } ->
   H.ComponentHTML Action cs m
-renderReminderToken total idx reminder =
+renderReminderToken angleToCenter total idx reminder =
   let
-    -- Position reminder tokens in a small arc below the player token
-    startAngle = pi / 4.0  -- Start 45 degrees from bottom
-    angleSpread = pi / 2.0  -- Spread over 90 degrees
-    angle = if total == 1
-      then pi / 2.0  -- Single token at bottom
-      else startAngle + (toNumber idx) * angleSpread / (toNumber (total - 1))
-    dist = 48.0  -- Distance from center
-    rx = dist * cos angle
-    ry = dist * sin angle
+    -- Position reminder tokens along line toward center
+    -- Start just inside the player token (radius 35) and go inward
+    baseDistance = 50.0  -- Starting distance from player center
+    spacing = 28.0       -- Space between reminder tokens
+    dist = baseDistance + (toNumber idx) * spacing
+    rx = dist * cos angleToCenter
+    ry = dist * sin angleToCenter
   in
     HH.element (HH.ElemName "g")
       [ HP.attr (HH.AttrName "transform") ("translate(" <> show rx <> "," <> show ry <> ")") ]
