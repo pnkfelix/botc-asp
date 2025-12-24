@@ -5,7 +5,7 @@ import Prelude
 import AspParser as ASP
 import Clingo as Clingo
 import Component.TimelineGrimoire as TG
-import Data.Array (length, mapWithIndex, null, head)
+import Data.Array (index, length, mapWithIndex, null)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -42,6 +42,7 @@ type State =
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
+  , selectedModelIndex :: Int  -- Which model to show in Timeline/Grimoire (0-indexed)
   -- Predicate navigator state
   , showPredicateList :: Boolean
   , selectedPredicate :: Maybe ASP.Predicate
@@ -60,6 +61,7 @@ data Action
   | SetModelLimit String
   | RunClingo
   | CancelSolve
+  | SelectModel Int  -- Select which model to display in Timeline/Grimoire
   | TogglePredicateList
   | SelectPredicate ASP.Predicate
   | ClosePredicateModal
@@ -77,6 +79,7 @@ initialState =
   , result: Nothing
   , isLoading: false
   , isInitialized: false
+  , selectedModelIndex: 0  -- First model selected by default
   , showPredicateList: false
   , selectedPredicate: Nothing
   }
@@ -215,7 +218,7 @@ render state =
         ]
 
     -- Results display
-    , renderResult state.result
+    , renderResult state
 
     -- Predicate list panel (slide-in from right)
     , renderPredicatePanel state.showPredicateList parsed.predicates
@@ -261,59 +264,84 @@ sourceFileToTextareaId = case _ of
   _ -> Nothing
 
 -- | Render the result section
-renderResult :: forall m. MonadAff m => Maybe ResultDisplay -> H.ComponentHTML Action Slots m
-renderResult Nothing =
-  HH.div
-    [ HP.style "padding: 20px; background: #f5f5f5; border-radius: 4px; color: #666;" ]
-    [ HH.text "Click 'Run Clingo' to solve the program" ]
+renderResult :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
+renderResult state = case state.result of
+  Nothing ->
+    HH.div
+      [ HP.style "padding: 20px; background: #f5f5f5; border-radius: 4px; color: #666;" ]
+      [ HH.text "Click 'Run Clingo' to solve the program" ]
 
-renderResult (Just (ResultError err)) =
-  HH.div
-    [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace; white-space: pre-wrap;" ]
-    [ HH.strong_ [ HH.text "Error: " ]
-    , HH.text err
-    ]
+  Just (ResultError err) ->
+    HH.div
+      [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace; white-space: pre-wrap;" ]
+      [ HH.strong_ [ HH.text "Error: " ]
+      , HH.text err
+      ]
 
-renderResult (Just ResultUnsat) =
-  HH.div
-    [ HP.style "padding: 20px; background: #fff3e0; border-radius: 4px; color: #e65100;" ]
-    [ HH.strong_ [ HH.text "UNSATISFIABLE" ]
-    , HH.p_ [ HH.text "No solutions exist for the given constraints." ]
-    ]
+  Just ResultUnsat ->
+    HH.div
+      [ HP.style "padding: 20px; background: #fff3e0; border-radius: 4px; color: #e65100;" ]
+      [ HH.strong_ [ HH.text "UNSATISFIABLE" ]
+      , HH.p_ [ HH.text "No solutions exist for the given constraints." ]
+      ]
 
-renderResult (Just (ResultSuccess answerSets)) =
-  HH.div_
-    [ HH.div
-        [ HP.style "padding: 20px; background: #e8f5e9; border-radius: 4px;" ]
-        [ HH.strong
-            [ HP.style "color: #2e7d32;" ]
-            [ HH.text $ "SATISFIABLE - Found " <> show (length answerSets) <> " answer set(s)" ]
-        , HH.div_ $ mapWithIndex renderAnswerSet answerSets
-        ]
-    -- Timeline and Grimoire view for the first answer set
-    , case head answerSets of
-        Just firstSet ->
-          HH.div
-            [ HP.style "margin-top: 20px;" ]
-            [ HH.h2
-                [ HP.style "color: #333; margin-bottom: 10px;" ]
-                [ HH.text "Timeline & Grimoire View" ]
-            , HH.slot _timelineGrimoire unit TG.component firstSet absurd
-            ]
-        Nothing -> HH.text ""
-    ]
-  where
-
-    renderAnswerSet idx atoms =
-      HH.div
-        [ HP.style "margin-top: 15px; padding: 10px; background: white; border-radius: 4px; border: 1px solid #c8e6c9;" ]
-        [ HH.div
-            [ HP.style "font-weight: bold; color: #388e3c; margin-bottom: 8px;" ]
-            [ HH.text $ "Answer Set " <> show (idx + 1) <> ":" ]
-        , HH.code
-            [ HP.style "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20;" ]
-            [ HH.text $ intercalate " " atoms ]
-        ]
+  Just (ResultSuccess answerSets) ->
+    let
+      selectedIdx = state.selectedModelIndex
+      selectedSet = index answerSets selectedIdx
+    in
+    HH.div_
+      [ -- Timeline and Grimoire view FIRST (for selected model)
+        case selectedSet of
+          Just atoms ->
+            HH.div
+              [ HP.style "margin-bottom: 20px;" ]
+              [ HH.h2
+                  [ HP.style "color: #333; margin-bottom: 10px;" ]
+                  [ HH.text $ "Timeline & Grimoire View"
+                      <> if length answerSets > 1
+                         then " (Model " <> show (selectedIdx + 1) <> " of " <> show (length answerSets) <> ")"
+                         else ""
+                  ]
+              , HH.slot _timelineGrimoire unit TG.component atoms absurd
+              ]
+          Nothing -> HH.text ""
+      -- Output section SECOND (compact, scrollable)
+      , HH.div
+          [ HP.style "padding: 15px; background: #e8f5e9; border-radius: 4px;" ]
+          [ HH.strong
+              [ HP.style "color: #2e7d32;" ]
+              [ HH.text $ "SATISFIABLE - Found " <> show (length answerSets) <> " answer set(s)"
+                  <> if length answerSets > 1 then " (click to select)" else ""
+              ]
+          , HH.div
+              [ HP.style "max-height: 200px; overflow-y: auto; margin-top: 10px;" ]
+              [ HH.div_ $ mapWithIndex (renderAnswerSet selectedIdx) answerSets ]
+          ]
+      ]
+    where
+      renderAnswerSet selectedIdx idx atoms =
+        let
+          isSelected = idx == selectedIdx
+          baseStyle = "margin-top: 8px; padding: 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; "
+          selectedStyle = if isSelected
+            then "background: #c8e6c9; border: 2px solid #4CAF50;"
+            else "background: white; border: 1px solid #c8e6c9;"
+          hoverNote = if not isSelected then " opacity: 0.9;" else ""
+        in
+        HH.div
+          [ HP.style $ baseStyle <> selectedStyle <> hoverNote
+          , HE.onClick \_ -> SelectModel idx
+          ]
+          [ HH.div
+              [ HP.style $ "font-weight: bold; margin-bottom: 4px; font-size: 12px; "
+                  <> if isSelected then "color: #1b5e20;" else "color: #388e3c;"
+              ]
+              [ HH.text $ "Answer Set " <> show (idx + 1) <> (if isSelected then " ✓" else "") ]
+          , HH.code
+              [ HP.style "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20; font-size: 11px; max-height: 60px; overflow-y: auto;" ]
+              [ HH.text $ intercalate " " atoms ]
+          ]
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
@@ -455,7 +483,7 @@ handleAction = case _ of
     H.modify_ \s -> s { modelLimit = limit }
 
   RunClingo -> do
-    H.modify_ \s -> s { isLoading = true, result = Nothing }
+    H.modify_ \s -> s { isLoading = true, result = Nothing, selectedModelIndex = 0 }
     state <- H.get
     -- Parse model limit (empty or invalid = 0 = all models)
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
@@ -482,6 +510,9 @@ handleAction = case _ of
     -- Restart the worker to cancel the current solve
     H.liftAff $ Clingo.restart "./clingo.wasm"
     H.modify_ \s -> s { isLoading = false, result = Just (ResultError "Solve cancelled by user") }
+
+  SelectModel idx ->
+    H.modify_ \s -> s { selectedModelIndex = idx }
 
   TogglePredicateList ->
     H.modify_ \s -> s { showPredicateList = not s.showPredicateList }
