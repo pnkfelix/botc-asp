@@ -236,21 +236,21 @@ renderGrimoire state =
       -- Legend
       , HH.div
           [ HP.style "margin-top: 15px; font-size: 12px; color: #666; text-align: center;" ]
-          [ -- Character type colors
+          [ -- Character type color families (each role has unique color within family)
             HH.span [ HP.style "margin-right: 12px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #1565c0; margin-right: 4px; vertical-align: middle;" ] []
+              [ HH.span [ HP.style "display: inline-block; width: 36px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #0D47A1, #2196F3, #00BCD4, #673AB7, #689F38); margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Townsfolk"
               ]
           , HH.span [ HP.style "margin-right: 12px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #00838f; margin-right: 4px; vertical-align: middle;" ] []
+              [ HH.span [ HP.style "display: inline-block; width: 24px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #26A69A, #4DD0E1, #78909C); margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Outsider"
               ]
           , HH.span [ HP.style "margin-right: 12px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #d84315; margin-right: 4px; vertical-align: middle;" ] []
+              [ HH.span [ HP.style "display: inline-block; width: 24px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #E65100, #FF9800, #E53935, #8D6E63); margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Minion"
               ]
           , HH.span [ HP.style "margin-right: 12px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #b71c1c; margin-right: 4px; vertical-align: middle;" ] []
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #B71C1C; margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Demon"
               ]
           -- Status indicators
@@ -378,23 +378,78 @@ renderReminderToken angleToCenter _total idx reminder =
           [ HH.text $ abbreviateToken reminder.token ]
       ]
 
--- | Get color based on role type
--- Good (Townsfolk, Outsiders): blue tones
--- Evil (Minions, Demons): red tones
+-- | Get unique color for each role
+-- Good (Townsfolk, Outsiders): blue-family tones (no red)
+-- Evil (Minions, Demons): red-family tones (no blue)
 getRoleColor :: String -> String
-getRoleColor role
-  | isMinion role = "#d84315"  -- Deep orange for minions
-  | isDemon role = "#b71c1c"    -- Dark red for demons
-  | isOutsider role = "#00838f" -- Teal for outsiders
-  | otherwise = "#1565c0"       -- Blue for townsfolk
+getRoleColor role = case role of
+  -- Townsfolk (blue spectrum, greens, purples - no red)
+  "washerwoman"    -> "#2196F3"  -- Bright blue
+  "librarian"      -> "#1976D2"  -- Medium blue
+  "investigator"   -> "#0D47A1"  -- Deep blue
+  "chef"           -> "#00BCD4"  -- Cyan
+  "empath"         -> "#00ACC1"  -- Dark cyan
+  "fortune_teller" -> "#673AB7"  -- Deep purple
+  "undertaker"     -> "#512DA8"  -- Dark purple
+  "monk"           -> "#689F38"  -- Light green (no red)
+  "ravenkeeper"    -> "#00796B"  -- Dark teal
+  "virgin"         -> "#03A9F4"  -- Light blue
+  "slayer"         -> "#546E7A"  -- Blue grey
+  "soldier"        -> "#37474F"  -- Dark blue grey
+  "mayor"          -> "#3F51B5"  -- Indigo
+  -- Outsiders (teal/cyan family - no red)
+  "butler"         -> "#26A69A"  -- Teal
+  "drunk"          -> "#4DB6AC"  -- Light teal
+  "recluse"        -> "#78909C"  -- Blue grey light
+  "saint"          -> "#4DD0E1"  -- Light cyan
+  -- Minions (orange/amber family - no blue)
+  "poisoner"       -> "#E65100"  -- Deep orange
+  "spy"            -> "#FF9800"  -- Amber
+  "scarlet_woman"  -> "#E53935"  -- Scarlet red
+  "baron"          -> "#8D6E63"  -- Brown
+  -- Demon (dark red - no blue)
+  "imp"            -> "#B71C1C"  -- Dark crimson
+  -- Fallback by type
+  _ | isMinion role  -> "#E65100"
+    | isDemon role   -> "#B71C1C"
+    | isOutsider role -> "#26A69A"
+    | otherwise      -> "#2196F3"
 
--- | Get lighter shade for reminder tokens based on role type
+-- | Get lighter shade for reminder tokens - uses same hue as source role
+-- (Reminder tokens use the same color as the role they come from)
 getRoleColorLight :: String -> String
-getRoleColorLight role
-  | isMinion role = "#ffab91"  -- Light orange for minions
-  | isDemon role = "#ef9a9a"    -- Light red for demons
-  | isOutsider role = "#80deea" -- Light teal for outsiders
-  | otherwise = "#64b5f6"       -- Light blue for townsfolk
+getRoleColorLight role = case role of
+  -- Townsfolk (lighter versions)
+  "washerwoman"    -> "#64B5F6"  -- Light blue
+  "librarian"      -> "#42A5F5"  -- Light medium blue
+  "investigator"   -> "#5472D3"  -- Light deep blue
+  "chef"           -> "#4DD0E1"  -- Light cyan
+  "empath"         -> "#4DD0E1"  -- Light cyan
+  "fortune_teller" -> "#9575CD"  -- Light purple
+  "undertaker"     -> "#7E57C2"  -- Light dark purple
+  "monk"           -> "#9CCC65"  -- Light green
+  "ravenkeeper"    -> "#4DB6AC"  -- Light teal
+  "virgin"         -> "#4FC3F7"  -- Lighter blue
+  "slayer"         -> "#90A4AE"  -- Light blue grey
+  "soldier"        -> "#78909C"  -- Light dark grey
+  "mayor"          -> "#7986CB"  -- Light indigo
+  -- Outsiders (lighter versions)
+  "butler"         -> "#80CBC4"  -- Light teal
+  "drunk"          -> "#B2DFDB"  -- Lighter teal
+  "recluse"        -> "#B0BEC5"  -- Lighter blue grey
+  "saint"          -> "#80DEEA"  -- Lighter cyan
+  -- Minions (lighter versions)
+  "poisoner"       -> "#FF8A65"  -- Light orange
+  "spy"            -> "#FFB74D"  -- Light amber
+  "scarlet_woman"  -> "#EF5350"  -- Light red
+  "baron"          -> "#BCAAA4"  -- Light brown
+  -- Demon
+  "imp"            -> "#EF5350"  -- Light red
+  -- Fallback
+  _ | isMinion role  -> "#FF8A65"
+    | isDemon role   -> "#EF5350"
+    | isOutsider role -> "#80CBC4"
+    | otherwise      -> "#64B5F6"
 
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
