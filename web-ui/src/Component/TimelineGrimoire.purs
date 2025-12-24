@@ -415,42 +415,6 @@ getRoleColor role = case role of
     | isOutsider role -> "#26A69A"
     | otherwise      -> "#2196F3"
 
--- | Get lighter shade for reminder tokens - uses same hue as source role
--- (Reminder tokens use the same color as the role they come from)
-getRoleColorLight :: String -> String
-getRoleColorLight role = case role of
-  -- Townsfolk (lighter versions)
-  "washerwoman"    -> "#64B5F6"  -- Light blue
-  "librarian"      -> "#42A5F5"  -- Light medium blue
-  "investigator"   -> "#5472D3"  -- Light deep blue
-  "chef"           -> "#4DD0E1"  -- Light cyan
-  "empath"         -> "#4DD0E1"  -- Light cyan
-  "fortune_teller" -> "#9575CD"  -- Light purple
-  "undertaker"     -> "#7E57C2"  -- Light dark purple
-  "monk"           -> "#9CCC65"  -- Light green
-  "ravenkeeper"    -> "#4DB6AC"  -- Light teal
-  "virgin"         -> "#4FC3F7"  -- Lighter blue
-  "slayer"         -> "#90A4AE"  -- Light blue grey
-  "soldier"        -> "#78909C"  -- Light dark grey
-  "mayor"          -> "#7986CB"  -- Light indigo
-  -- Outsiders (lighter versions)
-  "butler"         -> "#80CBC4"  -- Light teal
-  "drunk"          -> "#B2DFDB"  -- Lighter teal
-  "recluse"        -> "#B0BEC5"  -- Lighter blue grey
-  "saint"          -> "#80DEEA"  -- Lighter cyan
-  -- Minions (lighter versions)
-  "poisoner"       -> "#FF8A65"  -- Light orange
-  "spy"            -> "#FFB74D"  -- Light amber
-  "scarlet_woman"  -> "#EF5350"  -- Light red
-  "baron"          -> "#BCAAA4"  -- Light brown
-  -- Demon
-  "imp"            -> "#EF5350"  -- Light red
-  -- Fallback
-  _ | isMinion role  -> "#FF8A65"
-    | isDemon role   -> "#EF5350"
-    | isOutsider role -> "#80CBC4"
-    | otherwise      -> "#64B5F6"
-
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
 
@@ -483,9 +447,9 @@ tokenToRole token
   | S.take 4 token == "may_" = "mayor"
   | otherwise = "unknown"
 
--- | Get color for reminder token (shade of source role's type color)
+-- | Get color for reminder token (same color as the source role)
 getReminderColor :: String -> String
-getReminderColor token = getRoleColorLight (tokenToRole token)
+getReminderColor token = getRoleColor (tokenToRole token)
 
 -- | Abbreviate token name for display
 abbreviateToken :: String -> String
