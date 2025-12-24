@@ -21,7 +21,7 @@ time(night(1, RoleOrd, S)) :-
 % Other nights (2+) use other_night_role_order and other_night_substep
 % night_number/1 defines which nights we're modeling
 night_number(1).  % always model night 1
-% night_number(2). % uncomment or add in test to model night 2
+night_number(N) :- N = 2..night_count.  % model nights 2 through night_count
 
 time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
 
