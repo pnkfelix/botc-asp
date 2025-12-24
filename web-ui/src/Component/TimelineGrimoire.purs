@@ -21,6 +21,11 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Svg.Elements as SE
 import Halogen.Svg.Attributes as SA
+import Halogen.Svg.Attributes.Color (Color(..))
+import Halogen.Svg.Attributes.CSSLength (CSSLength(..))
+import Halogen.Svg.Attributes.FontSize (FontSize(..))
+import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
+import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 
 -- | Component state
@@ -210,8 +215,8 @@ renderGrimoire state =
                 [ SA.cx centerX
                 , SA.cy centerY
                 , SA.r radius
-                , SA.fill $ SA.NoFill
-                , SA.stroke $ SA.Named "#ccc"
+                , SA.fill None
+                , SA.stroke (Named "#ccc")
                 , SA.strokeWidth 1.0
                 , SA.strokeDashArray "4,4"
                 ]
@@ -222,8 +227,8 @@ renderGrimoire state =
                 else [ SE.text
                          [ SA.x centerX
                          , SA.y centerY
-                         , SA.textAnchor SA.AnchorMiddle
-                         , SA.fill $ SA.Named "#999"
+                         , SA.textAnchor AnchorMiddle
+                         , SA.fill (Named "#999")
                          ]
                          [ HH.text "No player data - add #show chair/2." ]
                      ])
@@ -281,27 +286,27 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
           [ SA.cx 0.0
           , SA.cy 0.0
           , SA.r 35.0
-          , SA.fill $ SA.Named roleColor
-          , SA.stroke $ SA.Named aliveColor
+          , SA.fill (Named roleColor)
+          , SA.stroke (Named aliveColor)
           , SA.strokeWidth 3.0
           ]
       -- Player name
       , SE.text
           [ SA.x 0.0
           , SA.y (-8.0)
-          , SA.textAnchor SA.AnchorMiddle
-          , SA.fill $ SA.Named "white"
-          , SA.fontWeight SA.FontWeightBold
-          , SA.fontSize $ SA.FontSizeLength $ SA.Px 10.0
+          , SA.textAnchor AnchorMiddle
+          , SA.fill (Named "white")
+          , SA.fontWeight FWeightBold
+          , SA.fontSize (FontSizeLength (Px 10.0))
           ]
           [ HH.text player.name ]
       -- Role name
       , SE.text
           [ SA.x 0.0
           , SA.y 5.0
-          , SA.textAnchor SA.AnchorMiddle
-          , SA.fill $ SA.Named "white"
-          , SA.fontSize $ SA.FontSizeLength $ SA.Px 8.0
+          , SA.textAnchor AnchorMiddle
+          , SA.fill (Named "white")
+          , SA.fontSize (FontSizeLength (Px 8.0))
           ]
           [ HH.text $ formatRoleName player.role ]
       -- Token (what they think they are, if different)
@@ -309,9 +314,9 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
           then SE.text
             [ SA.x 0.0
             , SA.y 16.0
-            , SA.textAnchor SA.AnchorMiddle
-            , SA.fill $ SA.Named "#ffeb3b"
-            , SA.fontSize $ SA.FontSizeLength $ SA.Px 7.0
+            , SA.textAnchor AnchorMiddle
+            , SA.fill (Named "#ffeb3b")
+            , SA.fontSize (FontSizeLength (Px 7.0))
             ]
             [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
           else SE.g [] []
@@ -343,18 +348,18 @@ renderReminderToken angleToCenter _total idx reminder =
           [ SA.cx 0.0
           , SA.cy 0.0
           , SA.r 12.0
-          , SA.fill $ SA.Named (getReminderColor reminder.token)
-          , SA.stroke $ SA.Named "#fff"
+          , SA.fill (Named (getReminderColor reminder.token))
+          , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
           ]
       -- Reminder abbreviation
       , SE.text
           [ SA.x 0.0
           , SA.y 3.0
-          , SA.textAnchor SA.AnchorMiddle
-          , SA.fill $ SA.Named "white"
-          , SA.fontWeight SA.FontWeightBold
-          , SA.fontSize $ SA.FontSizeLength $ SA.Px 6.0
+          , SA.textAnchor AnchorMiddle
+          , SA.fill (Named "white")
+          , SA.fontWeight FWeightBold
+          , SA.fontSize (FontSizeLength (Px 6.0))
           ]
           [ HH.text $ abbreviateToken reminder.token ]
       ]
