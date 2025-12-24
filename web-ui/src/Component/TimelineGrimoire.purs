@@ -14,7 +14,7 @@ import Data.Void (Void)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..), split, toUpper) as S
-import Data.String (length) as Str
+import Data.String as Str
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
