@@ -99,7 +99,7 @@ derive instance eqTimelineEvent :: Eq TimelineEvent
 -- | Game state at a particular time point
 type GameState =
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean }
-  , reminders :: Array { token :: String, player :: String }
+  , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
   }
 
@@ -430,8 +430,13 @@ buildGameState atoms targetTime =
     deadAtoms = filter (isDeadAt targetTime) atoms
     deadPlayers = mapMaybe getDeadName deadAtoms
 
-    -- Get reminders at exact target time (leverage ASP fluent)
-    remindersAtTime = mapMaybe (getReminderAt targetTime) atoms
+    -- Get all reminder atoms to find earliest placement times
+    allReminders = mapMaybe getReminder atoms
+
+    -- Get reminders active at target time, with their earliest placement time
+    -- Sort by placement time (oldest first = closer to role token)
+    remindersAtTime = sortBy (comparing _.placedAt) $
+      mapMaybe (getReminderWithPlacement allReminders targetTime) atoms
 
     -- Build player list
     players = chairs # map \c ->
@@ -467,11 +472,22 @@ buildGameState atoms targetTime =
     getDeadName (Dead name _) = Just name
     getDeadName _ = Nothing
 
-    getReminderAt t (ReminderOn token player time) =
+    -- Extract all reminder atoms with their times
+    getReminder (ReminderOn token player time) = Just { token, player, time }
+    getReminder _ = Nothing
+
+    -- For a reminder active at target time, find its earliest placement
+    getReminderWithPlacement allRems t (ReminderOn token player time) =
       if time == t
-        then Just { token, player }
+        then
+          let
+            -- Find all times this (token, player) pair appears
+            samePair = filter (\r -> r.token == token && r.player == player) allRems
+            -- Get the earliest time
+            earliestTime = fromMaybe time $ map _.time $ head $ sortBy (comparing _.time) samePair
+          in Just { token, player, placedAt: earliestTime }
         else Nothing
-    getReminderAt _ _ = Nothing
+    getReminderWithPlacement _ _ _ = Nothing
 
     lookup key arr = map _.value $ head $ filter (\x -> x.key == key) arr
 
