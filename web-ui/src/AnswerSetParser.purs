@@ -13,7 +13,6 @@ module AnswerSetParser
 import Prelude
 
 import Data.Array (filter, mapMaybe, sortBy, nub, head)
-import Data.Array as Array
 import Data.Foldable (elem, all)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
@@ -372,7 +371,7 @@ parseInt s =
        then Just (unsafeParseInt trimmed)
        else Nothing
   where
-    allDigits str = Array.all isDigit (split (Pattern "") str)
+    allDigits str = all isDigit (split (Pattern "") str)
     isDigit c = c >= "0" && c <= "9"
 
 foreign import unsafeParseInt :: String -> Int
@@ -417,7 +416,7 @@ buildGameState atoms targetTime =
       let
         role = fromMaybe "?" $ lookup c.name assignments
         token = fromMaybe role $ lookup c.name tokens
-        isAlive = Array.elem c.name alivePlayers && not (Array.elem c.name deadPlayers)
+        isAlive = elem c.name alivePlayers && not (elem c.name deadPlayers)
       in { name: c.name, chair: c.pos, role, token, alive: isAlive }
   in
     { players: sortBy (comparing _.chair) players
