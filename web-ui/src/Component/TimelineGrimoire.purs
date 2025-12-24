@@ -13,8 +13,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Void (Void)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
-import Data.String (Pattern(..), split, toUpper) as S
-import Data.String as Str
+import Data.String (Pattern(..))
+import Data.String as S
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -392,18 +392,18 @@ abbreviateToken t = case t of
   "sla_no_ability" -> "SLA"
   _ -> takeChars 3 t
   where
-    takeChars n s = if Str.length s <= n then s else fold (take n (S.split (S.Pattern "") s))
+    takeChars n s = if S.length s <= n then s else fold (take n (S.split (Pattern "") s))
 
 -- | Format role name for display (capitalize, replace underscores)
 formatRoleName :: String -> String
 formatRoleName role =
   let
-    parts = S.split (S.Pattern "_") role
+    parts = S.split (Pattern "_") role
     capitalized = map capitalize parts
   in
     intercalate " " capitalized
   where
-    capitalize s = case Array.uncons (S.split (S.Pattern "") s) of
+    capitalize s = case Array.uncons (S.split (Pattern "") s) of
       Just { head: h, tail: t } -> S.toUpper h <> fold t
       Nothing -> s
 
