@@ -5,7 +5,8 @@ import Prelude
 import AspParser as ASP
 import Clingo as Clingo
 import Component.TimelineGrimoire as TG
-import Data.Array (intercalate, length, mapWithIndex, null, head)
+import Data.Array (length, mapWithIndex, null, head)
+import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Void (Void, absurd)
