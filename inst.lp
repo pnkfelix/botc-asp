@@ -3,6 +3,7 @@
 #include "players.lp".
 
 #const player_count = 8.
+#const night_count = 1.
 assigned(0, felix, drunk).
 assigned(0, amanda, poisoner).
 assigned(0, rob, washerwoman).
