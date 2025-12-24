@@ -315,7 +315,9 @@ renderResult state = case state.result of
                   <> if length answerSets > 1 then " (click to select)" else ""
               ]
           , HH.div
-              [ HP.style "max-height: 200px; overflow-y: auto; margin-top: 10px;" ]
+              [ HP.style $ "max-height: 200px; overflow-y: auto; margin-top: 10px; "
+                  <> "-webkit-overflow-scrolling: touch; overscroll-behavior: contain;"
+              ]
               [ HH.div_ $ mapWithIndex (renderAnswerSet selectedIdx) answerSets ]
           ]
       ]
@@ -330,7 +332,7 @@ renderResult state = case state.result of
           hoverNote = if not isSelected then " opacity: 0.9;" else ""
         in
         HH.div
-          [ HP.style $ baseStyle <> selectedStyle <> hoverNote
+          [ HP.style $ baseStyle <> selectedStyle <> hoverNote <> " touch-action: pan-y;"
           , HE.onClick \_ -> SelectModel idx
           ]
           [ HH.div
@@ -339,7 +341,9 @@ renderResult state = case state.result of
               ]
               [ HH.text $ "Answer Set " <> show (idx + 1) <> (if isSelected then " ✓" else "") ]
           , HH.code
-              [ HP.style "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20; font-size: 11px; max-height: 60px; overflow-y: auto;" ]
+              [ HP.style $ "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20; font-size: 11px; max-height: 60px; overflow-y: auto; "
+                  <> "-webkit-overflow-scrolling: touch;"
+              ]
               [ HH.text $ intercalate " " atoms ]
           ]
 
