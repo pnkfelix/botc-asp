@@ -10,8 +10,8 @@ package:
     - foreign
     - halogen
     - integers
-    - math
     - maybe
+    - numbers
     - prelude
     - strings
     - tuples
