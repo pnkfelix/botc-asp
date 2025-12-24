@@ -12,7 +12,6 @@ package:
     - integers
     - math
     - maybe
-    - numbers
     - prelude
     - strings
     - tuples
