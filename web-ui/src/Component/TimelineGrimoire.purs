@@ -372,6 +372,14 @@ getRoleColor role
   | isOutsider role = "#0277bd" -- Blue for outsiders
   | otherwise = "#2e7d32"       -- Green for townsfolk
 
+-- | Get lighter shade for reminder tokens based on role type
+getRoleColorLight :: String -> String
+getRoleColorLight role
+  | isMinion role = "#ce93d8"  -- Light purple for minions
+  | isDemon role = "#ef9a9a"    -- Light red for demons
+  | isOutsider role = "#81d4fa" -- Light blue for outsiders
+  | otherwise = "#a5d6a7"       -- Light green for townsfolk
+
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
 
@@ -381,14 +389,32 @@ isDemon r = r == "imp"
 isOutsider :: String -> Boolean
 isOutsider r = r == "butler" || r == "drunk" || r == "recluse" || r == "saint"
 
--- | Get color for reminder token
+-- | Map token prefix to the role it belongs to
+tokenToRole :: String -> String
+tokenToRole token
+  | S.take 4 token == "poi_" = "poisoner"
+  | S.take 4 token == "imp_" = "imp"
+  | S.take 5 token == "monk_" = "monk"
+  | S.take 3 token == "ft_" = "fortune_teller"
+  | S.take 3 token == "ww_" = "washerwoman"
+  | S.take 4 token == "lib_" = "librarian"
+  | S.take 4 token == "inv_" = "investigator"
+  | S.take 4 token == "but_" = "butler"
+  | S.take 4 token == "sla_" = "slayer"
+  | S.take 4 token == "emp_" = "empath"
+  | S.take 4 token == "spy_" = "spy"
+  | S.take 3 token == "sw_" = "scarlet_woman"
+  | S.take 4 token == "rav_" = "ravenkeeper"
+  | S.take 5 token == "chef_" = "chef"
+  | S.take 4 token == "und_" = "undertaker"
+  | S.take 4 token == "vir_" = "virgin"
+  | S.take 4 token == "sol_" = "soldier"
+  | S.take 4 token == "may_" = "mayor"
+  | otherwise = "unknown"
+
+-- | Get color for reminder token (shade of source role's type color)
 getReminderColor :: String -> String
-getReminderColor token
-  | token == "poi_poisoned" = "#9c27b0"  -- Purple for poison
-  | token == "imp_dead" = "#f44336"       -- Red for death
-  | token == "monk_protected" = "#4caf50" -- Green for protection
-  | token == "ft_red_herring" = "#ff5722" -- Orange for red herring
-  | otherwise = "#ff9800"                 -- Default orange
+getReminderColor token = getRoleColorLight (tokenToRole token)
 
 -- | Abbreviate token name for display
 abbreviateToken :: String -> String
