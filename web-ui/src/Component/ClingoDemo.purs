@@ -315,8 +315,9 @@ renderResult state = case state.result of
                   <> if length answerSets > 1 then " (click to select)" else ""
               ]
           , HH.div
-              [ HP.style $ "max-height: 200px; overflow-y: auto; margin-top: 10px; "
-                  <> "-webkit-overflow-scrolling: touch; overscroll-behavior: contain;"
+              [ HP.style $ "max-height: 200px; overflow-y: scroll; margin-top: 10px; "
+                  <> "-webkit-overflow-scrolling: touch; overscroll-behavior: contain; "
+                  <> "touch-action: pan-y;"
               ]
               [ HH.div_ $ mapWithIndex (renderAnswerSet selectedIdx) answerSets ]
           ]
