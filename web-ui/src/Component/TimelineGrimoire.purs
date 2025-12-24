@@ -19,6 +19,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Svg.Elements as SE
+import Halogen.Svg.Attributes as SA
 import Data.Number (cos, sin, pi)
 
 -- | Component state
@@ -197,33 +199,31 @@ renderGrimoire state =
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 20px;" ]
       [ -- SVG grimoire
-        HH.element (HH.ElemName "svg")
-          [ HP.attr (HH.AttrName "viewBox") ("0 0 " <> show width <> " " <> show height)
-          , HP.attr (HH.AttrName "width") (show width)
-          , HP.attr (HH.AttrName "height") (show height)
-          , HP.style "display: block; margin: 0 auto; max-width: 100%;"
+        SE.svg
+          [ SA.viewBox 0.0 0.0 width height
+          , SA.width width
+          , SA.height height
           ]
           (
             -- Draw dashed circle showing table edge
-            [ HH.element (HH.ElemName "circle")
-                [ HP.attr (HH.AttrName "cx") (show centerX)
-                , HP.attr (HH.AttrName "cy") (show centerY)
-                , HP.attr (HH.AttrName "r") (show radius)
-                , HP.attr (HH.AttrName "fill") "none"
-                , HP.attr (HH.AttrName "stroke") "#ccc"
-                , HP.attr (HH.AttrName "stroke-width") "1"
-                , HP.attr (HH.AttrName "stroke-dasharray") "4,4"
+            [ SE.circle
+                [ SA.cx centerX
+                , SA.cy centerY
+                , SA.r radius
+                , SA.fill $ SA.NoFill
+                , SA.stroke $ SA.Named "#ccc"
+                , SA.strokeWidth 1.0
+                , SA.strokeDashArray "4,4"
                 ]
-                []
             ]
             -- Draw players
             <> (if playerCount > 0
                 then mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders) gameState.players
-                else [ HH.element (HH.ElemName "text")
-                         [ HP.attr (HH.AttrName "x") (show centerX)
-                         , HP.attr (HH.AttrName "y") (show centerY)
-                         , HP.attr (HH.AttrName "text-anchor") "middle"
-                         , HP.attr (HH.AttrName "fill") "#999"
+                else [ SE.text
+                         [ SA.x centerX
+                         , SA.y centerY
+                         , SA.textAnchor SA.AnchorMiddle
+                         , SA.fill $ SA.Named "#999"
                          ]
                          [ HH.text "No player data - add #show chair/2." ]
                      ])
@@ -273,50 +273,48 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
     roleColor = getRoleColor player.role
   in
-    HH.element (HH.ElemName "g")
-      [ HP.attr (HH.AttrName "transform") ("translate(" <> show x <> "," <> show y <> ")") ]
+    SE.g
+      [ SA.transform [ SA.Translate x y ] ]
       ( [
         -- Main role token (outer circle)
-        HH.element (HH.ElemName "circle")
-          [ HP.attr (HH.AttrName "cx") "0"
-          , HP.attr (HH.AttrName "cy") "0"
-          , HP.attr (HH.AttrName "r") "35"
-          , HP.attr (HH.AttrName "fill") roleColor
-          , HP.attr (HH.AttrName "stroke") aliveColor
-          , HP.attr (HH.AttrName "stroke-width") "3"
+        SE.circle
+          [ SA.cx 0.0
+          , SA.cy 0.0
+          , SA.r 35.0
+          , SA.fill $ SA.Named roleColor
+          , SA.stroke $ SA.Named aliveColor
+          , SA.strokeWidth 3.0
           ]
-          []
       -- Player name
-      , HH.element (HH.ElemName "text")
-          [ HP.attr (HH.AttrName "x") "0"
-          , HP.attr (HH.AttrName "y") "-8"
-          , HP.attr (HH.AttrName "text-anchor") "middle"
-          , HP.attr (HH.AttrName "font-size") "10"
-          , HP.attr (HH.AttrName "fill") "white"
-          , HP.attr (HH.AttrName "font-weight") "bold"
+      , SE.text
+          [ SA.x 0.0
+          , SA.y (-8.0)
+          , SA.textAnchor SA.AnchorMiddle
+          , SA.fill $ SA.Named "white"
+          , SA.fontWeight SA.FontWeightBold
+          , SA.fontSize $ SA.FontSizeLength $ SA.Px 10.0
           ]
           [ HH.text player.name ]
       -- Role name
-      , HH.element (HH.ElemName "text")
-          [ HP.attr (HH.AttrName "x") "0"
-          , HP.attr (HH.AttrName "y") "5"
-          , HP.attr (HH.AttrName "text-anchor") "middle"
-          , HP.attr (HH.AttrName "font-size") "8"
-          , HP.attr (HH.AttrName "fill") "white"
+      , SE.text
+          [ SA.x 0.0
+          , SA.y 5.0
+          , SA.textAnchor SA.AnchorMiddle
+          , SA.fill $ SA.Named "white"
+          , SA.fontSize $ SA.FontSizeLength $ SA.Px 8.0
           ]
           [ HH.text $ formatRoleName player.role ]
       -- Token (what they think they are, if different)
       , if player.token /= player.role
-          then HH.element (HH.ElemName "text")
-            [ HP.attr (HH.AttrName "x") "0"
-            , HP.attr (HH.AttrName "y") "16"
-            , HP.attr (HH.AttrName "text-anchor") "middle"
-            , HP.attr (HH.AttrName "font-size") "7"
-            , HP.attr (HH.AttrName "fill") "#ffeb3b"
-            , HP.attr (HH.AttrName "font-style") "italic"
+          then SE.text
+            [ SA.x 0.0
+            , SA.y 16.0
+            , SA.textAnchor SA.AnchorMiddle
+            , SA.fill $ SA.Named "#ffeb3b"
+            , SA.fontSize $ SA.FontSizeLength $ SA.Px 7.0
             ]
             [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
-          else HH.text ""
+          else SE.g [] []
       -- Reminder tokens positioned toward center
       ] <> mapWithIndex (renderReminderToken angleToCenter (length playerReminders)) playerReminders
       )
@@ -328,7 +326,7 @@ renderReminderToken :: forall cs m.
   Int ->    -- index
   { token :: String, player :: String } ->
   H.ComponentHTML Action cs m
-renderReminderToken angleToCenter total idx reminder =
+renderReminderToken angleToCenter _total idx reminder =
   let
     -- Position reminder tokens along line toward center
     -- Start just inside the player token (radius 35) and go inward
@@ -338,26 +336,25 @@ renderReminderToken angleToCenter total idx reminder =
     rx = dist * cos angleToCenter
     ry = dist * sin angleToCenter
   in
-    HH.element (HH.ElemName "g")
-      [ HP.attr (HH.AttrName "transform") ("translate(" <> show rx <> "," <> show ry <> ")") ]
+    SE.g
+      [ SA.transform [ SA.Translate rx ry ] ]
       [ -- Reminder circle
-        HH.element (HH.ElemName "circle")
-          [ HP.attr (HH.AttrName "cx") "0"
-          , HP.attr (HH.AttrName "cy") "0"
-          , HP.attr (HH.AttrName "r") "12"
-          , HP.attr (HH.AttrName "fill") (getReminderColor reminder.token)
-          , HP.attr (HH.AttrName "stroke") "#fff"
-          , HP.attr (HH.AttrName "stroke-width") "1"
+        SE.circle
+          [ SA.cx 0.0
+          , SA.cy 0.0
+          , SA.r 12.0
+          , SA.fill $ SA.Named (getReminderColor reminder.token)
+          , SA.stroke $ SA.Named "#fff"
+          , SA.strokeWidth 1.0
           ]
-          []
       -- Reminder abbreviation
-      , HH.element (HH.ElemName "text")
-          [ HP.attr (HH.AttrName "x") "0"
-          , HP.attr (HH.AttrName "y") "3"
-          , HP.attr (HH.AttrName "text-anchor") "middle"
-          , HP.attr (HH.AttrName "font-size") "6"
-          , HP.attr (HH.AttrName "fill") "white"
-          , HP.attr (HH.AttrName "font-weight") "bold"
+      , SE.text
+          [ SA.x 0.0
+          , SA.y 3.0
+          , SA.textAnchor SA.AnchorMiddle
+          , SA.fill $ SA.Named "white"
+          , SA.fontWeight SA.FontWeightBold
+          , SA.fontSize $ SA.FontSizeLength $ SA.Px 6.0
           ]
           [ HH.text $ abbreviateToken reminder.token ]
       ]

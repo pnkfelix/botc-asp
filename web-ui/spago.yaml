@@ -9,6 +9,7 @@ package:
     - foldable-traversable
     - foreign
     - halogen
+    - halogen-svg-elems
     - integers
     - maybe
     - numbers
