@@ -4,9 +4,12 @@ import Prelude
 
 import AspParser as ASP
 import Clingo as Clingo
-import Data.Array (intercalate, length, mapWithIndex, null)
+import Component.TimelineGrimoire as TG
+import Data.Array (length, mapWithIndex, null, head)
+import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Void (Void, absurd)
 import Data.String (trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
@@ -16,11 +19,18 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import TextareaUtils as TU
+import Type.Proxy (Proxy(..))
 
 -- | Which program panel is being edited
 data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
 
 derive instance eqProgramPanel :: Eq ProgramPanel
+
+-- | Child slots for embedded components
+type Slots = ( timelineGrimoire :: H.Slot TG.Query Void Unit )
+
+_timelineGrimoire :: Proxy "timelineGrimoire"
+_timelineGrimoire = Proxy
 
 -- | Component state
 type State =
@@ -104,6 +114,13 @@ defaultInstance = """% Instance: constraints and queries for this specific scena
 #show assigned/3.
 #show received/2.
 #show st_tells/4.
+
+% Show additional predicates for timeline/grimoire view
+#show player_chooses/4.
+#show reminder_on/3.
+#show time/1.
+#show alive/2.
+#show chair/2.
 """
 
 -- | The Halogen component
@@ -119,7 +136,7 @@ component =
     }
 
 -- | Render the component
-render :: forall cs m. State -> H.ComponentHTML Action cs m
+render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
 render state =
   let
     -- Parse all programs to get predicates
@@ -208,7 +225,7 @@ render state =
     ]
 
 -- | Render a single program panel with label and scrollable textarea
-renderProgramPanel :: forall cs m. String -> ProgramPanel -> String -> Boolean -> H.ComponentHTML Action cs m
+renderProgramPanel :: forall m. String -> ProgramPanel -> String -> Boolean -> H.ComponentHTML Action Slots m
 renderProgramPanel label panel value isLoading =
   HH.div
     [ HP.style "display: flex; flex-direction: column;" ]
@@ -244,7 +261,7 @@ sourceFileToTextareaId = case _ of
   _ -> Nothing
 
 -- | Render the result section
-renderResult :: forall cs m. Maybe ResultDisplay -> H.ComponentHTML Action cs m
+renderResult :: forall m. MonadAff m => Maybe ResultDisplay -> H.ComponentHTML Action Slots m
 renderResult Nothing =
   HH.div
     [ HP.style "padding: 20px; background: #f5f5f5; border-radius: 4px; color: #666;" ]
@@ -265,12 +282,25 @@ renderResult (Just ResultUnsat) =
     ]
 
 renderResult (Just (ResultSuccess answerSets)) =
-  HH.div
-    [ HP.style "padding: 20px; background: #e8f5e9; border-radius: 4px;" ]
-    [ HH.strong
-        [ HP.style "color: #2e7d32;" ]
-        [ HH.text $ "SATISFIABLE - Found " <> show (length answerSets) <> " answer set(s)" ]
-    , HH.div_ $ mapWithIndex renderAnswerSet answerSets
+  HH.div_
+    [ HH.div
+        [ HP.style "padding: 20px; background: #e8f5e9; border-radius: 4px;" ]
+        [ HH.strong
+            [ HP.style "color: #2e7d32;" ]
+            [ HH.text $ "SATISFIABLE - Found " <> show (length answerSets) <> " answer set(s)" ]
+        , HH.div_ $ mapWithIndex renderAnswerSet answerSets
+        ]
+    -- Timeline and Grimoire view for the first answer set
+    , case head answerSets of
+        Just firstSet ->
+          HH.div
+            [ HP.style "margin-top: 20px;" ]
+            [ HH.h2
+                [ HP.style "color: #333; margin-bottom: 10px;" ]
+                [ HH.text "Timeline & Grimoire View" ]
+            , HH.slot _timelineGrimoire unit TG.component firstSet absurd
+            ]
+        Nothing -> HH.text ""
     ]
   where
 
@@ -286,7 +316,7 @@ renderResult (Just (ResultSuccess answerSets)) =
         ]
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
-renderPredicatePanel :: forall cs m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action cs m
+renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
 renderPredicatePanel isVisible predicates =
   HH.div_
     [ -- Backdrop (click to close)
@@ -341,11 +371,11 @@ renderPredicatePanel isVisible predicates =
         [ HH.text $ pred.name <> "/" <> show pred.arity ]
 
 -- | Render the modal showing predicate references
-renderPredicateModal :: forall cs m.
+renderPredicateModal :: forall m.
   Maybe ASP.Predicate ->
   Array { name :: String, content :: String } ->
   (ASP.Predicate -> Array ASP.PredicateRef) ->
-  H.ComponentHTML Action cs m
+  H.ComponentHTML Action Slots m
 renderPredicateModal Nothing _ _ = HH.text ""
 renderPredicateModal (Just pred) sources findRefs =
   let refs = findRefs pred
