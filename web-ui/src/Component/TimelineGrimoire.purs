@@ -6,7 +6,7 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, take)
+import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, last, take)
 import Data.Array as Array
 import Data.Foldable (fold, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -500,10 +500,16 @@ handleAction = case _ of
     let atoms = ASP.parseAnswerSet atomStrings
     let timeline = ASP.extractTimeline atoms
     let allTimes = getAllTimePoints atoms
-    -- Preserve selected time if it exists in the new model, otherwise use first time
+    -- Preserve selected time if it exists, otherwise find closest earlier time
     let preservedTime = case currentState.selectedTime of
-          Just t | elem t allTimes -> Just t
-          _ -> head allTimes
+          Just t | elem t allTimes -> Just t  -- Exact match exists
+          Just t ->
+            -- Find closest earlier time point (last one that's <= selected)
+            let earlierTimes = filter (\tp -> ASP.compareTimePoints tp t /= GT) allTimes
+            in case last earlierTimes of
+                 Just closest -> Just closest
+                 Nothing -> head allTimes  -- No earlier time, use first
+          Nothing -> head allTimes
     H.modify_ \s -> s
       { atoms = atoms
       , timeline = timeline
