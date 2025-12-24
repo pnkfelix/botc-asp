@@ -79,6 +79,16 @@ between(T1, T2) :-
     (R1, S1) < (R3, S3),
     (R3, S3) < (R2, S2).
 
+% Phase transitions: night -> day -> night
+% The final time of night N transitions to day(N, 0)
+next(T, day(N, 0)) :- final_night_time(N, T), day_number(N).
+
+% Within a day: day(N, 0) -> day(N, exec)
+next(day(N, 0), day(N, exec)) :- day_number(N).
+
+% Day N ends, night N+1 begins
+next(day(N, exec), night(N+1, 0, 0)) :- day_number(N), night_number(N+1).
+
 player(P) :- name(P), chair(P,C), C < player_count.
 
 % Circular seating adjacency
@@ -353,8 +363,9 @@ thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 % ===========================================================================
 
 % day_number/1 defines which days we're modeling (like night_number)
-% By default, we model day 1 (which follows night 1)
+% Each day N follows night N, so we model the same range as nights
 day_number(1).
+day_number(N) :- N = 2..night_count.
 
 % Everyone is alive at the start of the game
 alive(P, night(1, 0, 0)) :- player(P).

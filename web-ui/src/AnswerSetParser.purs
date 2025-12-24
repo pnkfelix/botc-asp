@@ -42,7 +42,29 @@ data TimePoint
   | UnknownTime String
 
 derive instance eqTimePoint :: Eq TimePoint
-derive instance ordTimePoint :: Ord TimePoint
+
+-- Custom Ord instance to properly interleave nights and days:
+-- Night 1 < Day 1 < Night 2 < Day 2, etc.
+instance ordTimePoint :: Ord TimePoint where
+  compare (Night n1 r1 s1) (Night n2 r2 s2) =
+    case compare n1 n2 of
+      EQ -> case compare r1 r2 of
+        EQ -> compare s1 s2
+        other -> other
+      other -> other
+  compare (Day d1 p1) (Day d2 p2) =
+    case compare d1 d2 of
+      EQ -> compare p1 p2
+      other -> other
+  compare (Night n _r _s) (Day d _p) =
+    -- Night n comes before Day n, but after Day (n-1)
+    if n <= d then LT else GT
+  compare (Day d _p) (Night n _r _s) =
+    -- Day d comes after Night d, but before Night (d+1)
+    if d < n then LT else GT
+  compare (UnknownTime s1) (UnknownTime s2) = compare s1 s2
+  compare (UnknownTime _) _ = GT
+  compare _ (UnknownTime _) = LT
 
 instance showTimePoint :: Show TimePoint where
   show (Night n r s) = "night(" <> show n <> "," <> show r <> "," <> show s <> ")"
