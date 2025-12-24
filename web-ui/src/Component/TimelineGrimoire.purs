@@ -236,17 +236,31 @@ renderGrimoire state =
       -- Legend
       , HH.div
           [ HP.style "margin-top: 15px; font-size: 12px; color: #666; text-align: center;" ]
-          [ HH.span [ HP.style "margin-right: 15px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #4CAF50; margin-right: 4px; vertical-align: middle;" ] []
+          [ -- Character type colors
+            HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #1565c0; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Townsfolk"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #00838f; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Outsider"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #d84315; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Minion"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #b71c1c; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Demon"
+              ]
+          -- Status indicators
+          , HH.span [ HP.style "margin-left: 10px; margin-right: 12px; border-left: 1px solid #ccc; padding-left: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #4CAF50; margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Alive"
               ]
-          , HH.span [ HP.style "margin-right: 15px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #9e9e9e; margin-right: 4px; vertical-align: middle;" ] []
-              , HH.text "Dead"
-              ]
           , HH.span_
-              [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff9800; margin-right: 4px; vertical-align: middle;" ] []
-              , HH.text "Reminder Token"
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #9e9e9e; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Dead"
               ]
           ]
       ]
@@ -365,12 +379,22 @@ renderReminderToken angleToCenter _total idx reminder =
       ]
 
 -- | Get color based on role type
+-- Good (Townsfolk, Outsiders): blue tones
+-- Evil (Minions, Demons): red tones
 getRoleColor :: String -> String
 getRoleColor role
-  | isMinion role = "#7b1fa2"  -- Purple for minions
-  | isDemon role = "#c62828"    -- Red for demons
-  | isOutsider role = "#0277bd" -- Blue for outsiders
-  | otherwise = "#2e7d32"       -- Green for townsfolk
+  | isMinion role = "#d84315"  -- Deep orange for minions
+  | isDemon role = "#b71c1c"    -- Dark red for demons
+  | isOutsider role = "#00838f" -- Teal for outsiders
+  | otherwise = "#1565c0"       -- Blue for townsfolk
+
+-- | Get lighter shade for reminder tokens based on role type
+getRoleColorLight :: String -> String
+getRoleColorLight role
+  | isMinion role = "#ffab91"  -- Light orange for minions
+  | isDemon role = "#ef9a9a"    -- Light red for demons
+  | isOutsider role = "#80deea" -- Light teal for outsiders
+  | otherwise = "#64b5f6"       -- Light blue for townsfolk
 
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
@@ -381,14 +405,32 @@ isDemon r = r == "imp"
 isOutsider :: String -> Boolean
 isOutsider r = r == "butler" || r == "drunk" || r == "recluse" || r == "saint"
 
--- | Get color for reminder token
+-- | Map token prefix to the role it belongs to
+tokenToRole :: String -> String
+tokenToRole token
+  | S.take 4 token == "poi_" = "poisoner"
+  | S.take 4 token == "imp_" = "imp"
+  | S.take 5 token == "monk_" = "monk"
+  | S.take 3 token == "ft_" = "fortune_teller"
+  | S.take 3 token == "ww_" = "washerwoman"
+  | S.take 4 token == "lib_" = "librarian"
+  | S.take 4 token == "inv_" = "investigator"
+  | S.take 4 token == "but_" = "butler"
+  | S.take 4 token == "sla_" = "slayer"
+  | S.take 4 token == "emp_" = "empath"
+  | S.take 4 token == "spy_" = "spy"
+  | S.take 3 token == "sw_" = "scarlet_woman"
+  | S.take 4 token == "rav_" = "ravenkeeper"
+  | S.take 5 token == "chef_" = "chef"
+  | S.take 4 token == "und_" = "undertaker"
+  | S.take 4 token == "vir_" = "virgin"
+  | S.take 4 token == "sol_" = "soldier"
+  | S.take 4 token == "may_" = "mayor"
+  | otherwise = "unknown"
+
+-- | Get color for reminder token (shade of source role's type color)
 getReminderColor :: String -> String
-getReminderColor token
-  | token == "poi_poisoned" = "#9c27b0"  -- Purple for poison
-  | token == "imp_dead" = "#f44336"       -- Red for death
-  | token == "monk_protected" = "#4caf50" -- Green for protection
-  | token == "ft_red_herring" = "#ff5722" -- Orange for red herring
-  | otherwise = "#ff9800"                 -- Default orange
+getReminderColor token = getRoleColorLight (tokenToRole token)
 
 -- | Abbreviate token name for display
 abbreviateToken :: String -> String
