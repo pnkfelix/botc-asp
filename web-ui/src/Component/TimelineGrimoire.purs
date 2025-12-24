@@ -236,17 +236,31 @@ renderGrimoire state =
       -- Legend
       , HH.div
           [ HP.style "margin-top: 15px; font-size: 12px; color: #666; text-align: center;" ]
-          [ HH.span [ HP.style "margin-right: 15px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #4CAF50; margin-right: 4px; vertical-align: middle;" ] []
+          [ -- Character type colors
+            HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #1565c0; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Townsfolk"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #00838f; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Outsider"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #d84315; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Minion"
+              ]
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #b71c1c; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Demon"
+              ]
+          -- Status indicators
+          , HH.span [ HP.style "margin-left: 10px; margin-right: 12px; border-left: 1px solid #ccc; padding-left: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #4CAF50; margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Alive"
               ]
-          , HH.span [ HP.style "margin-right: 15px;" ]
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #9e9e9e; margin-right: 4px; vertical-align: middle;" ] []
-              , HH.text "Dead"
-              ]
           , HH.span_
-              [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff9800; margin-right: 4px; vertical-align: middle;" ] []
-              , HH.text "Reminder Token"
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #9e9e9e; margin-right: 4px; vertical-align: middle;" ] []
+              , HH.text "Dead"
               ]
           ]
       ]
@@ -365,20 +379,22 @@ renderReminderToken angleToCenter _total idx reminder =
       ]
 
 -- | Get color based on role type
+-- Good (Townsfolk, Outsiders): blue tones
+-- Evil (Minions, Demons): red tones
 getRoleColor :: String -> String
 getRoleColor role
-  | isMinion role = "#7b1fa2"  -- Purple for minions
-  | isDemon role = "#c62828"    -- Red for demons
-  | isOutsider role = "#0277bd" -- Blue for outsiders
-  | otherwise = "#2e7d32"       -- Green for townsfolk
+  | isMinion role = "#d84315"  -- Deep orange for minions
+  | isDemon role = "#b71c1c"    -- Dark red for demons
+  | isOutsider role = "#00838f" -- Teal for outsiders
+  | otherwise = "#1565c0"       -- Blue for townsfolk
 
 -- | Get lighter shade for reminder tokens based on role type
 getRoleColorLight :: String -> String
 getRoleColorLight role
-  | isMinion role = "#ce93d8"  -- Light purple for minions
+  | isMinion role = "#ffab91"  -- Light orange for minions
   | isDemon role = "#ef9a9a"    -- Light red for demons
-  | isOutsider role = "#81d4fa" -- Light blue for outsiders
-  | otherwise = "#a5d6a7"       -- Light green for townsfolk
+  | isOutsider role = "#80deea" -- Light teal for outsiders
+  | otherwise = "#64b5f6"       -- Light blue for townsfolk
 
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
