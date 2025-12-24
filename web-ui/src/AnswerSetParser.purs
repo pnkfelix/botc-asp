@@ -14,6 +14,7 @@ import Prelude
 
 import Data.Array (filter, mapMaybe, sortBy, nub, head)
 import Data.Array as Array
+import Data.Foldable (elem, all)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
 import Data.Ord (comparing)
