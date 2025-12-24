@@ -261,7 +261,7 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
   in
     HH.element (HH.ElemName "g")
       [ HP.attr (HH.AttrName "transform") ("translate(" <> show x <> "," <> show y <> ")") ]
-      [
+      ( [
         -- Main role token (outer circle)
         HH.element (HH.ElemName "circle")
           [ HP.attr (HH.AttrName "cx") "0"
@@ -304,8 +304,8 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
             [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
           else HH.text ""
       -- Reminder tokens (small circles around the main token)
-      ]
-      <> mapWithIndex (renderReminderToken (length playerReminders)) playerReminders
+      ] <> mapWithIndex (renderReminderToken (length playerReminders)) playerReminders
+      )
 
 -- | Render a reminder token
 renderReminderToken :: forall cs m.
