@@ -8,6 +8,7 @@ import Component.TimelineGrimoire as TG
 import Data.Array (intercalate, length, mapWithIndex, null, head)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Void (absurd)
 import Data.String (trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)

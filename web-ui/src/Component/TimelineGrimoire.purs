@@ -9,6 +9,7 @@ import AnswerSetParser as ASP
 import Data.Array (filter, length, mapWithIndex, null, sortBy, nub, head, take, fold, intercalate)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Void (Void)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..), split, toUpper) as S
