@@ -408,7 +408,7 @@ buildGameState atoms targetTime =
     deadAtoms = filter (isDeadAt targetTime) atoms
     deadPlayers = mapMaybe getDeadName deadAtoms
 
-    -- Get reminders at target time
+    -- Get reminders at exact target time (leverage ASP fluent)
     remindersAtTime = mapMaybe (getReminderAt targetTime) atoms
 
     -- Build player list
@@ -446,7 +446,7 @@ buildGameState atoms targetTime =
     getDeadName _ = Nothing
 
     getReminderAt t (ReminderOn token player time) =
-      if time == t || compareTimePoints time t == LT
+      if time == t
         then Just { token, player }
         else Nothing
     getReminderAt _ _ = Nothing
