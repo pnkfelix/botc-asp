@@ -12,12 +12,51 @@ Claude Code runs in two environments with different capabilities:
 - Can install npm packages directly
 - Can push branches and create PRs via CLI
 
-### Web Claude Code Remote (Restricted)
+### Web Claude Code Remote (CCR) - Restricted
 - Limited shell access, some network restrictions
 - **No `gh` CLI** - use GitHub API via `curl` or provide manual instructions
 - Binary downloads (e.g., from GitHub releases) may be blocked
-- Push branches, but may need user to create PRs manually
-- Can verify CI status via: `curl -s "https://api.github.com/repos/pnkfelix/botc-asp/actions/runs"`
+- **Cannot run local builds** - must rely on GitHub Actions for build testing
+- Can push branches, but user must create/merge PRs manually
+
+#### CCR Development Workflow
+
+CCR operates in a collaborative loop with the user. Since CCR cannot test builds locally, the workflow depends on GitHub Actions triggered by PRs.
+
+**PR Lifecycle States:**
+1. **No PR open** - CCR can push commits to the branch, but no CI runs until a PR is created
+2. **PR open** - Each push triggers GitHub Actions; CCR can monitor build status
+3. **PR merged** - The site goes live on GitHub Pages; further changes need a new PR
+
+**User Actions Required (CCR cannot do these):**
+1. **Create a PR** - After CCR pushes initial changes, user creates PR to trigger CI
+2. **Merge the PR** - After CI passes and user approves, user merges to deploy
+3. **Inspect the live site** - User evaluates rendered behavior on GitHub Pages
+4. **Inspect DOM** - User may need to check browser DevTools (can be difficult on mobile)
+
+**CCR Responsibilities:**
+- Track which PR (if any) is currently open for the working branch
+- Push commits and notify user when a PR is needed
+- Monitor GitHub Actions status after user creates PR:
+  ```bash
+  curl -s "https://api.github.com/repos/pnkfelix/botc-asp/actions/runs?per_page=5"
+  ```
+- After PR merge, remind user that a fresh PR is needed for subsequent changes
+- Suggest debugging output in rendering code if DOM inspection is impractical
+
+**State Tracking:**
+CCR should maintain awareness of:
+- Current branch name
+- Whether a PR exists for this branch (and its number/URL if known)
+- Whether the most recent PR was merged (requiring a new PR for further work)
+- Last known CI status (passing/failing/pending)
+
+**Debugging Strategies:**
+When the user cannot easily inspect the DOM (e.g., on mobile):
+- Add temporary console.log statements for key state
+- Render debug info directly in the UI (e.g., a collapsible debug panel)
+- Add data attributes to elements for easier identification
+- These can be removed once the issue is resolved
 
 ## Build Commands
 
