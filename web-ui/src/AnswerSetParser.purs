@@ -12,7 +12,7 @@ module AnswerSetParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, sortBy, nub, head)
+import Data.Array (filter, mapMaybe, sortBy, nub, nubByEq, head)
 import Data.Foldable (elem, all)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
@@ -408,8 +408,9 @@ buildGameState atoms targetTime =
     deadAtoms = filter (isDeadAt targetTime) atoms
     deadPlayers = mapMaybe getDeadName deadAtoms
 
-    -- Get reminders at target time
-    remindersAtTime = mapMaybe (getReminderAt targetTime) atoms
+    -- Get reminders at target time (deduplicated - fluents may repeat across times)
+    remindersAtTime = nubByEq sameReminder $ mapMaybe (getReminderAt targetTime) atoms
+    sameReminder r1 r2 = r1.token == r2.token && r1.player == r2.player
 
     -- Build player list
     players = chairs # map \c ->
