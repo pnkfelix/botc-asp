@@ -12,4 +12,4 @@ assigned(0, courtney, investigator).
 
 % Assert: ST CANNOT tell the investigator that amanda is "the Baron"
 % (If this is SAT, the test fails - poisoner shouldn't be claimable as baron)
-:- not st_tells(investigator, courtney, point(baron), _).
+:- not st_tells_core(investigator, courtney, point(baron), _).

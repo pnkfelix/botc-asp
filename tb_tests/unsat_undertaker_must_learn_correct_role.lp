@@ -24,4 +24,4 @@ executed(rob, 1).
 
 % Assert the negation: undertaker is NOT told chef
 % UNSAT proves this is impossible when functioning and alive
-:- st_tells(undertaker, amanda, point(chef), _).
+:- st_tells_core(undertaker, amanda, point(chef), _).

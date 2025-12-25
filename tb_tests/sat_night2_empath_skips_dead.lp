@@ -31,4 +31,4 @@ player_chooses(imp, steph, point(rob), night(2, 4, 2)).
 % Amanda's living neighbors become: taylor (evil) and pratik (good) = 1 evil
 
 % Assert: on night 2, empath should be told 1 (taylor=evil, pratik=good)
-:- not st_tells(empath, amanda, count(1), night(2, 6, 1)).
+:- not st_tells_core(empath, amanda, count(1), night(2, 6, 1)).

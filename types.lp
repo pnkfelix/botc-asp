@@ -7,7 +7,7 @@
 :- assigned(0, P, _), not player(P).
 :- reminder_on(_, P, _), not player(P).
 :- player_chooses(_, P, _, _), not player(P).
-:- st_tells(_, P, _, _), not player(P).
+:- st_tells_core(_, P, _, _), not player(P).
 :- slayer_shot(P, _, _), not player(P).
 :- slayer_shot(_, P, _), not player(P).
 :- executed(P, _), not player(P).
@@ -22,12 +22,12 @@
 :- first_night_role_order(R, _), not role(R).
 :- other_night_role_order(R, _), not role(R).
 :- player_chooses(R, _, _, _), not role(R).
-:- st_tells(R, _, _, _), not role(R).
+:- st_tells_core(R, _, _, _), not role(R).
 
 % --- Time validation ---
 :- reminder_on(_, _, T), not time(T).
 :- player_chooses(_, _, _, T), not time(T).
-:- st_tells(_, _, _, T), not time(T).
+:- st_tells_core(_, _, _, T), not time(T).
 :- alive(_, T), not time(T).
 :- died(_, T), not time(T).
 :- functioning(_, T), not time(T).

@@ -22,6 +22,6 @@ assigned(0, courtney, investigator).
 :- not reminder_on(inv_minion, amanda, _).
 
 % Assert: ST can tell each info role a different role for amanda
-:- not st_tells(washerwoman, rob, info(_, _, chef), _).
-:- not st_tells(librarian, taylor, info(_, _, drunk), _).
-:- not st_tells(investigator, courtney, info(_, _, spy), _).
+:- not st_tells_core(washerwoman, rob, info(_, _, chef), _).
+:- not st_tells_core(librarian, taylor, info(_, _, drunk), _).
+:- not st_tells_core(investigator, courtney, info(_, _, spy), _).

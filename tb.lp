@@ -131,7 +131,7 @@ may_register_as_role(P, R, T) :-
 
 % When functioning, role must match what ww_townsfolk player can register as
 % Player order in info tuple is normalized by chair (smaller first)
-{ st_tells(washerwoman, WW, info(First, Second, R), T) : may_register_as_role(PTownsfolk, R, T) } = 1 :-
+{ st_tells_core(washerwoman, WW, info(First, Second, R), T) : may_register_as_role(PTownsfolk, R, T) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(washerwoman, RoleOrd),
     assigned(0, WW, washerwoman),
@@ -141,7 +141,7 @@ may_register_as_role(P, R, T) :-
     functioning(WW, T).
 
 % When malfunctioning, ST can say any townsfolk role
-{ st_tells(washerwoman, WW, info(First, Second, R), T) : townsfolk(R) } = 1 :-
+{ st_tells_core(washerwoman, WW, info(First, Second, R), T) : townsfolk(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(washerwoman, RoleOrd),
     assigned(0, WW, washerwoman),
@@ -187,7 +187,7 @@ may_register_as_role(P, R, T) :-
     time(T).
 
 % When functioning, role must match what lib_outsider player can register as
-{ st_tells(librarian, LIB, info(First, Second, R), T) : may_register_as_role(POutsider, R, T) } = 1 :-
+{ st_tells_core(librarian, LIB, info(First, Second, R), T) : may_register_as_role(POutsider, R, T) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(librarian, RoleOrd),
     assigned(0, LIB, librarian),
@@ -197,7 +197,7 @@ may_register_as_role(P, R, T) :-
     functioning(LIB, T).
 
 % When malfunctioning, ST can say any outsider role
-{ st_tells(librarian, LIB, info(First, Second, R), T) : outsider(R) } = 1 :-
+{ st_tells_core(librarian, LIB, info(First, Second, R), T) : outsider(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(librarian, RoleOrd),
     assigned(0, LIB, librarian),
@@ -249,7 +249,7 @@ may_register_as_role(P, R, T) :-
     time(T).
 
 % When functioning, role must match what inv_minion player can register as
-{ st_tells(investigator, INV, info(First, Second, R), T) : may_register_as_role(PMinion, R, T) } = 1 :-
+{ st_tells_core(investigator, INV, info(First, Second, R), T) : may_register_as_role(PMinion, R, T) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(investigator, RoleOrd),
     assigned(0, INV, investigator),
@@ -259,7 +259,7 @@ may_register_as_role(P, R, T) :-
     functioning(INV, T).
 
 % When malfunctioning, ST can say any minion role
-{ st_tells(investigator, INV, info(First, Second, R), T) : minion(R) } = 1 :-
+{ st_tells_core(investigator, INV, info(First, Second, R), T) : minion(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(investigator, RoleOrd),
     assigned(0, INV, investigator),
@@ -291,7 +291,7 @@ evil_pair_count(N, T) :-
 
 % Chef st_tells: ST tells the chef a count
 % When functioning, the count must match the actual evil_pair_count
-st_tells(chef, Chef, count(N), T) :-
+st_tells_core(chef, Chef, count(N), T) :-
     T = night(1, RoleOrd, 1),
     first_night_role_order(chef, RoleOrd),
     assigned(0, Chef, chef),
@@ -299,7 +299,7 @@ st_tells(chef, Chef, count(N), T) :-
     evil_pair_count(N, T).
 
 % When malfunctioning, ST can tell any count from 0 to player_count/2
-{ st_tells(chef, Chef, count(N), T) : N = 0..player_count/2 } = 1 :-
+{ st_tells_core(chef, Chef, count(N), T) : N = 0..player_count/2 } = 1 :-
     T = night(1, RoleOrd, 1),
     first_night_role_order(chef, RoleOrd),
     assigned(0, Chef, chef),
@@ -323,7 +323,7 @@ empath_evil_neighbor_count(Empath, N, T) :-
 
 % Empath st_tells: ST tells the empath a count (0, 1, or 2)
 % When functioning, the count must match the actual neighbor evil count
-st_tells(empath, Empath, count(N), T) :-
+st_tells_core(empath, Empath, count(N), T) :-
     acting_role(T, empath),
     assigned(0, Empath, empath),
     alive(Empath, T),
@@ -331,7 +331,7 @@ st_tells(empath, Empath, count(N), T) :-
     empath_evil_neighbor_count(Empath, N, T).
 
 % When malfunctioning, ST can tell any count from 0 to 2
-{ st_tells(empath, Empath, count(N), T) : N = 0..2 } = 1 :-
+{ st_tells_core(empath, Empath, count(N), T) : N = 0..2 } = 1 :-
     acting_role(T, empath),
     assigned(0, Empath, empath),
     alive(Empath, T),
@@ -369,7 +369,7 @@ st_may_tell(undertaker, UT, point(R), night(N, RoleOrd, 1)) :-
     role(R).
 
 % ST picks exactly one from what they may tell
-{ st_tells(undertaker, UT, Msg, T) : st_may_tell(undertaker, UT, Msg, T) } = 1 :-
+{ st_tells_core(undertaker, UT, Msg, T) : st_may_tell(undertaker, UT, Msg, T) } = 1 :-
     night_number(N), N > 1,
     other_night_role_order(undertaker, RoleOrd),
     T = night(N, RoleOrd, 1),
@@ -415,7 +415,7 @@ player_chooses(ravenkeeper, RK, point(P), T) :-
     rk_choice(RK, P, T).
 
 % When functioning, ST tells the ravenkeeper the chosen player's role
-st_tells(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) :-
+st_tells_core(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
     other_night_role_order(ravenkeeper, RoleOrd),
     assigned(0, RK, ravenkeeper),
@@ -425,7 +425,7 @@ st_tells(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) :-
     may_register_as_role(P, R, night(N, RoleOrd, 3)).
 
 % When malfunctioning, ST can say any role
-{ st_tells(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) : role(R) } = 1 :-
+{ st_tells_core(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) : role(R) } = 1 :-
     night_number(N), N > 1,
     other_night_role_order(ravenkeeper, RoleOrd),
     assigned(0, RK, ravenkeeper),
@@ -514,39 +514,39 @@ ft_got_ping(FT, T) :-
 % Fortune teller st_tells: yes if either chosen player pings as demon
 % Only at substep 3 (after player has chosen)
 % When functioning: answer must be accurate
-st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
+st_tells_core(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
     first_night_role_order(fortune_teller, RoleOrd), N = 1,
     assigned(0, FT, fortune_teller),
     functioning(FT, night(N, RoleOrd, 3)),
     ft_got_ping(FT, night(N, RoleOrd, 3)).
 
-st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
+st_tells_core(fortune_teller, FT, yes, night(N, RoleOrd, 3)) :-
     other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
     assigned(0, FT, fortune_teller),
     functioning(FT, night(N, RoleOrd, 3)),
     ft_got_ping(FT, night(N, RoleOrd, 3)).
 
-st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
+st_tells_core(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
     first_night_role_order(fortune_teller, RoleOrd), N = 1,
     assigned(0, FT, fortune_teller),
     functioning(FT, night(N, RoleOrd, 3)),
     not ft_got_ping(FT, night(N, RoleOrd, 3)).
 
-st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
+st_tells_core(fortune_teller, FT, no, night(N, RoleOrd, 3)) :-
     other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
     assigned(0, FT, fortune_teller),
     functioning(FT, night(N, RoleOrd, 3)),
     not ft_got_ping(FT, night(N, RoleOrd, 3)).
 
 % When malfunctioning: ST can say yes or no
-{ st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
-  st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
+{ st_tells_core(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
+  st_tells_core(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
     first_night_role_order(fortune_teller, RoleOrd), N = 1,
     assigned(0, FT, fortune_teller),
     not functioning(FT, night(N, RoleOrd, 3)).
 
-{ st_tells(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
-  st_tells(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
+{ st_tells_core(fortune_teller, FT, yes, night(N, RoleOrd, 3)) ;
+  st_tells_core(fortune_teller, FT, no, night(N, RoleOrd, 3)) } = 1 :-
     other_night_role_order(fortune_teller, RoleOrd), night_number(N), N > 1,
     assigned(0, FT, fortune_teller),
     not functioning(FT, night(N, RoleOrd, 3)).

@@ -41,10 +41,10 @@ assigned(0, sullivan, drunk).  % believed he was empath
 % ===========================================================================
 
 % Chef (jon) learns 1 - because recluse registered as evil next to scarlet woman
-:- not st_tells(chef, jon, count(1), night(1, 5, 1)).
+:- not st_tells_core(chef, jon, count(1), night(1, 5, 1)).
 
 % Sullivan (drunk, thinks he's empath) learns 0 - ST can tell him anything
-st_tells(empath, sullivan, count(0), night(1, 6, 1)).
+st_tells_core(empath, sullivan, count(0), night(1, 6, 1)).
 
 % Fortune Teller's red herring is Sullivan
 :- not reminder_on(ft_red_herring, sullivan, night(1, 0, 0)).
@@ -52,7 +52,7 @@ st_tells(empath, sullivan, count(0), night(1, 6, 1)).
 % Fortune Teller (Blair) picks Tom and Elliott on night 1, gets "yes"
 player_chooses(fortune_teller, blair, point(tom), night(1, 7, 2)).
 player_chooses(fortune_teller, blair, point(elliott), night(1, 7, 2)).
-:- not st_tells(fortune_teller, blair, yes, night(1, 7, 3)).
+:- not st_tells_core(fortune_teller, blair, yes, night(1, 7, 3)).
 
 % TODO: more night 1 actions (monk, etc.)
 
@@ -71,7 +71,7 @@ player_chooses(monk, tom, point(sullivan), night(2, 2, 2)).
 player_chooses(imp, luke, point(sullivan), night(2, 4, 2)).
 
 % Sullivan (drunk, thinks he's empath) learns 0
-st_tells(empath, sullivan, count(0), night(2, 6, 1)).
+st_tells_core(empath, sullivan, count(0), night(2, 6, 1)).
 
 % Fortune Teller (Blair) picks Tom and Oli
 player_chooses(fortune_teller, blair, point(tom), night(2, 7, 2)).
@@ -97,7 +97,7 @@ player_chooses(imp, luke, point(tom), night(3, 4, 2)).
 % (This should be derived automatically from executed(jon, 2))
 
 % Sullivan (drunk, thinks he's empath) learns 1
-st_tells(empath, sullivan, count(1), night(3, 6, 1)).
+st_tells_core(empath, sullivan, count(1), night(3, 6, 1)).
 
 % Fortune Teller (Blair) picks Laurie and Isaac
 % (Blair must get "no" - proved by contradiction: asserting "yes" is UNSAT)
@@ -125,14 +125,14 @@ player_chooses(imp, luke, point(oli), night(4, 4, 2)).
 player_chooses(ravenkeeper, oli, point(laurie), night(4, 5, 2)).
 
 % Sullivan (drunk, thinks he's empath) learns 0
-st_tells(empath, sullivan, count(0), night(4, 6, 1)).
+st_tells_core(empath, sullivan, count(0), night(4, 6, 1)).
 
 % Fortune Teller (Blair) picks Sullivan and Luke
 player_chooses(fortune_teller, blair, point(sullivan), night(4, 7, 2)).
 player_chooses(fortune_teller, blair, point(luke), night(4, 7, 2)).
 
 % Undertaker (Isaac) learns Elliott was "poisoner" (Recluse mis-registration)
-:- not st_tells(undertaker, isaac, point(poisoner), night(4, 8, 1)).
+:- not st_tells_core(undertaker, isaac, point(poisoner), night(4, 8, 1)).
 
 % ===========================================================================
 % Day 4: Oli announced dead, Luke executed

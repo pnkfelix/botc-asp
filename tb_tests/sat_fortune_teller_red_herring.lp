@@ -19,4 +19,4 @@ assigned(0, felix, poisoner).         % chair 5
 :- not ft_choice(amanda, taylor, _).
 
 % Assert: FT should be told "yes" (red herring pings as demon)
-:- not st_tells(fortune_teller, amanda, yes, _).
+:- not st_tells_core(fortune_teller, amanda, yes, _).

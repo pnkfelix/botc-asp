@@ -11,4 +11,4 @@ assigned(0, rob, chef).         % chair 1
 :- reminder_on(poi_poisoned, rob, _).
 
 % Assert: Chef CAN be told count(1) - spy registers as evil next to imp
-:- not st_tells(chef, rob, count(1), _).
+:- not st_tells_core(chef, rob, count(1), _).

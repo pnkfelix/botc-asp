@@ -20,4 +20,4 @@ assigned(0, felix, poisoner).         % chair 5
 :- reminder_on(ft_red_herring, taylor, _).
 
 % Assert: ST can tell the poisoned FT "yes" (even though it's wrong)
-:- not st_tells(fortune_teller, amanda, yes, _).
+:- not st_tells_core(fortune_teller, amanda, yes, _).

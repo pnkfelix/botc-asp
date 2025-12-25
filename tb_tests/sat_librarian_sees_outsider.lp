@@ -13,4 +13,4 @@ assigned(0, taylor, librarian).
 :- not reminder_on(lib_outsider, felix, _).
 
 % Assert: ST CAN tell the librarian that felix is "the Drunk"
-:- not st_tells(librarian, taylor, info(_, _, drunk), _).
+:- not st_tells_core(librarian, taylor, info(_, _, drunk), _).
