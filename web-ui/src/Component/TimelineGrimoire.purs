@@ -6,14 +6,16 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, last, take)
+import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, last, take, foldl)
 import Data.Array as Array
+import Data.Char (toCharCode)
 import Data.Foldable (fold, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Void (Void)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..))
+import Data.String.CodeUnits (toCharArray)
 import Data.String as S
 import Halogen as H
 import Halogen.HTML as HH
@@ -378,42 +380,46 @@ renderReminderToken angleToCenter _total idx reminder =
           [ HH.text $ abbreviateToken reminder.token ]
       ]
 
+-- | Simple hash function for strings
+-- Returns a positive integer derived from the string
+hashString :: String -> Int
+hashString s =
+  let chars = toCharArray s
+      codes = map toCharCode chars
+      -- Polynomial hash with prime multiplier, keep positive with mod
+      rawHash = foldl (\acc c -> (acc * 31 + c) `mod` 1000000) 0 codes
+  in if rawHash < 0 then rawHash + 1000000 else rawHash
+
+-- | Convert hash to HSL color string
+-- isEvil: true for minions/demons (no blue), false for good (no red)
+hashToHslColor :: Boolean -> Int -> String
+hashToHslColor isEvil h =
+  let -- For good: hue 90-270 (green through blue, avoiding red/orange)
+      -- For evil: hue 0-60 or 300-360 (red/orange/yellow/magenta, avoiding blue)
+      hue = if isEvil
+              then
+                -- Evil: use 0-60 (red-yellow) or 300-360 (magenta-red)
+                -- Map to 120 degree range split across two zones
+                let hMod = h `mod` 120
+                in if hMod < 60 then hMod else hMod + 240  -- 0-60 or 300-360
+              else
+                -- Good: use 90-270 (green through blue through purple)
+                (h `mod` 180) + 90
+      -- Saturation 55-75% for vivid but not garish colors
+      sat = 55 + ((h / 7) `mod` 21)
+      -- Lightness 40-55% for good visibility on dark and light backgrounds
+      light = 40 + ((h / 13) `mod` 16)
+  in "hsl(" <> show hue <> ", " <> show sat <> "%, " <> show light <> "%)"
+
 -- | Get unique color for each role
--- Good (Townsfolk, Outsiders): blue-family tones (no red)
--- Evil (Minions, Demons): red-family tones (no blue)
+-- Color is deterministically derived from role name hash
+-- Good (Townsfolk, Outsiders): green/cyan/blue/purple tones (no red)
+-- Evil (Minions, Demons): red/orange/yellow/magenta tones (no blue)
 getRoleColor :: String -> String
-getRoleColor role = case role of
-  -- Townsfolk (blue spectrum, greens, purples - no red)
-  "washerwoman"    -> "#2196F3"  -- Bright blue
-  "librarian"      -> "#1976D2"  -- Medium blue
-  "investigator"   -> "#0D47A1"  -- Deep blue
-  "chef"           -> "#00BCD4"  -- Cyan
-  "empath"         -> "#00ACC1"  -- Dark cyan
-  "fortune_teller" -> "#673AB7"  -- Deep purple
-  "undertaker"     -> "#512DA8"  -- Dark purple
-  "monk"           -> "#689F38"  -- Light green (no red)
-  "ravenkeeper"    -> "#00796B"  -- Dark teal
-  "virgin"         -> "#03A9F4"  -- Light blue
-  "slayer"         -> "#546E7A"  -- Blue grey
-  "soldier"        -> "#37474F"  -- Dark blue grey
-  "mayor"          -> "#3F51B5"  -- Indigo
-  -- Outsiders (teal/cyan family - no red)
-  "butler"         -> "#26A69A"  -- Teal
-  "drunk"          -> "#4DB6AC"  -- Light teal
-  "recluse"        -> "#78909C"  -- Blue grey light
-  "saint"          -> "#4DD0E1"  -- Light cyan
-  -- Minions (orange/amber family - no blue)
-  "poisoner"       -> "#E65100"  -- Deep orange
-  "spy"            -> "#FF9800"  -- Amber
-  "scarlet_woman"  -> "#E53935"  -- Scarlet red
-  "baron"          -> "#8D6E63"  -- Brown
-  -- Demon (dark red - no blue)
-  "imp"            -> "#B71C1C"  -- Dark crimson
-  -- Fallback by type
-  _ | isMinion role  -> "#E65100"
-    | isDemon role   -> "#B71C1C"
-    | isOutsider role -> "#26A69A"
-    | otherwise      -> "#2196F3"
+getRoleColor role =
+  let h = hashString role
+      isEvil = isMinion role || isDemon role
+  in hashToHslColor isEvil h
 
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
