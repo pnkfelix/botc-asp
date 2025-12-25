@@ -9,7 +9,7 @@ import Data.Array (index, length, mapWithIndex, null, slice)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Void (Void, absurd)
+import Data.Void (Void)
 import Data.String (trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
@@ -27,7 +27,7 @@ data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
 derive instance eqProgramPanel :: Eq ProgramPanel
 
 -- | Child slots for embedded components
-type Slots = ( timelineGrimoire :: H.Slot TG.Query Void Unit )
+type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
 
 _timelineGrimoire :: Proxy "timelineGrimoire"
 _timelineGrimoire = Proxy
@@ -70,6 +70,7 @@ data Action
   | SelectPredicate ASP.Predicate
   | ClosePredicateModal
   | JumpToReference String Int  -- sourceFile, lineNumber
+  | HandleTimelineEvent TG.Output  -- Handle timeline event clicks
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -321,7 +322,10 @@ renderResult state = case state.result of
                          then " (Model " <> show (selectedIdx + 1) <> " of " <> show totalCount <> ")"
                          else ""
                   ]
-              , HH.slot _timelineGrimoire unit TG.component atoms absurd
+              , HH.p
+                  [ HP.style "font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic;" ]
+                  [ HH.text "Click on timeline events to navigate to the atom in the answer set and its rule definition." ]
+              , HH.slot _timelineGrimoire unit TG.component atoms HandleTimelineEvent
               ]
           Nothing -> HH.text ""
       -- Output section SECOND (compact, scrollable)
@@ -360,7 +364,8 @@ renderResult state = case state.result of
               ]
             else HH.text ""
           , HH.div
-              [ HP.style $ "max-height: 200px; overflow-y: scroll; margin-top: 10px; "
+              [ HP.id "answer-set-display"
+              , HP.style $ "max-height: 200px; overflow-y: scroll; margin-top: 10px; "
                   <> "-webkit-overflow-scrolling: touch; overscroll-behavior: contain; "
                   <> "touch-action: pan-y;"
               ]
@@ -592,6 +597,19 @@ handleAction = case _ of
     case sourceFileToTextareaId sourceFile of
       Just textareaId -> liftEffect $ TU.scrollToLine textareaId lineNumber
       Nothing -> pure unit
+
+  HandleTimelineEvent output -> case output of
+    TG.TimelineEventClicked { sourceAtom, predicateName, predicateArity } -> do
+      -- First, scroll to the atom in the answer set display
+      if sourceAtom /= ""
+        then do
+          _ <- liftEffect $ TU.scrollToText "answer-set-display" sourceAtom
+          pure unit
+        else pure unit
+      -- Second, select the predicate to show its rule definitions
+      -- This will trigger the predicate modal to open
+      let pred = { name: predicateName, arity: predicateArity }
+      H.modify_ \s -> s { selectedPredicate = Just pred }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation

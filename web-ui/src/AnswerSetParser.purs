@@ -3,11 +3,15 @@ module AnswerSetParser
   , TimePoint(..)
   , GameState
   , TimelineEvent(..)
+  , ParsedAtom
   , parseAnswerSet
+  , parseAnswerSetWithOriginals
   , buildGameState
   , extractTimeline
+  , extractTimelineWithSources
   , getStateAtTime
   , compareTimePoints
+  , atomToPredicateName
   ) where
 
 import Prelude
@@ -34,6 +38,9 @@ data Atom
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
+
+-- | A parsed atom with its original string representation
+type ParsedAtom = { atom :: Atom, original :: String }
 
 -- | Time points in the game
 data TimePoint
@@ -83,15 +90,18 @@ data TimelineEvent
       , eventType :: String  -- "st_tells" or "player_chooses"
       , player :: String
       , message :: String
+      , sourceAtom :: String  -- Original atom string for navigation
       }
   | TokenPlaced
       { time :: TimePoint
       , token :: String
       , player :: String
+      , sourceAtom :: String
       }
   | Execution
       { day :: Int
       , player :: String
+      , sourceAtom :: String
       }
 
 derive instance eqTimelineEvent :: Eq TimelineEvent
@@ -409,6 +419,10 @@ alt Nothing y = y
 parseAnswerSet :: Array String -> Array Atom
 parseAnswerSet = map parseAtom
 
+-- | Parse all atoms and keep original strings
+parseAnswerSetWithOriginals :: Array String -> Array ParsedAtom
+parseAnswerSetWithOriginals = map \s -> { atom: parseAtom s, original: s }
+
 -- | Build game state from parsed atoms at a specific time
 buildGameState :: Array Atom -> TimePoint -> GameState
 buildGameState atoms targetTime =
@@ -528,26 +542,30 @@ buildGameState atoms targetTime =
 
     lookup key arr = map _.value $ head $ filter (\x -> x.key == key) arr
 
--- | Extract timeline events from atoms
+-- | Extract timeline events from atoms (legacy version without sources)
 extractTimeline :: Array Atom -> Array TimelineEvent
-extractTimeline atoms =
+extractTimeline atoms = extractTimelineWithSources (map (\a -> { atom: a, original: "" }) atoms)
+
+-- | Extract timeline events from parsed atoms with source strings
+extractTimelineWithSources :: Array ParsedAtom -> Array TimelineEvent
+extractTimelineWithSources parsedAtoms =
   let
-    stTellsEvents = mapMaybe toStTellsEvent atoms
-    playerChoosesEvents = mapMaybe toPlayerChoosesEvent atoms
-    executionEvents = mapMaybe toExecutionEvent atoms
+    stTellsEvents = mapMaybe toStTellsEvent parsedAtoms
+    playerChoosesEvents = mapMaybe toPlayerChoosesEvent parsedAtoms
+    executionEvents = mapMaybe toExecutionEvent parsedAtoms
   in
     sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> executionEvents)
   where
-    toStTellsEvent (StTells role player message time) =
-      Just $ RoleAction { time, role, eventType: "st_tells", player, message }
+    toStTellsEvent { atom: StTells role player message time, original } =
+      Just $ RoleAction { time, role, eventType: "st_tells", player, message, sourceAtom: original }
     toStTellsEvent _ = Nothing
 
-    toPlayerChoosesEvent (PlayerChooses role player choice time) =
-      Just $ RoleAction { time, role, eventType: "player_chooses", player, message: choice }
+    toPlayerChoosesEvent { atom: PlayerChooses role player choice time, original } =
+      Just $ RoleAction { time, role, eventType: "player_chooses", player, message: choice, sourceAtom: original }
     toPlayerChoosesEvent _ = Nothing
 
-    toExecutionEvent (Executed player day) =
-      Just $ Execution { day, player }
+    toExecutionEvent { atom: Executed player day, original } =
+      Just $ Execution { day, player, sourceAtom: original }
     toExecutionEvent _ = Nothing
 
     compareEvents e1 e2 = case e1, e2 of
@@ -578,3 +596,24 @@ getAllTimePoints atoms =
 -- | Get state at a specific time point
 getStateAtTime :: Array Atom -> TimePoint -> GameState
 getStateAtTime = buildGameState
+
+-- | Get the predicate name and arity for an atom (for finding rule definitions)
+atomToPredicateName :: Atom -> { name :: String, arity :: Int }
+atomToPredicateName = case _ of
+  Assigned _ _ _         -> { name: "assigned", arity: 3 }
+  Received _ _           -> { name: "received", arity: 2 }
+  StTells _ _ _ _        -> { name: "st_tells", arity: 4 }
+  PlayerChooses _ _ _ _  -> { name: "player_chooses", arity: 4 }
+  ReminderOn _ _ _       -> { name: "reminder_on", arity: 3 }
+  Alive _ _              -> { name: "alive", arity: 2 }
+  Dead _ _               -> { name: "dead", arity: 2 }
+  Time _                 -> { name: "time", arity: 1 }
+  ActingRole _ _         -> { name: "acting_role", arity: 2 }
+  Chair _ _              -> { name: "chair", arity: 2 }
+  Executed _ _           -> { name: "executed", arity: 2 }
+  UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
+  where
+    takeUntilParen s =
+      case indexOf (Pattern "(") s of
+        Just idx -> take idx s
+        Nothing -> s
