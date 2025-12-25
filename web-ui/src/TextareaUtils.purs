@@ -1,6 +1,7 @@
 module TextareaUtils
   ( scrollToLine
   , focusTextarea
+  , scrollToText
   ) where
 
 import Prelude
@@ -19,3 +20,11 @@ foreign import focusTextareaImpl :: String -> Effect Unit
 
 focusTextarea :: String -> Effect Unit
 focusTextarea = focusTextareaImpl
+
+-- | Scroll to and highlight specific text within a scrollable element
+-- | Takes the element ID and the text to find and highlight
+-- | Returns true if found and highlighted, false otherwise
+foreign import scrollToTextImpl :: String -> String -> Effect Boolean
+
+scrollToText :: String -> String -> Effect Boolean
+scrollToText = scrollToTextImpl

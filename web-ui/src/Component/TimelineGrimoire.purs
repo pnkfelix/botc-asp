@@ -1,17 +1,17 @@
 module Component.TimelineGrimoire
   ( component
   , Query
+  , Output(..)
   ) where
 
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, length, mapWithIndex, null, sortBy, nub, head, last, take, foldl)
+import Data.Array (elem, filter, length, map, mapWithIndex, null, sortBy, nub, head, last, take, foldl)
 import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Foldable (fold, intercalate)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Void (Void)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..))
@@ -30,9 +30,18 @@ import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 
+-- | Output events from the component
+data Output
+  = TimelineEventClicked
+      { sourceAtom :: String      -- Original atom string to highlight in answer set
+      , predicateName :: String   -- Predicate name for finding rules (e.g., "st_tells")
+      , predicateArity :: Int     -- Arity for finding rules
+      }
+
 -- | Component state
 type State =
-  { atoms :: Array ASP.Atom
+  { parsedAtoms :: Array ASP.ParsedAtom  -- Parsed atoms with original strings
+  , atoms :: Array ASP.Atom              -- Just the atoms (for backward compat)
   , timeline :: Array ASP.TimelineEvent
   , selectedTime :: Maybe ASP.TimePoint
   , allTimePoints :: Array ASP.TimePoint
@@ -45,9 +54,10 @@ data Query a
 data Action
   = ReceiveAtoms (Array String)
   | SelectTimePoint ASP.TimePoint
+  | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
 
--- | The Halogen component (slot-less, no output)
-component :: forall m. H.Component Query (Array String) Void m
+-- | The Halogen component with output events
+component :: forall m. H.Component Query (Array String) Output m
 component =
   H.mkComponent
     { initialState
@@ -62,12 +72,14 @@ component =
 initialState :: Array String -> State
 initialState atomStrings =
   let
-    atoms = ASP.parseAnswerSet atomStrings
-    timeline = ASP.extractTimeline atoms
+    parsedAtoms = ASP.parseAnswerSetWithOriginals atomStrings
+    atoms = map _.atom parsedAtoms
+    timeline = ASP.extractTimelineWithSources parsedAtoms
     allTimes = getAllTimePoints atoms
     firstTime = head allTimes
   in
-    { atoms
+    { parsedAtoms
+    , atoms
     , timeline
     , selectedTime: firstTime
     , allTimePoints: allTimes
@@ -162,13 +174,17 @@ eventAtTime t (ASP.RoleAction r) = r.time == t
 eventAtTime t (ASP.TokenPlaced r) = r.time == t
 eventAtTime _ (ASP.Execution _) = false  -- Executions happen at day end
 
--- | Render a single event
+-- | Render a single event (clickable for navigation)
 renderEvent :: forall cs m. ASP.TimelineEvent -> H.ComponentHTML Action cs m
 renderEvent event =
   case event of
     ASP.RoleAction r ->
       HH.div
-        [ HP.style "font-size: 12px; color: #555; margin: 4px 0;" ]
+        [ HP.style $ "font-size: 12px; color: #555; margin: 4px 0; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to navigate to this atom in the answer set and its rule definition"
+        ]
         [ HH.span
             [ HP.style $ "display: inline-block; padding: 2px 6px; border-radius: 3px; "
                 <> "background: " <> (if r.eventType == "st_tells" then "#e8f5e9" else "#fff3e0") <> "; "
@@ -181,11 +197,19 @@ renderEvent event =
         ]
     ASP.TokenPlaced r ->
       HH.div
-        [ HP.style "font-size: 12px; color: #888; margin: 4px 0;" ]
+        [ HP.style $ "font-size: 12px; color: #888; margin: 4px 0; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to navigate to this atom"
+        ]
         [ HH.text $ r.token <> " placed on " <> r.player ]
     ASP.Execution r ->
       HH.div
-        [ HP.style "font-size: 12px; color: #c62828; margin: 4px 0; font-weight: bold;" ]
+        [ HP.style $ "font-size: 12px; color: #c62828; margin: 4px 0; font-weight: bold; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to navigate to this atom"
+        ]
         [ HH.text $ r.player <> " executed" ]
 
 -- | Render the grimoire (players in a circle)
@@ -499,12 +523,13 @@ formatTimePoint (ASP.Day n p) = "Day " <> show n <> " (" <> p <> ")"
 formatTimePoint (ASP.UnknownTime s) = s
 
 -- | Handle actions
-handleAction :: forall cs o m. Action -> H.HalogenM State Action cs o m Unit
+handleAction :: forall cs m. Action -> H.HalogenM State Action cs Output m Unit
 handleAction = case _ of
   ReceiveAtoms atomStrings -> do
     currentState <- H.get
-    let atoms = ASP.parseAnswerSet atomStrings
-    let timeline = ASP.extractTimeline atoms
+    let parsedAtoms = ASP.parseAnswerSetWithOriginals atomStrings
+    let atoms = map _.atom parsedAtoms
+    let timeline = ASP.extractTimelineWithSources parsedAtoms
     let allTimes = getAllTimePoints atoms
     -- Preserve selected time if it exists, otherwise find closest earlier time
     let preservedTime = case currentState.selectedTime of
@@ -517,7 +542,8 @@ handleAction = case _ of
                  Nothing -> head allTimes  -- No earlier time, use first
           Nothing -> head allTimes
     H.modify_ \s -> s
-      { atoms = atoms
+      { parsedAtoms = parsedAtoms
+      , atoms = atoms
       , timeline = timeline
       , allTimePoints = allTimes
       , selectedTime = preservedTime
@@ -525,3 +551,24 @@ handleAction = case _ of
 
   SelectTimePoint t ->
     H.modify_ \s -> s { selectedTime = Just t }
+
+  ClickTimelineEvent event -> do
+    -- Extract source atom and predicate info from the event
+    let eventInfo = case event of
+          ASP.RoleAction r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: r.eventType  -- "st_tells" or "player_chooses"
+            , predicateArity: 4
+            }
+          ASP.TokenPlaced r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "reminder_on"
+            , predicateArity: 3
+            }
+          ASP.Execution r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "executed"
+            , predicateArity: 2
+            }
+    -- Emit the output event
+    H.raise $ TimelineEventClicked eventInfo
