@@ -13,9 +13,22 @@ Claude Code runs in two environments with different capabilities:
 - Can push branches and create PRs via CLI
 
 ### Web Claude Code Remote (CCR) - Restricted
+
+> ⚠️ **CRITICAL: CCR CANNOT BUILD THIS PROJECT LOCALLY** ⚠️
+>
+> The following tools are **NOT AVAILABLE** in the CCR environment:
+> - `spago` - PureScript build tool (not installed)
+> - `clingo` - ASP solver (not installed)
+> - `npm run build` - **WILL FAIL** because it requires `spago`
+>
+> **CCR MUST use GitHub Actions for ALL build testing.** There is no alternative.
+> Push your changes, have the user create a PR, and monitor CI results.
+
 - Limited shell access, some network restrictions
 - **No `gh` CLI** - use GitHub API via `curl` or provide manual instructions
 - Binary downloads (e.g., from GitHub releases) may be blocked
+- **No `spago`** - PureScript compiler is not installed; `npm run build` will fail
+- **No `clingo`** - ASP solver is not installed; cannot run `.lp` tests locally
 - **Cannot run local builds** - must rely on GitHub Actions for build testing
 - Can push branches, but user must create/merge PRs manually
 
@@ -60,7 +73,16 @@ When the user cannot easily inspect the DOM (e.g., on mobile):
 
 ## Build Commands
 
-All web-ui commands run from the `web-ui/` directory:
+> ⚠️ **CCR Users: These commands are for TERMINAL Claude Code only!**
+>
+> If you are running in CCR (Web Claude Code Remote), **DO NOT attempt to run these commands**.
+> They will fail because `spago` is not installed. Instead:
+> 1. Make your code changes
+> 2. Commit and push to your branch
+> 3. Ask the user to create a PR
+> 4. Monitor GitHub Actions for build results
+
+All web-ui commands run from the `web-ui/` directory **(Terminal Claude Code only)**:
 
 ```bash
 cd web-ui
@@ -68,17 +90,17 @@ cd web-ui
 # Install dependencies (first time or after package.json changes)
 npm install
 
-# Full build (recommended)
+# Full build (recommended) - REQUIRES spago!
 npm run build
 
 # Individual steps:
 npm run embed-lp    # Embed *.lp files into EmbeddedPrograms.js
-npm run build:purs  # Compile PureScript via spago
+npm run build:purs  # Compile PureScript via spago (NOT available in CCR!)
 npm run bundle      # Bundle JS with esbuild
 npm run copy:wasm   # Copy clingo WASM to dist/
 
 # Development mode
-npm run dev         # Watch + rebuild on changes
+npm run dev         # Watch + rebuild on changes (NOT available in CCR!)
 ```
 
 ## Project Conventions
@@ -111,7 +133,11 @@ export const runClingoImpl = (program, models, callback) => ...
 ## Testing Approach
 
 ### ASP Logic Tests
-Run clingo directly on test files:
+
+> ⚠️ **CCR Users: `clingo` is NOT available in your environment!**
+> You cannot run ASP tests locally. Push your changes and rely on GitHub Actions.
+
+Run clingo directly on test files **(Terminal Claude Code only)**:
 ```bash
 clingo botc.lp tb.lp tb_tests/sat_chef_counts_evil_pairs.lp 0
 # Should output: SATISFIABLE
@@ -123,6 +149,14 @@ clingo botc.lp tb.lp tb_tests/unsat_red_herring_on_demon.lp 0
 ### Web UI Testing
 The CI builds and bundles the PureScript code. Type errors will fail the build.
 Currently no automated UI tests - test manually via GitHub Pages deployment.
+
+### CCR Testing Strategy
+Since CCR cannot run builds or tests locally, the **only** way to verify changes is:
+1. Push commits to your feature branch
+2. Ask the user to create/update a PR
+3. Monitor GitHub Actions: `curl -s "https://api.github.com/repos/pnkfelix/botc-asp/actions/runs?per_page=5"`
+4. If CI fails, read the error logs and fix the issues
+5. Repeat until CI passes
 
 ## Git Workflow
 
@@ -144,13 +178,22 @@ Currently no automated UI tests - test manually via GitHub Pages deployment.
 1. Add role to appropriate category in `tb.lp` (or script file)
 2. Define role abilities as ASP rules
 3. Create `sat_*.lp` and `unsat_*.lp` tests
-4. Run `npm run embed-lp` to update web UI
+4. Run `npm run embed-lp` to update web UI **(Terminal only; CCR: push and let CI do this)**
 
 ### Adding FFI Function
 1. Add JavaScript implementation in `*.js` file
 2. Add foreign import in corresponding `*.purs` file
 3. Use `Effect` or `Aff` types for side effects
-4. Rebuild: `npm run build:purs && npm run bundle`
+4. Rebuild: `npm run build:purs && npm run bundle` **(Terminal only; CCR: push and let CI build)**
+
+### CCR Workflow for Any Code Change
+Since CCR cannot build locally, follow this pattern for **all** code changes:
+1. Make your edits to the source files
+2. Commit with a descriptive message
+3. Push to your branch: `git push -u origin <branch-name>`
+4. Tell the user: "Please create a PR so CI can test the build"
+5. Wait for user confirmation, then check CI status
+6. If CI fails, fix issues and repeat from step 1
 
 ### Debugging CI Failures
 Check workflow runs:
