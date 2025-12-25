@@ -219,14 +219,27 @@ signal(point(R)) :- role(R).
 % ===========================================================================
 % Simplified st_tells predicates for player-visible information
 % These drop implementation details (player identity, exact timing) and expose
-% what players actually observe: a role received certain info.
+% what players actually observe in a simplified form.
 % ===========================================================================
 
-% st_tells(Role, Info) - the role was told Info at some point
-st_tells(R, Info) :- st_tells_core(R, _, Info, _).
+% For count info (chef, empath): st_tells(chef, 2) instead of st_tells(chef, count(2))
+st_tells(R, N) :- st_tells_core(R, _, count(N), _).
+st_tells(P, N) :- st_tells_core(_, P, count(N), _).
 
-% st_tells(Player, Info) - the player was told Info at some point
-st_tells(P, Info) :- st_tells_core(_, P, Info, _).
+% For info tuples (washerwoman, librarian, investigator): extract the role shown
+% st_tells(washerwoman, chef) means "washerwoman was told about a chef"
+st_tells(R, Role) :- st_tells_core(R, _, info(_, _, Role), _).
+st_tells(P, Role) :- st_tells_core(_, P, info(_, _, Role), _).
+
+% For point info (undertaker, ravenkeeper): st_tells(undertaker, poisoner)
+st_tells(R, Role) :- st_tells_core(R, _, point(Role), _).
+st_tells(P, Role) :- st_tells_core(_, P, point(Role), _).
+
+% For yes/no (fortune_teller): already simple, pass through directly
+st_tells(R, yes) :- st_tells_core(R, _, yes, _).
+st_tells(R, no) :- st_tells_core(R, _, no, _).
+st_tells(P, yes) :- st_tells_core(_, P, yes, _).
+st_tells(P, no) :- st_tells_core(_, P, no, _).
 
 % player_chooses(Role, Player, Choice, T) - Player communicates Choice to ST
 % as part of Role's ability at time T (in response to ST's request)
