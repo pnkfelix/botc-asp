@@ -7,7 +7,7 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, length, map, mapWithIndex, null, sortBy, nub, head, last, take, foldl)
+import Data.Array (elem, filter, foldl, head, last, length, mapWithIndex, nub, null, sortBy, take)
 import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Foldable (fold, intercalate)
