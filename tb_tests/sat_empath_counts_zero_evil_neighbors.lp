@@ -13,4 +13,4 @@ assigned(0, felix, poisoner).   % chair 5 - not neighbor of empath
 :- reminder_on(poi_poisoned, rob, _).
 
 % Assert: Empath is told count(0) - no evil neighbors
-:- not st_tells(empath, rob, count(0), _).
+:- not st_tells_core(empath, rob, count(0), _).

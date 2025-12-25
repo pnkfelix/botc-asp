@@ -20,4 +20,4 @@ assigned(0, felix, poisoner).         % chair 5
 :- reminder_on(ft_red_herring, taylor, _).
 
 % Assert: FT should be told "no"
-:- not st_tells(fortune_teller, amanda, no, _).
+:- not st_tells_core(fortune_teller, amanda, no, _).

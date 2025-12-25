@@ -1,5 +1,5 @@
 % Test: Undertaker gets no info when no execution occurred
-% When no one is executed, undertaker cannot receive any st_tells
+% When no one is executed, undertaker cannot receive any st_tells_core
 #include "base.lp".
 
 assigned(0, amanda, undertaker).
@@ -14,4 +14,4 @@ day_number(2).
 % No execution on day 1
 
 % Assert: Trying to force undertaker to get info should be UNSAT
-:- not st_tells(undertaker, amanda, _, _).
+:- not st_tells_core(undertaker, amanda, _, _).

@@ -14,4 +14,4 @@ assigned(0, courtney, investigator).
 
 % Assert: ST CAN tell the investigator that felix is "the Baron"
 % (even though felix is actually a Recluse, she registers as minion)
-:- not st_tells(investigator, courtney, info(_, _, baron), _).
+:- not st_tells_core(investigator, courtney, info(_, _, baron), _).

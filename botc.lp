@@ -199,22 +199,34 @@ signal(point(P)) :- player(P).
 % Pointing to a role on the script
 signal(point(R)) :- role(R).
 
-% st_tells(Role, Player, Message, T) - ST communicates Message to Player
-% as part of Role's ability at time T
+% st_tells_core(Role, Player, Message, T) - ST communicates Message to Player
+% as part of Role's ability at time T. This is the detailed/implementation form.
 
-% Constraint: st_tells for a role can only go to players who think they have
+% Constraint: st_tells_core for a role can only go to players who think they have
 % that role (i.e., received that role's token). This covers both:
 % 1. Players who actually have the role
 % 2. Players who think they have it (e.g., Drunk with chef token)
 % NOTE: This will need adjustment for Philosopher (gains another role's ability),
 % Pixie (gains ability after townsfolk dies), and Pit Hag (can change roles mid-game).
-:- st_tells(R, P, _, _), not received(P, R).
+:- st_tells_core(R, P, _, _), not received(P, R).
 
 % Constraint: a player can only receive one message from a role at a given time.
 % Roles that communicate multiple pieces of info (e.g., Washerwoman pointing to
 % two players and naming a role) use tuple values like info(P1, P2, Role).
 % Using aggregate instead of pairwise comparison to avoid grounding explosion.
-:- st_tells(R, P, _, T), #count { V : st_tells(R, P, V, T) } > 1.
+:- st_tells_core(R, P, _, T), #count { V : st_tells_core(R, P, V, T) } > 1.
+
+% ===========================================================================
+% Simplified st_tells predicates for player-visible information
+% These drop implementation details (player identity, exact timing) and expose
+% what players actually observe: a role received certain info.
+% ===========================================================================
+
+% st_tells(Role, Info) - the role was told Info at some point
+st_tells(R, Info) :- st_tells_core(R, _, Info, _).
+
+% st_tells(Player, Info) - the player was told Info at some point
+st_tells(P, Info) :- st_tells_core(_, P, Info, _).
 
 % player_chooses(Role, Player, Choice, T) - Player communicates Choice to ST
 % as part of Role's ability at time T (in response to ST's request)

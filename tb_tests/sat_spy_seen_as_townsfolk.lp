@@ -13,4 +13,4 @@ assigned(0, rob, washerwoman).
 
 % Assert: ST CAN tell the washerwoman that amanda is "the Chef"
 % (even though amanda is actually a Spy, she registers as townsfolk)
-:- not st_tells(washerwoman, rob, info(_, _, chef), _).
+:- not st_tells_core(washerwoman, rob, info(_, _, chef), _).

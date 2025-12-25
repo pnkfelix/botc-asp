@@ -12,4 +12,4 @@ assigned(0, taylor, librarian).
 
 % Assert: ST CANNOT tell the librarian that felix is "the Butler"
 % (If this is SAT, the test fails - drunk shouldn't be claimable as butler)
-:- not st_tells(librarian, taylor, point(butler), _).
+:- not st_tells_core(librarian, taylor, point(butler), _).

@@ -21,4 +21,4 @@ executed(rob, 1).
 :- reminder_on(imp_dead, amanda, _).
 
 % Assert: A model exists where undertaker is told chef
-:- not st_tells(undertaker, amanda, point(chef), _).
+:- not st_tells_core(undertaker, amanda, point(chef), _).

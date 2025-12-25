@@ -11,4 +11,4 @@ assigned(0, rob, chef).         % chair 1
 :- reminder_on(poi_poisoned, rob, _).
 
 % Assert: Chef is told count(0) - no pairs of adjacent evil players
-:- not st_tells(chef, rob, count(0), _).
+:- not st_tells_core(chef, rob, count(0), _).
