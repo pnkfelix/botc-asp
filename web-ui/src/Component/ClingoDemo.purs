@@ -608,7 +608,7 @@ handleAction = case _ of
         else pure unit
       -- Second, select the predicate to show its rule definitions
       -- This will trigger the predicate modal to open
-      let pred = { name: predicateName, arity: predicateArity, sourceFile: "", lineNumber: 0 }
+      let pred = { name: predicateName, arity: predicateArity }
       H.modify_ \s -> s { selectedPredicate = Just pred }
 
   NoOp ->
