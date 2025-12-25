@@ -13,7 +13,7 @@ assigned(0, courtney, investigator).
 % ===========================================================================
 % Example: Player-visible constraints using simplified st_tells
 % ===========================================================================
-% The simplified st_tells/2 predicates let you express what players observed
+% The simplified st_tells predicates let you express what players observed
 % without needing implementation details like timestamps or wrapper terms.
 %
 % Info values are unwrapped for convenience:
@@ -22,15 +22,21 @@ assigned(0, courtney, investigator).
 %   point(R) -> R      (undertaker, ravenkeeper)
 %   yes/no -> yes/no   (fortune_teller)
 %
-% Examples by role:
-%   :- not st_tells(chef, 2).           % chef was told 2
-%   :- not st_tells(empath, 1).         % empath was told 1
-%   :- not st_tells(fortune_teller, yes). % FT was told yes
-%   :- not st_tells(washerwoman, chef). % washerwoman was told "chef"
-%   :- not st_tells(undertaker, imp).   % undertaker learned "imp"
+% --- st_tells/2: for one-time info or when night doesn't matter ---
+%   :- not st_tells(chef, 2).             % chef was told 2
+%   :- not st_tells(washerwoman, chef).   % washerwoman was told "chef"
+%   :- not st_tells(undertaker, imp).     % undertaker learned "imp"
+%   :- not st_tells(fortune_teller, yes). % FT was told yes (at some point)
+%
+% --- st_tells/3: includes night number for recurring info roles ---
+%   :- not st_tells(empath, 1, 2).          % empath told 1 on night 2
+%   :- not st_tells(fortune_teller, yes, 1). % FT told yes on night 1
+%   :- not st_tells(fortune_teller, no, 3).  % FT told no on night 3
+%   :- not st_tells(undertaker, chef, 2).   % undertaker learned chef on night 2
 %
 % Can also query by player name:
-%   :- not st_tells(amanda, 2).         % amanda was told 2
+%   :- not st_tells(amanda, 2).      % amanda was told 2
+%   :- not st_tells(amanda, 1, 2).   % amanda was told 1 on night 2
 %
 % These derive from st_tells_core(Role, Player, Info, Time), the detailed form.
 % ===========================================================================
