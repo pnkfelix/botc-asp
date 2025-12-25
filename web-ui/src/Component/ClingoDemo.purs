@@ -5,7 +5,7 @@ import Prelude
 import AspParser as ASP
 import Clingo as Clingo
 import Component.TimelineGrimoire as TG
-import Data.Array (index, length, mapWithIndex, null)
+import Data.Array (index, length, mapWithIndex, null, slice)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -43,6 +43,8 @@ type State =
   , isLoading :: Boolean
   , isInitialized :: Boolean
   , selectedModelIndex :: Int  -- Which model to show in Timeline/Grimoire (0-indexed)
+  -- Pagination for answer sets list (prevents browser crash with many models)
+  , answerSetPage :: Int       -- Current page of answer sets (0-indexed)
   -- Predicate navigator state
   , showPredicateList :: Boolean
   , selectedPredicate :: Maybe ASP.Predicate
@@ -62,11 +64,17 @@ data Action
   | RunClingo
   | CancelSolve
   | SelectModel Int  -- Select which model to display in Timeline/Grimoire
+  | PrevAnswerSetPage
+  | NextAnswerSetPage
   | TogglePredicateList
   | SelectPredicate ASP.Predicate
   | ClosePredicateModal
   | JumpToReference String Int  -- sourceFile, lineNumber
   | NoOp  -- Used to stop event propagation
+
+-- | Number of answer sets to display per page (prevents browser crash with many models)
+answerSetPageSize :: Int
+answerSetPageSize = 20
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -80,6 +88,7 @@ initialState =
   , isLoading: false
   , isInitialized: false
   , selectedModelIndex: 0  -- First model selected by default
+  , answerSetPage: 0       -- First page of answer sets
   , showPredicateList: false
   , selectedPredicate: Nothing
   }
@@ -289,6 +298,15 @@ renderResult state = case state.result of
     let
       selectedIdx = state.selectedModelIndex
       selectedSet = index answerSets selectedIdx
+      -- Pagination: only render a subset of answer sets to prevent browser crash
+      totalCount = length answerSets
+      pageStart = state.answerSetPage * answerSetPageSize
+      pageEnd = min (pageStart + answerSetPageSize) totalCount
+      pageItems = slice pageStart pageEnd answerSets
+      totalPages = (totalCount + answerSetPageSize - 1) / answerSetPageSize
+      currentPage = state.answerSetPage + 1
+      hasPrevPage = state.answerSetPage > 0
+      hasNextPage = pageEnd < totalCount
     in
     HH.div_
       [ -- Timeline and Grimoire view FIRST (for selected model)
@@ -299,8 +317,8 @@ renderResult state = case state.result of
               [ HH.h2
                   [ HP.style "color: #333; margin-bottom: 10px;" ]
                   [ HH.text $ "Timeline & Grimoire View"
-                      <> if length answerSets > 1
-                         then " (Model " <> show (selectedIdx + 1) <> " of " <> show (length answerSets) <> ")"
+                      <> if totalCount > 1
+                         then " (Model " <> show (selectedIdx + 1) <> " of " <> show totalCount <> ")"
                          else ""
                   ]
               , HH.slot _timelineGrimoire unit TG.component atoms absurd
@@ -311,15 +329,43 @@ renderResult state = case state.result of
           [ HP.style "padding: 15px; background: #e8f5e9; border-radius: 4px;" ]
           [ HH.strong
               [ HP.style "color: #2e7d32;" ]
-              [ HH.text $ "SATISFIABLE - Found " <> show (length answerSets) <> " answer set(s)"
-                  <> if length answerSets > 1 then " (click to select)" else ""
+              [ HH.text $ "SATISFIABLE - Found " <> show totalCount <> " answer set(s)"
+                  <> if totalCount > 1 then " (click to select)" else ""
               ]
+          -- Pagination controls (only show if more than one page)
+          , if totalPages > 1
+            then HH.div
+              [ HP.style "display: flex; align-items: center; gap: 10px; margin-top: 10px;" ]
+              [ HH.button
+                  [ HP.style $ "padding: 6px 12px; font-size: 14px; cursor: pointer; "
+                      <> "background: " <> (if hasPrevPage then "#4CAF50" else "#ccc") <> "; "
+                      <> "color: white; border: none; border-radius: 4px;"
+                  , HE.onClick \_ -> PrevAnswerSetPage
+                  , HP.disabled (not hasPrevPage)
+                  ]
+                  [ HH.text "← Prev" ]
+              , HH.span
+                  [ HP.style "font-size: 14px; color: #666;" ]
+                  [ HH.text $ "Page " <> show currentPage <> " of " <> show totalPages
+                      <> " (showing " <> show (pageStart + 1) <> "-" <> show pageEnd <> ")"
+                  ]
+              , HH.button
+                  [ HP.style $ "padding: 6px 12px; font-size: 14px; cursor: pointer; "
+                      <> "background: " <> (if hasNextPage then "#4CAF50" else "#ccc") <> "; "
+                      <> "color: white; border: none; border-radius: 4px;"
+                  , HE.onClick \_ -> NextAnswerSetPage
+                  , HP.disabled (not hasNextPage)
+                  ]
+                  [ HH.text "Next →" ]
+              ]
+            else HH.text ""
           , HH.div
               [ HP.style $ "max-height: 200px; overflow-y: scroll; margin-top: 10px; "
                   <> "-webkit-overflow-scrolling: touch; overscroll-behavior: contain; "
                   <> "touch-action: pan-y;"
               ]
-              [ HH.div_ $ mapWithIndex (renderAnswerSet selectedIdx) answerSets ]
+              -- Render only the current page of answer sets (with correct global indices)
+              [ HH.div_ $ mapWithIndex (\pageIdx atoms -> renderAnswerSet selectedIdx (pageStart + pageIdx) atoms) pageItems ]
           ]
       ]
     where
@@ -488,7 +534,7 @@ handleAction = case _ of
     H.modify_ \s -> s { modelLimit = limit }
 
   RunClingo -> do
-    H.modify_ \s -> s { isLoading = true, result = Nothing, selectedModelIndex = 0 }
+    H.modify_ \s -> s { isLoading = true, result = Nothing, selectedModelIndex = 0, answerSetPage = 0 }
     state <- H.get
     -- Parse model limit (empty or invalid = 0 = all models)
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
@@ -518,6 +564,17 @@ handleAction = case _ of
 
   SelectModel idx ->
     H.modify_ \s -> s { selectedModelIndex = idx }
+
+  PrevAnswerSetPage ->
+    H.modify_ \s -> s { answerSetPage = max 0 (s.answerSetPage - 1) }
+
+  NextAnswerSetPage -> do
+    state <- H.get
+    let maxPage = case state.result of
+          Just (ResultSuccess answerSets) ->
+            (length answerSets - 1) / answerSetPageSize
+          _ -> 0
+    H.modify_ \s -> s { answerSetPage = min maxPage (s.answerSetPage + 1) }
 
   TogglePredicateList ->
     H.modify_ \s -> s { showPredicateList = not s.showPredicateList }
