@@ -16,7 +16,7 @@ module AnswerSetParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, sortBy, nub, head, findIndex, index)
+import Data.Array (filter, map, mapMaybe, sortBy, nub, head, findIndex, index)
 import Data.Foldable (elem, all)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
