@@ -2,6 +2,10 @@
 never_in_bag(drunk).
 mistaken_identity(drunk, townsfolk).
 
+% Drunk is always impaired - place "Is the Drunk" reminder token
+reminder_on(drunk_is_drunk, P, T) :- assigned(0, P, drunk), time(T), alive(P, T).
+causes_impairment(drunk_is_drunk).
+
 townsfolk(X) :- tb_townsfolk(X).
 outsider(X) :- tb_outsider(X).
 minion(X) :- tb_minion(X).
@@ -761,4 +765,38 @@ sw_becomes_demon(SW, N) :-
 
 % When Scarlet Woman becomes demon, she gains the Imp role
 assigned(N, SW, imp) :- sw_becomes_demon(SW, N).
+
+% ===========================================================================
+% Reminder Token Metadata (for grimoire rendering)
+% ===========================================================================
+
+% reminder_belongs_to(Token, Role) - which role owns this reminder token
+reminder_belongs_to(drunk_is_drunk, drunk).
+reminder_belongs_to(poi_poisoned, poisoner).
+reminder_belongs_to(ww_townsfolk, washerwoman).
+reminder_belongs_to(ww_wrong, washerwoman).
+reminder_belongs_to(lib_outsider, librarian).
+reminder_belongs_to(lib_wrong, librarian).
+reminder_belongs_to(inv_minion, investigator).
+reminder_belongs_to(inv_wrong, investigator).
+reminder_belongs_to(ft_red_herring, fortune_teller).
+reminder_belongs_to(but_master, butler).
+reminder_belongs_to(sla_no_ability, slayer).
+reminder_belongs_to(monk_protected, monk).
+reminder_belongs_to(imp_dead, imp).
+
+% reminder_label(Token, Label) - human-readable label for grimoire display
+reminder_label(drunk_is_drunk, "Is the Drunk").
+reminder_label(poi_poisoned, "Poisoned").
+reminder_label(ww_townsfolk, "Townsfolk").
+reminder_label(ww_wrong, "Wrong").
+reminder_label(lib_outsider, "Outsider").
+reminder_label(lib_wrong, "Wrong").
+reminder_label(inv_minion, "Minion").
+reminder_label(inv_wrong, "Wrong").
+reminder_label(ft_red_herring, "Red herring").
+reminder_label(but_master, "Master").
+reminder_label(sla_no_ability, "No ability").
+reminder_label(monk_protected, "Protected").
+reminder_label(imp_dead, "Dead").
 

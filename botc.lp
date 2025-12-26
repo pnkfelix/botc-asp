@@ -463,3 +463,24 @@ died(P, day(N, exec)) :- executed(P, N).
 
 % Validate: executed player must have been alive at start of day
 :- executed(P, N), not alive(P, day(N, 0)).
+
+% ===========================================================================
+% Grimoire State (for rendering)
+% These predicates provide a clean interface for a frontend to render the
+% grimoire at any point in time with minimal deduction.
+% ===========================================================================
+
+% grimoire_token(Player, RoleToken, Time) - what role token to display for a player
+% This is the token they received (what they think they are), not their true role.
+% A Drunk with the Chef token should display as Chef.
+grimoire_token(P, R, T) :- received(P, R), time(T).
+
+% grimoire_reminder(Player, ReminderToken, Time) - which reminder tokens to show
+grimoire_reminder(P, Token, T) :- reminder_on(Token, P, T).
+
+% grimoire_alive(Player, Time) - whether the player is alive
+grimoire_alive(P, T) :- alive(P, T).
+
+% grimoire_true_role(Player, Role) - the player's actual role (ST view only)
+% This is for the ST's knowledge, not displayed on tokens.
+grimoire_true_role(P, R) :- assigned(0, P, R).
