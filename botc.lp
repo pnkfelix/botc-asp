@@ -222,6 +222,8 @@ signal(point(R)) :- role(R).
 % what players actually observe in a simplified form.
 % ===========================================================================
 
+% --- Binary st_tells/2: for one-time info or when night doesn't matter ---
+
 % For count info (chef, empath): st_tells(chef, 2) instead of st_tells(chef, count(2))
 st_tells(R, N) :- st_tells_core(R, _, count(N), _).
 st_tells(P, N) :- st_tells_core(_, P, count(N), _).
@@ -240,6 +242,24 @@ st_tells(R, yes) :- st_tells_core(R, _, yes, _).
 st_tells(R, no) :- st_tells_core(R, _, no, _).
 st_tells(P, yes) :- st_tells_core(_, P, yes, _).
 st_tells(P, no) :- st_tells_core(_, P, no, _).
+
+% --- Ternary st_tells/3: includes night number for recurring info roles ---
+% Use this for empath, fortune_teller, or any role that gets info multiple nights.
+% Format: st_tells(RoleOrPlayer, Info, NightNum)
+
+% For count info with night: st_tells(empath, 1, 2) = "empath told 1 on night 2"
+st_tells(R, N, Night) :- st_tells_core(R, _, count(N), night(Night, _, _)).
+st_tells(P, N, Night) :- st_tells_core(_, P, count(N), night(Night, _, _)).
+
+% For yes/no with night: st_tells(fortune_teller, yes, 3) = "FT told yes on night 3"
+st_tells(R, yes, Night) :- st_tells_core(R, _, yes, night(Night, _, _)).
+st_tells(R, no, Night) :- st_tells_core(R, _, no, night(Night, _, _)).
+st_tells(P, yes, Night) :- st_tells_core(_, P, yes, night(Night, _, _)).
+st_tells(P, no, Night) :- st_tells_core(_, P, no, night(Night, _, _)).
+
+% For point info with night (undertaker gets info on night after execution)
+st_tells(R, Role, Night) :- st_tells_core(R, _, point(Role), night(Night, _, _)).
+st_tells(P, Role, Night) :- st_tells_core(_, P, point(Role), night(Night, _, _)).
 
 % player_chooses(Role, Player, Choice, T) - Player communicates Choice to ST
 % as part of Role's ability at time T (in response to ST's request)
