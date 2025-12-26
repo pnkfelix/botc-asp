@@ -183,7 +183,7 @@ renderEvent event =
         [ HP.style $ "font-size: 12px; color: #555; margin: 4px 0; cursor: pointer; "
             <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
         , HE.onClick \_ -> ClickTimelineEvent event
-        , HP.title "Click to navigate to this atom in the answer set and its rule definition"
+        , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.span
             [ HP.style $ "display: inline-block; padding: 2px 6px; border-radius: 3px; "
@@ -200,7 +200,7 @@ renderEvent event =
         [ HP.style $ "font-size: 12px; color: #888; margin: 4px 0; cursor: pointer; "
             <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
         , HE.onClick \_ -> ClickTimelineEvent event
-        , HP.title "Click to navigate to this atom"
+        , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.text $ r.token <> " placed on " <> r.player ]
     ASP.Execution r ->
@@ -208,7 +208,7 @@ renderEvent event =
         [ HP.style $ "font-size: 12px; color: #c62828; margin: 4px 0; font-weight: bold; cursor: pointer; "
             <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
         , HE.onClick \_ -> ClickTimelineEvent event
-        , HP.title "Click to navigate to this atom"
+        , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.text $ r.player <> " executed" ]
 
