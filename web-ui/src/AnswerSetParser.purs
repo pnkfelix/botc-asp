@@ -33,7 +33,7 @@ data Atom
   | Dead String TimePoint               -- dead(player, time)
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
-  | Chair String Int                    -- chair(player, position)
+  | Chair String Int                    -- game_chair(player, position)
   | Executed String Int                 -- executed(player, day)
   | UnknownAtom String                  -- anything we don't recognize
 
@@ -262,10 +262,10 @@ parseActingRole s = do
       Just $ ActingRole time (trim role)
     Nothing -> Nothing
 
--- | Parse chair(Player, Position)
+-- | Parse game_chair(Player, Position)
 parseChair :: String -> Maybe Atom
 parseChair s = do
-  let pattern = "chair("
+  let pattern = "game_chair("
   _ <- if take (length pattern) s == pattern then Just unit else Nothing
   let rest = drop (length pattern) (take (length s - 1) s)
   let parts = split (Pattern ",") rest
@@ -609,7 +609,7 @@ atomToPredicateName = case _ of
   Dead _ _               -> { name: "dead", arity: 2 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
-  Chair _ _              -> { name: "chair", arity: 2 }
+  Chair _ _              -> { name: "game_chair", arity: 2 }
   Executed _ _           -> { name: "executed", arity: 2 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
