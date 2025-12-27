@@ -3,7 +3,8 @@
 #include "players.lp".
 
 #const player_count = 8.
-#const night_count = 1.
+% We are demoing three nights, so we write needs_night(3).
+needs_night(3).
 assigned(0, felix, drunk).
 assigned(0, amanda, poisoner).
 assigned(0, rob, washerwoman).
