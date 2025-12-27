@@ -8,8 +8,7 @@ assigned(0, taylor, virgin).
 assigned(0, steph, imp).
 assigned(0, felix, poisoner).
 
-night_number(2).
-day_number(2).
+needs_night(2).
 
 % Rob (chef) was executed on day 1
 executed(rob, 1).

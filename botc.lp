@@ -20,8 +20,11 @@ time(night(1, RoleOrd, S)) :-
 
 % Other nights (2+) use other_night_role_order and other_night_substep
 % night_number/1 defines which nights we're modeling
+% Tests/instances can add needs_night(N) to request modeling of night N;
+% all nights from 1 to N will be included automatically.
 night_number(1).  % always model night 1
-night_number(N) :- N = 2..night_count.  % model nights 2 through night_count
+night_number(N) :- needs_night(N).  % include any explicitly requested night
+night_number(N) :- night_number(N+1), N >= 1.  % fill in all nights below
 
 time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
 
@@ -169,7 +172,8 @@ living_neighbor(P1, P2, T) :- living_neighbor_clockwise(P1, P2, T).
 living_neighbor(P1, P2, T) :- living_neighbor_counterclockwise(P1, P2, T).
 
 % Reminder token inertia: once placed, tokens persist to the next time point
-reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2).
+% (unless explicitly removed via token_removed)
+reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2), not token_removed(Token, P, T2).
 
 % A player is impaired at time T if they have a token that causes impairment
 impaired(P, T) :- reminder_on(Token, P, T), causes_impairment(Token).
@@ -409,8 +413,7 @@ thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 
 % day_number/1 defines which days we're modeling (like night_number)
 % Each day N follows night N, so we model the same range as nights
-day_number(1).
-day_number(N) :- N = 2..night_count.
+day_number(N) :- night_number(N).
 
 % Everyone is alive at the start of the game
 alive(P, night(1, 0, 0)) :- player(P).
