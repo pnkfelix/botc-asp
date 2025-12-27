@@ -8,11 +8,15 @@ module Clingo
   , run
   , init
   , restart
+  , resolveIncludes
   ) where
 
 import Prelude
 
 import Control.Promise (Promise, toAffE)
+import Data.Function.Uncurried (Fn1, runFn1)
+import Data.Maybe (Maybe(..))
+import Data.Nullable (Nullable, toNullable)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Foreign (Foreign, unsafeFromForeign)
@@ -65,6 +69,7 @@ data SolveResult
 foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
+foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
@@ -105,3 +110,9 @@ parseResult foreign' =
         OptimumFound (unsafeFromForeign foreign')
       other ->
         Error ("Unknown result type: " <> other)
+
+-- | Resolve #include directives in a program string
+-- | Takes a file resolver function that maps filenames to their content
+resolveIncludes :: String -> (String -> Maybe String) -> String
+resolveIncludes program resolver =
+  resolveIncludesImpl program (runFn1 \filename -> toNullable (resolver filename))
