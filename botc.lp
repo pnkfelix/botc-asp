@@ -94,6 +94,9 @@ next(day(N, exec), night(N+1, 0, 0)) :- day_number(N), night_number(N+1).
 
 player(P) :- name(P), chair(P,C), C < player_count.
 
+% Game chair: only chairs for players actually in this game
+game_chair(P, C) :- player(P), chair(P, C).
+
 % Circular seating adjacency
 % Two players are neighbors if their chairs are adjacent (mod player_count)
 neighbor(P1, P2) :-

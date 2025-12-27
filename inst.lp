@@ -51,7 +51,7 @@ assigned(0, courtney, investigator).
 #show registers_as/3.
 
 % For grimoire/timeline rendering
-#show chair/2.
+#show game_chair/2.
 #show alive/2.
 #show st_tells/4.
 #show player_chooses/4.
