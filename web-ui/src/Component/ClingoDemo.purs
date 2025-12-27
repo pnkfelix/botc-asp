@@ -284,7 +284,7 @@ renderResult state = case state.result of
                   ]
               , HH.p
                   [ HP.style "font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic;" ]
-                  [ HH.text "Click on timeline events to navigate to the atom in the answer set and its rule definition." ]
+                  [ HH.text "Click on timeline events to highlight the corresponding atom in the answer set below." ]
               , HH.slot _timelineGrimoire unit TG.component atoms HandleTimelineEvent
               ]
           Nothing -> HH.text ""
@@ -569,17 +569,13 @@ handleAction = case _ of
       Nothing -> pure unit
 
   HandleTimelineEvent output -> case output of
-    TG.TimelineEventClicked { sourceAtom, predicateName, predicateArity } -> do
-      -- First, scroll to the atom in the answer set display
+    TG.TimelineEventClicked { sourceAtom } -> do
+      -- Scroll to the atom in the answer set display
       if sourceAtom /= ""
         then do
           _ <- liftEffect $ TU.scrollToText "answer-set-display" sourceAtom
           pure unit
         else pure unit
-      -- Second, select the predicate to show its rule definitions
-      -- This will trigger the predicate modal to open
-      let pred = { name: predicateName, arity: predicateArity }
-      H.modify_ \s -> s { selectedPredicate = Just pred }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
