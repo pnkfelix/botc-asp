@@ -1,8 +1,7 @@
 % Test: Night 2 - Imp kills a player
 #include "base.lp".
 
-night_number(2).
-day_number(2).
+needs_night(2).
 
 assigned(0, amanda, empath).
 assigned(0, rob, washerwoman).

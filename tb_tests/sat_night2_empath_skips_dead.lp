@@ -1,8 +1,7 @@
 % Test: Night 2 - Empath skips dead neighbors to find living neighbors
 #include "base.lp".
 
-night_number(2).
-day_number(2).
+needs_night(2).
 
 % Seating: amanda - rob - taylor - courtney - steph - felix - neha - pratik
 % amanda is empath
