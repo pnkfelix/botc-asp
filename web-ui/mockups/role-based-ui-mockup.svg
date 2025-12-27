@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" width="1400" height="1000">
+  <defs>
+    <!-- Gradients for visual polish -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d3748"/>
+      <stop offset="100%" style="stop-color:#1a202c"/>
+    </linearGradient>
+    <linearGradient id="sidebarGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2d3748"/>
+      <stop offset="100%" style="stop-color:#4a5568"/>
+    </linearGradient>
+    <linearGradient id="goodGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#48bb78"/>
+      <stop offset="100%" style="stop-color:#38a169"/>
+    </linearGradient>
+    <linearGradient id="evilGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fc8181"/>
+      <stop offset="100%" style="stop-color:#e53e3e"/>
+    </linearGradient>
+
+    <!-- Drop shadow filter -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="1000" fill="#1a202c"/>
+
+  <!-- ===== HEADER BAR ===== -->
+  <rect x="0" y="0" width="1400" height="60" fill="url(#headerGrad)"/>
+  <text x="20" y="40" font-family="system-ui, sans-serif" font-size="24" font-weight="bold" fill="#e2e8f0">
+    Blood on the Clocktower - ASP Solver
+  </text>
+
+  <!-- Script selector dropdown in header -->
+  <rect x="350" y="15" width="200" height="30" rx="5" fill="#4a5568" stroke="#718096" stroke-width="1"/>
+  <text x="365" y="36" font-family="system-ui, sans-serif" font-size="14" fill="#e2e8f0">📜 Trouble Brewing</text>
+  <text x="535" y="36" font-family="system-ui, sans-serif" font-size="12" fill="#a0aec0">▼</text>
+
+  <!-- Dropdown hint -->
+  <rect x="350" y="50" width="200" height="80" rx="5" fill="#2d3748" stroke="#718096" stroke-width="1" opacity="0.95" filter="url(#shadow)"/>
+  <text x="365" y="72" font-family="system-ui, sans-serif" font-size="12" fill="#a0aec0">Available Scripts:</text>
+  <text x="370" y="92" font-family="system-ui, sans-serif" font-size="13" fill="#e2e8f0">• Trouble Brewing ✓</text>
+  <text x="370" y="112" font-family="system-ui, sans-serif" font-size="13" fill="#718096">• Bad Moon Rising</text>
+  <text x="370" y="132" font-family="system-ui, sans-serif" font-size="13" fill="#718096">• Custom Script...</text>
+
+  <!-- Action buttons in header -->
+  <rect x="1150" y="15" width="100" height="30" rx="5" fill="#48bb78"/>
+  <text x="1175" y="36" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="white">▶ Solve</text>
+
+  <rect x="1260" y="15" width="60" height="30" rx="5" fill="#4a5568" stroke="#718096" stroke-width="1"/>
+  <text x="1275" y="36" font-family="system-ui, sans-serif" font-size="14" fill="#e2e8f0">⚙️</text>
+
+  <!-- ===== LEFT SIDEBAR: ROLE LIBRARY ===== -->
+  <rect x="0" y="60" width="280" height="940" fill="#2d3748"/>
+
+  <!-- Sidebar header -->
+  <rect x="0" y="60" width="280" height="45" fill="#1a202c"/>
+  <text x="15" y="90" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#e2e8f0">
+    Role Library
+  </text>
+
+  <!-- Search box -->
+  <rect x="15" y="115" width="250" height="30" rx="5" fill="#4a5568"/>
+  <text x="25" y="135" font-family="system-ui, sans-serif" font-size="13" fill="#718096">🔍 Search roles...</text>
+
+  <!-- Category: Townsfolk -->
+  <rect x="10" y="160" width="260" height="28" rx="3" fill="#2b6cb0" opacity="0.3"/>
+  <text x="20" y="180" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#90cdf4">
+    TOWNSFOLK (13)
+  </text>
+  <text x="230" y="180" font-family="system-ui, sans-serif" font-size="12" fill="#90cdf4">▼</text>
+
+  <!-- Townsfolk role cards -->
+  <g id="roleCardWasherwoman">
+    <rect x="15" y="195" width="250" height="45" rx="5" fill="#4a5568" stroke="#63b3ed" stroke-width="2"/>
+    <circle cx="40" cy="218" r="15" fill="#3182ce"/>
+    <text x="40" y="223" font-family="system-ui, sans-serif" font-size="12" fill="white" text-anchor="middle">W</text>
+    <text x="65" y="213" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#e2e8f0">Washerwoman</text>
+    <text x="65" y="230" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">First night: Learn townsfolk</text>
+    <rect x="220" y="205" width="35" height="20" rx="3" fill="#48bb78"/>
+    <text x="227" y="219" font-family="system-ui, sans-serif" font-size="10" fill="white">N1</text>
+  </g>
+
+  <g id="roleCardLibrarian">
+    <rect x="15" y="245" width="250" height="45" rx="5" fill="#4a5568" stroke="#2d3748" stroke-width="1"/>
+    <circle cx="40" cy="268" r="15" fill="#3182ce"/>
+    <text x="40" y="273" font-family="system-ui, sans-serif" font-size="12" fill="white" text-anchor="middle">L</text>
+    <text x="65" y="263" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#e2e8f0">Librarian</text>
+    <text x="65" y="280" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">First night: Learn outsider</text>
+    <rect x="220" y="255" width="35" height="20" rx="3" fill="#48bb78"/>
+    <text x="227" y="269" font-family="system-ui, sans-serif" font-size="10" fill="white">N1</text>
+  </g>
+
+  <g id="roleCardChef">
+    <rect x="15" y="295" width="250" height="45" rx="5" fill="#4a5568" stroke="#2d3748" stroke-width="1"/>
+    <circle cx="40" cy="318" r="15" fill="#3182ce"/>
+    <text x="40" y="323" font-family="system-ui, sans-serif" font-size="12" fill="white" text-anchor="middle">C</text>
+    <text x="65" y="313" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#e2e8f0">Chef</text>
+    <text x="65" y="330" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">First night: Count evil pairs</text>
+    <rect x="220" y="305" width="35" height="20" rx="3" fill="#48bb78"/>
+    <text x="227" y="319" font-family="system-ui, sans-serif" font-size="10" fill="white">N1</text>
+  </g>
+
+  <!-- More roles indicator -->
+  <text x="140" y="360" font-family="system-ui, sans-serif" font-size="12" fill="#718096" text-anchor="middle">
+    ... 10 more townsfolk
+  </text>
+
+  <!-- Category: Outsiders -->
+  <rect x="10" y="380" width="260" height="28" rx="3" fill="#805ad5" opacity="0.3"/>
+  <text x="20" y="400" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#d6bcfa">
+    OUTSIDERS (4)
+  </text>
+  <text x="230" y="400" font-family="system-ui, sans-serif" font-size="12" fill="#d6bcfa">▶</text>
+
+  <!-- Category: Minions -->
+  <rect x="10" y="415" width="260" height="28" rx="3" fill="#e53e3e" opacity="0.3"/>
+  <text x="20" y="435" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#feb2b2">
+    MINIONS (4)
+  </text>
+  <text x="230" y="435" font-family="system-ui, sans-serif" font-size="12" fill="#feb2b2">▶</text>
+
+  <!-- Category: Demons -->
+  <rect x="10" y="450" width="260" height="28" rx="3" fill="#c53030" opacity="0.3"/>
+  <text x="20" y="470" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#fc8181">
+    DEMONS (1)
+  </text>
+  <text x="230" y="470" font-family="system-ui, sans-serif" font-size="12" fill="#fc8181">▶</text>
+
+  <!-- Divider -->
+  <line x1="15" y1="500" x2="265" y2="500" stroke="#4a5568" stroke-width="1"/>
+
+  <!-- Script Roles Section -->
+  <text x="15" y="530" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">
+    Current Script Roles
+  </text>
+  <text x="15" y="550" font-family="system-ui, sans-serif" font-size="12" fill="#718096">
+    Drag roles here to build a custom script
+  </text>
+
+  <!-- Dashed drop zone -->
+  <rect x="15" y="565" width="250" height="100" rx="5" fill="none" stroke="#4a5568" stroke-width="2" stroke-dasharray="8,4"/>
+  <text x="140" y="620" font-family="system-ui, sans-serif" font-size="12" fill="#4a5568" text-anchor="middle">
+    Drop roles or select a preset script
+  </text>
+
+  <!-- File info -->
+  <rect x="15" y="685" width="250" height="60" rx="5" fill="#1a202c"/>
+  <text x="25" y="705" font-family="system-ui, sans-serif" font-size="11" fill="#718096">Role File:</text>
+  <text x="25" y="722" font-family="system-ui, sans-serif" font-size="11" fill="#63b3ed" font-family="monospace">roles/washerwoman.lp</text>
+  <text x="25" y="738" font-family="system-ui, sans-serif" font-size="10" fill="#4a5568">Click to view/edit source</text>
+
+  <!-- ===== MAIN CONTENT AREA ===== -->
+
+  <!-- Tab bar -->
+  <rect x="280" y="60" width="1120" height="40" fill="#1a202c"/>
+  <rect x="290" y="65" width="120" height="30" rx="5 5 0 0" fill="#2d3748"/>
+  <text x="315" y="86" font-family="system-ui, sans-serif" font-size="13" fill="#e2e8f0">📊 Grimoire</text>
+
+  <rect x="420" y="65" width="120" height="30" rx="5 5 0 0" fill="#4a5568"/>
+  <text x="445" y="86" font-family="system-ui, sans-serif" font-size="13" fill="#a0aec0">📜 Timeline</text>
+
+  <rect x="550" y="65" width="140" height="30" rx="5 5 0 0" fill="#4a5568"/>
+  <text x="575" y="86" font-family="system-ui, sans-serif" font-size="13" fill="#a0aec0">⚙️ Constraints</text>
+
+  <rect x="700" y="65" width="100" height="30" rx="5 5 0 0" fill="#4a5568"/>
+  <text x="720" y="86" font-family="system-ui, sans-serif" font-size="13" fill="#a0aec0">📝 ASP</text>
+
+  <!-- Main content background -->
+  <rect x="280" y="100" width="820" height="900" fill="#2d3748"/>
+
+  <!-- ===== GRIMOIRE VIEW ===== -->
+
+  <!-- Player circle (simplified) -->
+  <circle cx="690" cy="420" r="250" fill="none" stroke="#4a5568" stroke-width="2"/>
+  <circle cx="690" cy="420" r="180" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- Player tokens around the circle -->
+  <!-- Player 1 (top) -->
+  <g transform="translate(690, 145)">
+    <circle r="35" fill="#3182ce" stroke="#63b3ed" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Alice</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#bee3f8" text-anchor="middle">Washerwoman</text>
+  </g>
+
+  <!-- Player 2 -->
+  <g transform="translate(850, 195)">
+    <circle r="35" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Bob</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#bee3f8" text-anchor="middle">Chef</text>
+  </g>
+
+  <!-- Player 3 -->
+  <g transform="translate(940, 320)">
+    <circle r="35" fill="#e53e3e" stroke="#fc8181" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Carol</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#feb2b2" text-anchor="middle">Poisoner</text>
+  </g>
+
+  <!-- Player 4 -->
+  <g transform="translate(940, 520)">
+    <circle r="35" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Dave</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#bee3f8" text-anchor="middle">Empath</text>
+  </g>
+
+  <!-- Player 5 -->
+  <g transform="translate(850, 645)">
+    <circle r="35" fill="#805ad5" stroke="#d6bcfa" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Eve</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#e9d8fd" text-anchor="middle">Drunk</text>
+  </g>
+
+  <!-- Player 6 (bottom) -->
+  <g transform="translate(690, 695)">
+    <circle r="35" fill="#c53030" stroke="#fc8181" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Frank</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#feb2b2" text-anchor="middle">Imp</text>
+  </g>
+
+  <!-- Player 7 -->
+  <g transform="translate(530, 645)">
+    <circle r="35" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Grace</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#bee3f8" text-anchor="middle">Monk</text>
+  </g>
+
+  <!-- Player 8 -->
+  <g transform="translate(440, 520)">
+    <circle r="35" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+    <text y="5" font-family="system-ui, sans-serif" font-size="11" fill="white" text-anchor="middle">Henry</text>
+    <text y="20" font-family="system-ui, sans-serif" font-size="9" fill="#bee3f8" text-anchor="middle">Mayor</text>
+  </g>
+
+  <!-- Center info -->
+  <rect x="620" y="380" width="140" height="80" rx="10" fill="#1a202c" opacity="0.9"/>
+  <text x="690" y="405" font-family="system-ui, sans-serif" font-size="12" fill="#718096" text-anchor="middle">Night 1</text>
+  <text x="690" y="425" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#e2e8f0" text-anchor="middle">8 Players</text>
+  <text x="690" y="445" font-family="system-ui, sans-serif" font-size="11" fill="#48bb78" text-anchor="middle">7 alive • 1 dead</text>
+
+  <!-- Reminder tokens (floating near players) -->
+  <g transform="translate(735, 190)">
+    <circle r="12" fill="#fc8181"/>
+    <text y="4" font-family="system-ui, sans-serif" font-size="8" fill="white" text-anchor="middle">☠️</text>
+  </g>
+  <text x="735" y="215" font-family="system-ui, sans-serif" font-size="8" fill="#fc8181" text-anchor="middle">Poisoned</text>
+
+  <!-- Legend -->
+  <rect x="300" y="750" width="780" height="80" rx="5" fill="#1a202c"/>
+  <text x="320" y="775" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#e2e8f0">Legend:</text>
+
+  <circle cx="340" cy="800" r="12" fill="#3182ce"/>
+  <text x="360" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Townsfolk</text>
+
+  <circle cx="450" cy="800" r="12" fill="#805ad5"/>
+  <text x="470" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Outsider</text>
+
+  <circle cx="550" cy="800" r="12" fill="#e53e3e"/>
+  <text x="570" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Minion</text>
+
+  <circle cx="640" cy="800" r="12" fill="#c53030"/>
+  <text x="660" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Demon</text>
+
+  <rect x="730" y="788" width="24" height="24" rx="12" fill="none" stroke="#48bb78" stroke-width="3"/>
+  <text x="765" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Alive</text>
+
+  <rect x="830" y="788" width="24" height="24" rx="12" fill="none" stroke="#718096" stroke-width="3"/>
+  <text x="865" y="805" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Dead</text>
+
+  <!-- Answer set navigation -->
+  <rect x="300" y="850" width="780" height="50" rx="5" fill="#1a202c"/>
+  <text x="320" y="880" font-family="system-ui, sans-serif" font-size="12" fill="#718096">Answer Set:</text>
+  <rect x="410" y="860" width="30" height="30" rx="5" fill="#4a5568"/>
+  <text x="420" y="880" font-family="system-ui, sans-serif" font-size="14" fill="#e2e8f0">◀</text>
+  <text x="460" y="882" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">3 of 47</text>
+  <rect x="530" y="860" width="30" height="30" rx="5" fill="#4a5568"/>
+  <text x="540" y="880" font-family="system-ui, sans-serif" font-size="14" fill="#e2e8f0">▶</text>
+
+  <rect x="600" y="860" width="100" height="30" rx="15" fill="#48bb78"/>
+  <text x="625" y="880" font-family="system-ui, sans-serif" font-size="11" fill="white">SATISFIABLE</text>
+
+  <!-- ===== RIGHT SIDEBAR: ROLE DETAILS ===== -->
+  <rect x="1100" y="60" width="300" height="940" fill="#2d3748"/>
+
+  <!-- Role detail header -->
+  <rect x="1100" y="60" width="300" height="45" fill="#1a202c"/>
+  <text x="1115" y="90" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#e2e8f0">
+    Role Details
+  </text>
+  <text x="1380" y="90" font-family="system-ui, sans-serif" font-size="16" fill="#718096">✕</text>
+
+  <!-- Selected role card -->
+  <rect x="1110" y="115" width="280" height="120" rx="8" fill="#4a5568" stroke="#63b3ed" stroke-width="2"/>
+  <circle cx="1155" cy="160" r="30" fill="#3182ce"/>
+  <text x="1155" y="167" font-family="system-ui, sans-serif" font-size="20" fill="white" text-anchor="middle">W</text>
+  <text x="1200" y="145" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#e2e8f0">Washerwoman</text>
+  <text x="1200" y="165" font-family="system-ui, sans-serif" font-size="12" fill="#90cdf4">Townsfolk</text>
+  <rect x="1200" y="175" width="60" height="20" rx="3" fill="#48bb78"/>
+  <text x="1210" y="189" font-family="system-ui, sans-serif" font-size="10" fill="white">First Night</text>
+
+  <text x="1120" y="215" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">
+    You start knowing that 1 of 2 players is
+  </text>
+  <text x="1120" y="230" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">
+    a particular Townsfolk.
+  </text>
+
+  <!-- Ability breakdown -->
+  <text x="1115" y="260" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">
+    Night Sequence
+  </text>
+
+  <rect x="1110" y="275" width="280" height="120" rx="5" fill="#1a202c"/>
+
+  <!-- Step 1 -->
+  <circle cx="1135" cy="300" r="12" fill="#4a5568" stroke="#63b3ed" stroke-width="2"/>
+  <text x="1135" y="305" font-family="system-ui, sans-serif" font-size="10" fill="white" text-anchor="middle">1</text>
+  <text x="1155" y="305" font-family="system-ui, sans-serif" font-size="11" fill="#e2e8f0">ST selects townsfolk player</text>
+
+  <!-- Arrow -->
+  <line x1="1135" y1="315" x2="1135" y2="330" stroke="#4a5568" stroke-width="2"/>
+  <polygon points="1130,330 1140,330 1135,340" fill="#4a5568"/>
+
+  <!-- Step 2 -->
+  <circle cx="1135" cy="355" r="12" fill="#4a5568" stroke="#63b3ed" stroke-width="2"/>
+  <text x="1135" y="360" font-family="system-ui, sans-serif" font-size="10" fill="white" text-anchor="middle">2</text>
+  <text x="1155" y="360" font-family="system-ui, sans-serif" font-size="11" fill="#e2e8f0">ST selects decoy player</text>
+
+  <!-- Arrow -->
+  <line x1="1135" y1="370" x2="1135" y2="385" stroke="#4a5568" stroke-width="2"/>
+
+  <!-- Step 3 -->
+  <circle cx="1135" cy="395" r="12" fill="#48bb78"/>
+  <text x="1135" y="400" font-family="system-ui, sans-serif" font-size="10" fill="white" text-anchor="middle">3</text>
+  <text x="1155" y="400" font-family="system-ui, sans-serif" font-size="11" fill="#48bb78">ST tells players + role</text>
+
+  <!-- Reminder tokens section -->
+  <text x="1115" y="435" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">
+    Reminder Tokens
+  </text>
+
+  <rect x="1110" y="450" width="130" height="50" rx="5" fill="#1a202c"/>
+  <circle cx="1140" cy="475" r="15" fill="#63b3ed"/>
+  <text x="1140" y="480" font-family="system-ui, sans-serif" font-size="12" fill="white" text-anchor="middle">T</text>
+  <text x="1165" y="480" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Townsfolk</text>
+
+  <rect x="1250" y="450" width="130" height="50" rx="5" fill="#1a202c"/>
+  <circle cx="1280" cy="475" r="15" fill="#718096"/>
+  <text x="1280" y="480" font-family="system-ui, sans-serif" font-size="12" fill="white" text-anchor="middle">W</text>
+  <text x="1305" y="480" font-family="system-ui, sans-serif" font-size="11" fill="#a0aec0">Wrong</text>
+
+  <!-- ASP Source section -->
+  <text x="1115" y="530" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">
+    ASP Source
+  </text>
+  <text x="1290" y="530" font-family="system-ui, sans-serif" font-size="11" fill="#63b3ed">Edit ✎</text>
+
+  <rect x="1110" y="545" width="280" height="150" rx="5" fill="#1a202c"/>
+  <text x="1120" y="565" font-family="monospace" font-size="10" fill="#718096">% roles/washerwoman.lp</text>
+  <text x="1120" y="585" font-family="monospace" font-size="10" fill="#90cdf4">role_type(washerwoman, townsfolk).</text>
+  <text x="1120" y="605" font-family="monospace" font-size="10" fill="#90cdf4">first_night_order(washerwoman, 2).</text>
+  <text x="1120" y="625" font-family="monospace" font-size="10" fill="#48bb78">% Substeps</text>
+  <text x="1120" y="645" font-family="monospace" font-size="10" fill="#90cdf4">first_night_substep(washerwoman,</text>
+  <text x="1130" y="660" font-family="monospace" font-size="10" fill="#90cdf4">1, st_chooses(target)).</text>
+  <text x="1120" y="680" font-family="monospace" font-size="10" fill="#718096">...</text>
+
+  <!-- Constraints section -->
+  <text x="1115" y="720" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#e2e8f0">
+    Related Constraints
+  </text>
+
+  <rect x="1110" y="735" width="280" height="60" rx="5" fill="#1a202c"/>
+  <text x="1120" y="755" font-family="system-ui, sans-serif" font-size="10" fill="#a0aec0">• Must show a valid townsfolk (if not drunk/poisoned)</text>
+  <text x="1120" y="775" font-family="system-ui, sans-serif" font-size="10" fill="#a0aec0">• Decoy must not be the actual townsfolk shown</text>
+
+  <!-- Actions -->
+  <rect x="1110" y="815" width="135" height="35" rx="5" fill="#4a5568"/>
+  <text x="1140" y="838" font-family="system-ui, sans-serif" font-size="12" fill="#e2e8f0">Add to Script</text>
+
+  <rect x="1255" y="815" width="135" height="35" rx="5" fill="#2d3748" stroke="#718096" stroke-width="1"/>
+  <text x="1280" y="838" font-family="system-ui, sans-serif" font-size="12" fill="#a0aec0">View Tests</text>
+
+  <!-- ===== ANNOTATIONS ===== -->
+
+  <!-- Annotation 1: Script Selector -->
+  <rect x="560" y="20" width="280" height="70" rx="5" fill="#faf089" opacity="0.95" filter="url(#shadow)"/>
+  <text x="575" y="45" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#744210">💡 Script Selector</text>
+  <text x="575" y="62" font-family="system-ui, sans-serif" font-size="10" fill="#744210">Switch between preset scripts or</text>
+  <text x="575" y="77" font-family="system-ui, sans-serif" font-size="10" fill="#744210">build a custom one from role library</text>
+  <line x1="560" y1="50" x2="555" y2="35" stroke="#ecc94b" stroke-width="2"/>
+
+  <!-- Annotation 2: Role Library -->
+  <rect x="15" y="760" width="250" height="90" rx="5" fill="#faf089" opacity="0.95" filter="url(#shadow)"/>
+  <text x="30" y="785" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#744210">💡 Role Library</text>
+  <text x="30" y="802" font-family="system-ui, sans-serif" font-size="10" fill="#744210">Each role = one .lp file</text>
+  <text x="30" y="817" font-family="system-ui, sans-serif" font-size="10" fill="#744210">- Browse all available roles</text>
+  <text x="30" y="832" font-family="system-ui, sans-serif" font-size="10" fill="#744210">- Drag to build custom scripts</text>
+  <text x="30" y="847" font-family="system-ui, sans-serif" font-size="10" fill="#744210">- Click for role details panel →</text>
+
+  <!-- Annotation 3: Role Details -->
+  <rect x="1110" y="870" width="280" height="70" rx="5" fill="#faf089" opacity="0.95" filter="url(#shadow)"/>
+  <text x="1125" y="895" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#744210">💡 Role Details Panel</text>
+  <text x="1125" y="912" font-family="system-ui, sans-serif" font-size="10" fill="#744210">View ability, night sequence, ASP source,</text>
+  <text x="1125" y="927" font-family="system-ui, sans-serif" font-size="10" fill="#744210">and related constraints for any role</text>
+
+  <!-- Annotation 4: Tabbed Interface -->
+  <rect x="820" y="40" width="260" height="55" rx="5" fill="#faf089" opacity="0.95" filter="url(#shadow)"/>
+  <text x="835" y="65" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#744210">💡 Tabbed Main View</text>
+  <text x="835" y="82" font-family="system-ui, sans-serif" font-size="10" fill="#744210">Grimoire | Timeline | Constraints | Raw ASP</text>
+
+  <!-- Title for mockup -->
+  <rect x="450" y="920" width="500" height="70" rx="10" fill="#2d3748" stroke="#63b3ed" stroke-width="2" filter="url(#shadow)"/>
+  <text x="700" y="948" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#e2e8f0" text-anchor="middle">
+    PROPOSED UI MOCKUP: Role-Based Script System
+  </text>
+  <text x="700" y="972" font-family="system-ui, sans-serif" font-size="12" fill="#a0aec0" text-anchor="middle">
+    One .lp file per role • Script = collection of roles • Modular architecture
+  </text>
+</svg>
