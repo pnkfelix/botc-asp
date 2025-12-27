@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BotC ASP - Role-Based UI Mockup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a202c;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(to bottom, #2d3748, #1a202c);
+      padding: 0 20px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 1px solid #4a5568;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .script-selector {
+      position: relative;
+    }
+
+    .script-selector select {
+      background: #4a5568;
+      color: #e2e8f0;
+      border: 1px solid #718096;
+      border-radius: 5px;
+      padding: 8px 30px 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      appearance: none;
+    }
+
+    .script-selector::after {
+      content: "▼";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: #a0aec0;
+      font-size: 10px;
+    }
+
+    .header-spacer {
+      flex: 1;
+    }
+
+    .solve-btn {
+      background: #48bb78;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .solve-btn:hover {
+      background: #38a169;
+    }
+
+    .settings-btn {
+      background: #4a5568;
+      border: 1px solid #718096;
+      border-radius: 5px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ===== LEFT SIDEBAR: ROLE LIBRARY ===== */
+    .role-library {
+      width: 280px;
+      background: #2d3748;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #4a5568;
+    }
+
+    .sidebar-header {
+      background: #1a202c;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .search-box {
+      margin: 10px 15px;
+      padding: 8px 12px;
+      background: #4a5568;
+      border: none;
+      border-radius: 5px;
+      color: #e2e8f0;
+      font-size: 13px;
+      width: calc(100% - 30px);
+    }
+
+    .search-box::placeholder {
+      color: #718096;
+    }
+
+    .role-categories {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+
+    .role-category {
+      margin-bottom: 8px;
+    }
+
+    .category-header {
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .category-header.townsfolk { background: rgba(43, 108, 176, 0.3); color: #90cdf4; }
+    .category-header.outsider { background: rgba(128, 90, 213, 0.3); color: #d6bcfa; }
+    .category-header.minion { background: rgba(229, 62, 62, 0.3); color: #feb2b2; }
+    .category-header.demon { background: rgba(197, 48, 48, 0.3); color: #fc8181; }
+
+    .role-list {
+      margin-top: 5px;
+    }
+
+    .role-card {
+      background: #4a5568;
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .role-card:hover {
+      border-color: #63b3ed;
+    }
+
+    .role-card.selected {
+      border-color: #63b3ed;
+      border-width: 2px;
+    }
+
+    .role-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .role-icon.townsfolk { background: #3182ce; }
+    .role-icon.outsider { background: #805ad5; }
+    .role-icon.minion { background: #e53e3e; }
+    .role-icon.demon { background: #c53030; }
+
+    .role-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .role-name {
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .role-brief {
+      font-size: 11px;
+      color: #a0aec0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .role-badge {
+      background: #48bb78;
+      color: white;
+      font-size: 9px;
+      padding: 3px 6px;
+      border-radius: 3px;
+    }
+
+    .script-drop-zone {
+      margin: 15px;
+      padding: 20px;
+      border: 2px dashed #4a5568;
+      border-radius: 5px;
+      text-align: center;
+      color: #4a5568;
+      font-size: 12px;
+    }
+
+    .file-info {
+      margin: 10px 15px;
+      padding: 10px;
+      background: #1a202c;
+      border-radius: 5px;
+      font-size: 11px;
+    }
+
+    .file-info .label {
+      color: #718096;
+    }
+
+    .file-info .path {
+      color: #63b3ed;
+      font-family: monospace;
+    }
+
+    .file-info .hint {
+      color: #4a5568;
+      font-size: 10px;
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #2d3748;
+      overflow: hidden;
+    }
+
+    .tab-bar {
+      background: #1a202c;
+      display: flex;
+      padding: 5px 10px 0;
+      gap: 5px;
+    }
+
+    .tab {
+      padding: 10px 20px;
+      border-radius: 5px 5px 0 0;
+      font-size: 13px;
+      cursor: pointer;
+      background: #4a5568;
+      color: #a0aec0;
+    }
+
+    .tab.active {
+      background: #2d3748;
+      color: #e2e8f0;
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+    }
+
+    /* ===== GRIMOIRE (SVG-based) ===== */
+    .grimoire-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .grimoire-svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .grimoire-legend {
+      background: #1a202c;
+      padding: 15px 20px;
+      border-radius: 5px;
+      display: flex;
+      gap: 25px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #a0aec0;
+    }
+
+    .legend-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.townsfolk { background: #3182ce; }
+    .legend-dot.outsider { background: #805ad5; }
+    .legend-dot.minion { background: #e53e3e; }
+    .legend-dot.demon { background: #c53030; }
+    .legend-dot.alive { border: 3px solid #48bb78; background: transparent; }
+    .legend-dot.dead { border: 3px solid #718096; background: transparent; }
+
+    .answer-set-nav {
+      background: #1a202c;
+      padding: 12px 20px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .nav-label {
+      color: #718096;
+      font-size: 12px;
+    }
+
+    .nav-btn {
+      background: #4a5568;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 12px;
+      color: #e2e8f0;
+      cursor: pointer;
+    }
+
+    .nav-current {
+      font-weight: bold;
+    }
+
+    .status-badge {
+      background: #48bb78;
+      color: white;
+      padding: 6px 15px;
+      border-radius: 15px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .status-badge.unsat {
+      background: #e53e3e;
+    }
+
+    /* ===== RIGHT SIDEBAR: ROLE DETAILS ===== */
+    .role-details {
+      width: 300px;
+      background: #2d3748;
+      border-left: 1px solid #4a5568;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .details-header {
+      background: #1a202c;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .close-btn {
+      color: #718096;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .details-content {
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .detail-role-card {
+      background: #4a5568;
+      border: 2px solid #63b3ed;
+      border-radius: 8px;
+      padding: 15px;
+      display: flex;
+      gap: 15px;
+    }
+
+    .detail-role-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #3182ce;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: bold;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .detail-role-info h3 {
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .detail-role-type {
+      color: #90cdf4;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .detail-ability {
+      font-size: 12px;
+      color: #a0aec0;
+      line-height: 1.4;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .night-sequence {
+      background: #1a202c;
+      border-radius: 5px;
+      padding: 15px;
+    }
+
+    .sequence-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #4a5568;
+      border: 2px solid #63b3ed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    .step-number.final {
+      background: #48bb78;
+      border-color: #48bb78;
+    }
+
+    .step-text {
+      font-size: 12px;
+      padding-top: 3px;
+    }
+
+    .step-connector {
+      width: 2px;
+      height: 15px;
+      background: #4a5568;
+      margin-left: 11px;
+      margin-bottom: 5px;
+    }
+
+    .reminder-tokens {
+      display: flex;
+      gap: 10px;
+    }
+
+    .reminder-token {
+      background: #1a202c;
+      border-radius: 5px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .token-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .token-icon.info { background: #63b3ed; }
+    .token-icon.wrong { background: #718096; }
+
+    .token-label {
+      font-size: 11px;
+      color: #a0aec0;
+    }
+
+    .asp-source {
+      background: #1a202c;
+      border-radius: 5px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    .asp-comment { color: #48bb78; }
+    .asp-code { color: #90cdf4; }
+    .asp-dim { color: #718096; }
+
+    .constraints-list {
+      background: #1a202c;
+      border-radius: 5px;
+      padding: 12px;
+      font-size: 11px;
+      color: #a0aec0;
+    }
+
+    .constraints-list li {
+      margin-bottom: 8px;
+      margin-left: 15px;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .action-btn.primary {
+      background: #4a5568;
+      border: none;
+      color: #e2e8f0;
+    }
+
+    .action-btn.secondary {
+      background: transparent;
+      border: 1px solid #718096;
+      color: #a0aec0;
+    }
+
+    /* ===== ANNOTATIONS (for mockup only) ===== */
+    .annotation {
+      position: fixed;
+      background: #faf089;
+      color: #744210;
+      padding: 10px 15px;
+      border-radius: 5px;
+      font-size: 12px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.3);
+      z-index: 100;
+      max-width: 250px;
+    }
+
+    .annotation strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .annotation-1 { top: 70px; left: 560px; }
+    .annotation-2 { bottom: 120px; left: 20px; }
+    .annotation-3 { bottom: 20px; right: 20px; }
+    .annotation-4 { top: 110px; left: 700px; }
+
+    /* Mockup banner */
+    .mockup-banner {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      border: 2px solid #63b3ed;
+      padding: 15px 30px;
+      border-radius: 10px;
+      text-align: center;
+      z-index: 1000;
+    }
+
+    .mockup-banner h2 {
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    .mockup-banner p {
+      font-size: 12px;
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">Blood on the Clocktower - ASP Solver</div>
+    <div class="script-selector">
+      <select>
+        <option>📜 Trouble Brewing</option>
+        <option>📜 Bad Moon Rising</option>
+        <option>📜 Sects and Violets</option>
+        <option>📜 Custom Script...</option>
+      </select>
+    </div>
+    <div class="header-spacer"></div>
+    <button class="solve-btn">▶ Solve</button>
+    <button class="settings-btn">⚙️</button>
+  </header>
+
+  <div class="main-container">
+
+    <!-- LEFT SIDEBAR: ROLE LIBRARY -->
+    <aside class="role-library">
+      <div class="sidebar-header">Role Library</div>
+      <input type="text" class="search-box" placeholder="🔍 Search roles...">
+
+      <div class="role-categories">
+        <!-- Townsfolk -->
+        <div class="role-category">
+          <div class="category-header townsfolk">
+            <span>TOWNSFOLK (13)</span>
+            <span>▼</span>
+          </div>
+          <div class="role-list">
+            <div class="role-card selected">
+              <div class="role-icon townsfolk">W</div>
+              <div class="role-info">
+                <div class="role-name">Washerwoman</div>
+                <div class="role-brief">First night: Learn townsfolk</div>
+              </div>
+              <div class="role-badge">N1</div>
+            </div>
+            <div class="role-card">
+              <div class="role-icon townsfolk">L</div>
+              <div class="role-info">
+                <div class="role-name">Librarian</div>
+                <div class="role-brief">First night: Learn outsider</div>
+              </div>
+              <div class="role-badge">N1</div>
+            </div>
+            <div class="role-card">
+              <div class="role-icon townsfolk">C</div>
+              <div class="role-info">
+                <div class="role-name">Chef</div>
+                <div class="role-brief">First night: Count evil pairs</div>
+              </div>
+              <div class="role-badge">N1</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Outsiders -->
+        <div class="role-category">
+          <div class="category-header outsider">
+            <span>OUTSIDERS (4)</span>
+            <span>▶</span>
+          </div>
+        </div>
+
+        <!-- Minions -->
+        <div class="role-category">
+          <div class="category-header minion">
+            <span>MINIONS (4)</span>
+            <span>▶</span>
+          </div>
+        </div>
+
+        <!-- Demons -->
+        <div class="role-category">
+          <div class="category-header demon">
+            <span>DEMONS (1)</span>
+            <span>▶</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="script-drop-zone">
+        <strong>Current Script Roles</strong><br>
+        Drag roles here to build a custom script
+      </div>
+
+      <div class="file-info">
+        <div class="label">Role File:</div>
+        <div class="path">roles/washerwoman.lp</div>
+        <div class="hint">Click to view/edit source</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <div class="tab-bar">
+        <div class="tab active">📊 Grimoire</div>
+        <div class="tab">📜 Timeline</div>
+        <div class="tab">⚙️ Constraints</div>
+        <div class="tab">📝 ASP</div>
+      </div>
+
+      <div class="tab-content">
+        <div class="grimoire-container">
+
+          <!-- SVG GRIMOIRE - This is where SVG makes sense -->
+          <svg class="grimoire-svg" viewBox="0 0 500 500" width="450" height="450">
+            <!-- Outer circle -->
+            <circle cx="250" cy="250" r="200" fill="none" stroke="#4a5568" stroke-width="2"/>
+            <!-- Inner dashed circle -->
+            <circle cx="250" cy="250" r="140" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="5,5"/>
+
+            <!-- Center info -->
+            <rect x="190" y="210" width="120" height="80" rx="10" fill="#1a202c" opacity="0.9"/>
+            <text x="250" y="235" text-anchor="middle" fill="#718096" font-size="12">Night 1</text>
+            <text x="250" y="258" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="bold">8 Players</text>
+            <text x="250" y="278" text-anchor="middle" fill="#48bb78" font-size="11">7 alive • 1 dead</text>
+
+            <!-- Players arranged in circle -->
+            <!-- Player 1 (top) - Washerwoman -->
+            <g transform="translate(250, 50)">
+              <circle r="30" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Alice</text>
+              <text y="15" text-anchor="middle" fill="#bee3f8" font-size="8">Washerwoman</text>
+            </g>
+
+            <!-- Player 2 - Chef -->
+            <g transform="translate(390, 110)">
+              <circle r="30" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Bob</text>
+              <text y="15" text-anchor="middle" fill="#bee3f8" font-size="8">Chef</text>
+            </g>
+
+            <!-- Player 3 - Poisoner (Minion) -->
+            <g transform="translate(450, 250)">
+              <circle r="30" fill="#e53e3e" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Carol</text>
+              <text y="15" text-anchor="middle" fill="#feb2b2" font-size="8">Poisoner</text>
+            </g>
+
+            <!-- Player 4 - Empath -->
+            <g transform="translate(390, 390)">
+              <circle r="30" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Dave</text>
+              <text y="15" text-anchor="middle" fill="#bee3f8" font-size="8">Empath</text>
+            </g>
+
+            <!-- Player 5 - Drunk (Outsider) -->
+            <g transform="translate(250, 450)">
+              <circle r="30" fill="#805ad5" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Eve</text>
+              <text y="15" text-anchor="middle" fill="#e9d8fd" font-size="8">Drunk</text>
+            </g>
+
+            <!-- Player 6 - Imp (Demon) -->
+            <g transform="translate(110, 390)">
+              <circle r="30" fill="#c53030" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Frank</text>
+              <text y="15" text-anchor="middle" fill="#feb2b2" font-size="8">Imp</text>
+            </g>
+
+            <!-- Player 7 - Monk -->
+            <g transform="translate(50, 250)">
+              <circle r="30" fill="#3182ce" stroke="#718096" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Grace</text>
+              <text y="15" text-anchor="middle" fill="#bee3f8" font-size="8">Monk</text>
+            </g>
+
+            <!-- Player 8 - Mayor -->
+            <g transform="translate(110, 110)">
+              <circle r="30" fill="#3182ce" stroke="#48bb78" stroke-width="3"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="10">Henry</text>
+              <text y="15" text-anchor="middle" fill="#bee3f8" font-size="8">Mayor</text>
+            </g>
+
+            <!-- Reminder token example -->
+            <g transform="translate(285, 75)">
+              <circle r="10" fill="#fc8181"/>
+              <text y="3" text-anchor="middle" fill="white" font-size="7">☠</text>
+            </g>
+            <text x="285" y="95" text-anchor="middle" fill="#fc8181" font-size="8">Poisoned</text>
+          </svg>
+
+          <!-- Legend (HTML, not SVG) -->
+          <div class="grimoire-legend">
+            <div class="legend-item">
+              <div class="legend-dot townsfolk"></div>
+              <span>Townsfolk</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot outsider"></div>
+              <span>Outsider</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot minion"></div>
+              <span>Minion</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot demon"></div>
+              <span>Demon</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot alive"></div>
+              <span>Alive</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot dead"></div>
+              <span>Dead</span>
+            </div>
+          </div>
+
+          <!-- Answer set navigation -->
+          <div class="answer-set-nav">
+            <span class="nav-label">Answer Set:</span>
+            <button class="nav-btn">◀</button>
+            <span class="nav-current">3 of 47</span>
+            <button class="nav-btn">▶</button>
+            <span class="status-badge">SATISFIABLE</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR: ROLE DETAILS -->
+    <aside class="role-details">
+      <div class="details-header">
+        <span>Role Details</span>
+        <span class="close-btn">✕</span>
+      </div>
+
+      <div class="details-content">
+        <!-- Selected role card -->
+        <div class="detail-role-card">
+          <div class="detail-role-icon">W</div>
+          <div class="detail-role-info">
+            <h3>Washerwoman</h3>
+            <div class="detail-role-type">Townsfolk • First Night</div>
+            <div class="detail-ability">
+              You start knowing that 1 of 2 players is a particular Townsfolk.
+            </div>
+          </div>
+        </div>
+
+        <!-- Night Sequence -->
+        <div>
+          <div class="section-title">Night Sequence</div>
+          <div class="night-sequence">
+            <div class="sequence-step">
+              <div class="step-number">1</div>
+              <div class="step-text">ST selects townsfolk player</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="sequence-step">
+              <div class="step-number">2</div>
+              <div class="step-text">ST selects decoy player</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="sequence-step">
+              <div class="step-number final">3</div>
+              <div class="step-text">ST tells players + role</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reminder Tokens -->
+        <div>
+          <div class="section-title">Reminder Tokens</div>
+          <div class="reminder-tokens">
+            <div class="reminder-token">
+              <div class="token-icon info">T</div>
+              <div class="token-label">Townsfolk</div>
+            </div>
+            <div class="reminder-token">
+              <div class="token-icon wrong">W</div>
+              <div class="token-label">Wrong</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ASP Source -->
+        <div>
+          <div class="section-title" style="display: flex; justify-content: space-between;">
+            <span>ASP Source</span>
+            <span style="color: #63b3ed; font-weight: normal; cursor: pointer;">Edit ✎</span>
+          </div>
+          <div class="asp-source">
+            <div class="asp-dim">% roles/washerwoman.lp</div>
+            <div class="asp-code">role_type(washerwoman, townsfolk).</div>
+            <div class="asp-code">first_night_order(washerwoman, 2).</div>
+            <div class="asp-comment">% Substeps</div>
+            <div class="asp-code">first_night_substep(washerwoman,</div>
+            <div class="asp-code">  1, st_chooses(target)).</div>
+            <div class="asp-dim">...</div>
+          </div>
+        </div>
+
+        <!-- Constraints -->
+        <div>
+          <div class="section-title">Related Constraints</div>
+          <ul class="constraints-list">
+            <li>Must show a valid townsfolk (if not drunk/poisoned)</li>
+            <li>Decoy must not be the actual townsfolk shown</li>
+          </ul>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-buttons">
+          <button class="action-btn primary">Add to Script</button>
+          <button class="action-btn secondary">View Tests</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ANNOTATIONS (for mockup purposes) -->
+  <div class="annotation annotation-1">
+    <strong>💡 Script Selector</strong>
+    Switch between preset scripts or build a custom one from role library
+  </div>
+
+  <div class="annotation annotation-2">
+    <strong>💡 Role Library</strong>
+    Each role = one .lp file<br>
+    • Browse all available roles<br>
+    • Drag to build custom scripts<br>
+    • Click for role details →
+  </div>
+
+  <div class="annotation annotation-3">
+    <strong>💡 Role Details Panel</strong>
+    View ability, night sequence, ASP source, and constraints for any role
+  </div>
+
+  <div class="annotation annotation-4">
+    <strong>💡 Tabbed Main View</strong>
+    Grimoire | Timeline | Constraints | Raw ASP
+  </div>
+
+  <!-- Mockup banner -->
+  <div class="mockup-banner">
+    <h2>PROPOSED UI MOCKUP: Role-Based Script System</h2>
+    <p>One .lp file per role • Script = collection of roles • Modular architecture</p>
+  </div>
+
+</body>
+</html>
