@@ -169,7 +169,8 @@ living_neighbor(P1, P2, T) :- living_neighbor_clockwise(P1, P2, T).
 living_neighbor(P1, P2, T) :- living_neighbor_counterclockwise(P1, P2, T).
 
 % Reminder token inertia: once placed, tokens persist to the next time point
-reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2).
+% (unless explicitly removed via token_removed)
+reminder_on(Token, P, T2) :- reminder_on(Token, P, T1), next(T1, T2), not token_removed(Token, P, T2).
 
 % A player is impaired at time T if they have a token that causes impairment
 impaired(P, T) :- reminder_on(Token, P, T), causes_impairment(Token).
