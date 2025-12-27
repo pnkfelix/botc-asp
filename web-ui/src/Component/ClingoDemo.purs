@@ -11,7 +11,6 @@ import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
-import Data.Void (Void)
 import Data.String (trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
@@ -23,11 +22,6 @@ import Halogen.HTML.Properties as HP
 import TextareaUtils as TU
 import Type.Proxy (Proxy(..))
 
--- | Which program panel is being edited
-data ProgramPanel = BotcPanel | TbPanel | PlayersPanel | InstancePanel
-
-derive instance eqProgramPanel :: Eq ProgramPanel
-
 -- | Child slots for embedded components
 type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
 
@@ -36,17 +30,16 @@ _timelineGrimoire = Proxy
 
 -- | Component state
 type State =
-  { botcProgram :: String      -- Core game rules (botc.lp)
-  , tbProgram :: String        -- Trouble Brewing script (tb.lp)
-  , playersProgram :: String   -- Player configuration (players.lp)
-  , instanceProgram :: String  -- Instance/query for this run
-  , modelLimit :: String       -- Max models to return (empty = 0 = all)
+  { files :: Map.Map String String  -- Virtual filesystem: filename -> content
+  , currentFile :: String           -- Currently selected file for editing
+  , showFileDirectory :: Boolean    -- Is file directory popup visible
+  , modelLimit :: String            -- Max models to return (empty = 0 = all)
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
-  , selectedModelIndex :: Int  -- Which model to show in Timeline/Grimoire (0-indexed)
+  , selectedModelIndex :: Int       -- Which model to show in Timeline/Grimoire (0-indexed)
   -- Pagination for answer sets list (prevents browser crash with many models)
-  , answerSetPage :: Int       -- Current page of answer sets (0-indexed)
+  , answerSetPage :: Int            -- Current page of answer sets (0-indexed)
   -- Predicate navigator state
   , showPredicateList :: Boolean
   , selectedPredicate :: Maybe ASP.Predicate
@@ -61,11 +54,13 @@ data ResultDisplay
 -- | Component actions
 data Action
   = Initialize
-  | SetProgram ProgramPanel String
+  | SelectFile String           -- Switch to editing a different file
+  | SetFileContent String       -- Update current file's content
+  | ToggleFileDirectory         -- Show/hide file directory popup
   | SetModelLimit String
   | RunClingo
   | CancelSolve
-  | SelectModel Int  -- Select which model to display in Timeline/Grimoire
+  | SelectModel Int             -- Select which model to display in Timeline/Grimoire
   | PrevAnswerSetPage
   | NextAnswerSetPage
   | TogglePredicateList
@@ -79,13 +74,22 @@ data Action
 answerSetPageSize :: Int
 answerSetPageSize = 20
 
+-- | List of available files in order
+availableFiles :: Array String
+availableFiles = ["inst.lp", "botc.lp", "tb.lp", "players.lp", "types.lp"]
+
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { botcProgram: EP.botcLp
-  , tbProgram: EP.tbLp
-  , playersProgram: EP.playersLp
-  , instanceProgram: EP.instLp
+  { files: Map.fromFoldable
+      [ Tuple "botc.lp" EP.botcLp
+      , Tuple "tb.lp" EP.tbLp
+      , Tuple "players.lp" EP.playersLp
+      , Tuple "inst.lp" EP.instLp
+      , Tuple "types.lp" EP.typesLp
+      ]
+  , currentFile: "inst.lp"  -- Start with instance file selected
+  , showFileDirectory: false
   , modelLimit: ""  -- Empty = 0 = all models
   , result: Nothing
   , isLoading: false
@@ -108,18 +112,21 @@ component =
         }
     }
 
+-- | Get current file content from state
+getCurrentFileContent :: State -> String
+getCurrentFileContent state = fromMaybe "" $ Map.lookup state.currentFile state.files
+
+-- | Build sources array from files Map for parsing
+getSources :: State -> Array { name :: String, content :: String }
+getSources state = map (\name -> { name, content: fromMaybe "" $ Map.lookup name state.files }) availableFiles
+
 -- | Render the component
 render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
 render state =
   let
-    -- Parse all programs to get predicates
-    sources =
-      [ { name: "botc.lp", content: state.botcProgram }
-      , { name: "tb.lp", content: state.tbProgram }
-      , { name: "players.lp", content: state.playersProgram }
-      , { name: "instance", content: state.instanceProgram }
-      ]
+    sources = getSources state
     parsed = ASP.parseProgram sources
+    currentContent = getCurrentFileContent state
   in
   HH.div
     [ HP.style "font-family: system-ui, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px; position: relative;" ]
@@ -128,23 +135,44 @@ render state =
         [ HP.style "color: #666;" ]
         [ HH.text "Blood on the Clocktower ASP Explorer" ]
 
-    -- Predicate navigator toggle button (mobile-friendly)
-    , HH.button
-        [ HP.style $ "position: fixed; bottom: 20px; right: 20px; z-index: 100; "
-            <> "padding: 12px 16px; font-size: 14px; cursor: pointer; "
-            <> "background: #2196F3; color: white; border: none; border-radius: 50px; "
-            <> "box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
-        , HE.onClick \_ -> TogglePredicateList
-        ]
-        [ HH.text $ if state.showPredicateList then "Hide Predicates" else "Show Predicates" ]
-
-    -- Program panels in a 2x2 grid (responsive)
+    -- Floating action buttons (bottom right)
     , HH.div
-        [ HP.style "display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 20px 0;" ]
-        [ renderProgramPanel "botc.lp (Core Rules)" BotcPanel state.botcProgram state.isLoading
-        , renderProgramPanel "tb.lp (Trouble Brewing)" TbPanel state.tbProgram state.isLoading
-        , renderProgramPanel "players.lp (Players)" PlayersPanel state.playersProgram state.isLoading
-        , renderProgramPanel "Instance (Query)" InstancePanel state.instanceProgram state.isLoading
+        [ HP.style "position: fixed; bottom: 20px; right: 20px; z-index: 100; display: flex; flex-direction: column; gap: 10px;" ]
+        [ -- File directory button
+          HH.button
+            [ HP.style $ "padding: 12px 16px; font-size: 14px; cursor: pointer; "
+                <> "background: #FF9800; color: white; border: none; border-radius: 50px; "
+                <> "box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
+            , HE.onClick \_ -> ToggleFileDirectory
+            ]
+            [ HH.text "Files" ]
+        , -- Predicate navigator toggle button
+          HH.button
+            [ HP.style $ "padding: 12px 16px; font-size: 14px; cursor: pointer; "
+                <> "background: #2196F3; color: white; border: none; border-radius: 50px; "
+                <> "box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
+            , HE.onClick \_ -> TogglePredicateList
+            ]
+            [ HH.text $ if state.showPredicateList then "Hide Predicates" else "Predicates" ]
+        ]
+
+    -- Single file editor with file tabs
+    , HH.div
+        [ HP.style "margin: 20px 0;" ]
+        [ -- File tabs
+          HH.div
+            [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;" ]
+            (map (renderFileTab state.currentFile) availableFiles)
+        , -- Editor textarea
+          HH.textarea
+            [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
+                <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
+                <> "resize: vertical; overflow: auto;"
+            , HP.id "editor-textarea"
+            , HP.value currentContent
+            , HE.onValueInput SetFileContent
+            , HP.disabled state.isLoading
+            ]
         ]
 
     -- Controls: model limit input, run button, cancel button
@@ -190,6 +218,9 @@ render state =
     -- Results display
     , renderResult state
 
+    -- File directory popup
+    , renderFileDirectory state.showFileDirectory state.currentFile
+
     -- Predicate list panel (slide-in from right)
     , renderPredicatePanel state.showPredicateList parsed.predicates
 
@@ -197,41 +228,100 @@ render state =
     , renderPredicateModal state.selectedPredicate sources parsed.references
     ]
 
--- | Render a single program panel with label and scrollable textarea
-renderProgramPanel :: forall m. String -> ProgramPanel -> String -> Boolean -> H.ComponentHTML Action Slots m
-renderProgramPanel label panel value isLoading =
-  HH.div
-    [ HP.style "display: flex; flex-direction: column;" ]
-    [ HH.label
-        [ HP.style "font-weight: bold; margin-bottom: 8px; color: #333;" ]
-        [ HH.text label ]
-    , HH.textarea
-        [ HP.style $ "width: 100%; height: 300px; font-family: monospace; font-size: 12px; "
-            <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
-            <> "resize: vertical; overflow: auto;"
-        , HP.id (panelToTextareaId panel)
-        , HP.value value
-        , HE.onValueInput (SetProgram panel)
-        , HP.disabled isLoading
+-- | Render a file tab button
+renderFileTab :: forall m. String -> String -> H.ComponentHTML Action Slots m
+renderFileTab currentFile fileName =
+  let
+    isSelected = fileName == currentFile
+    baseStyle = "padding: 8px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px 4px 0 0; "
+    selectedStyle = if isSelected
+      then "background: #4CAF50; color: white; font-weight: bold;"
+      else "background: #e0e0e0; color: #333;"
+  in
+  HH.button
+    [ HP.style $ baseStyle <> selectedStyle
+    , HE.onClick \_ -> SelectFile fileName
+    ]
+    [ HH.text fileName ]
+
+-- | Render the file directory popup
+renderFileDirectory :: forall m. Boolean -> String -> H.ComponentHTML Action Slots m
+renderFileDirectory isVisible currentFile =
+  HH.div_
+    [ -- Backdrop (click to close)
+      HH.div
+        [ HP.style $ "position: fixed; top: 0; left: 0; right: 0; bottom: 0; "
+            <> "background: rgba(0,0,0,0.3); z-index: 98; "
+            <> "opacity: " <> (if isVisible then "1" else "0") <> "; "
+            <> "pointer-events: " <> (if isVisible then "auto" else "none") <> "; "
+            <> "transition: opacity 0.3s ease;"
+        , HE.onClick \_ -> ToggleFileDirectory
+        ]
+        []
+    -- Panel
+    , HH.div
+        [ HP.style $ "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); "
+            <> "background: white; border-radius: 8px; padding: 20px; "
+            <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 99; "
+            <> "min-width: 300px; "
+            <> "opacity: " <> (if isVisible then "1" else "0") <> "; "
+            <> "pointer-events: " <> (if isVisible then "auto" else "none") <> "; "
+            <> "transition: opacity 0.3s ease;"
+        , HE.onClick \_ -> NoOp  -- Prevent clicks from closing via backdrop
+        ]
+        [ -- Header
+          HH.div
+            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" ]
+            [ HH.h3
+                [ HP.style "margin: 0; color: #333;" ]
+                [ HH.text "Files" ]
+            , HH.button
+                [ HP.style "background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 0 5px;"
+                , HE.onClick \_ -> ToggleFileDirectory
+                ]
+                [ HH.text "×" ]
+            ]
+        -- File list
+        , HH.div
+            [ HP.style "display: flex; flex-direction: column; gap: 8px;" ]
+            (map (renderFileItem currentFile) availableFiles)
         ]
     ]
 
--- | Convert a panel to its textarea element ID
-panelToTextareaId :: ProgramPanel -> String
-panelToTextareaId = case _ of
-  BotcPanel -> "textarea-botc"
-  TbPanel -> "textarea-tb"
-  PlayersPanel -> "textarea-players"
-  InstancePanel -> "textarea-instance"
+-- | Render a file item in the directory popup
+renderFileItem :: forall m. String -> String -> H.ComponentHTML Action Slots m
+renderFileItem currentFile fileName =
+  let
+    isSelected = fileName == currentFile
+    description = case fileName of
+      "inst.lp" -> "Instance/scenario configuration"
+      "botc.lp" -> "Core game rules"
+      "tb.lp" -> "Trouble Brewing script"
+      "players.lp" -> "Player names and seating"
+      "types.lp" -> "Type validation rules"
+      _ -> ""
+  in
+  HH.button
+    [ HP.style $ "display: block; width: 100%; text-align: left; "
+        <> "padding: 12px 15px; "
+        <> "background: " <> (if isSelected then "#e8f5e9" else "#f5f5f5") <> "; "
+        <> "border: " <> (if isSelected then "2px solid #4CAF50" else "1px solid #ddd") <> "; "
+        <> "border-radius: 4px; cursor: pointer;"
+    , HE.onClick \_ -> SelectFile fileName
+    ]
+    [ HH.div
+        [ HP.style $ "font-weight: " <> (if isSelected then "bold" else "normal") <> "; "
+            <> "font-family: monospace; font-size: 14px;"
+        ]
+        [ HH.text fileName ]
+    , HH.div
+        [ HP.style "font-size: 12px; color: #666; margin-top: 4px;" ]
+        [ HH.text description ]
+    ]
 
--- | Convert a source file name to textarea ID
+-- | Convert a source file name to textarea ID (now just one editor)
 sourceFileToTextareaId :: String -> Maybe String
-sourceFileToTextareaId = case _ of
-  "botc.lp" -> Just "textarea-botc"
-  "tb.lp" -> Just "textarea-tb"
-  "players.lp" -> Just "textarea-players"
-  "instance" -> Just "textarea-instance"
-  _ -> Nothing
+sourceFileToTextareaId _ = Just "editor-textarea"
 
 -- | Render the result section
 renderResult :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
@@ -421,7 +511,7 @@ renderPredicateModal :: forall m.
   (ASP.Predicate -> Array ASP.PredicateRef) ->
   H.ComponentHTML Action Slots m
 renderPredicateModal Nothing _ _ = HH.text ""
-renderPredicateModal (Just pred) sources findRefs =
+renderPredicateModal (Just pred) _ findRefs =
   let refs = findRefs pred
   in
   HH.div
@@ -488,12 +578,14 @@ handleAction = case _ of
     H.liftAff $ Clingo.init "./clingo.wasm"
     H.modify_ \s -> s { isInitialized = true }
 
-  SetProgram panel prog ->
-    H.modify_ \s -> case panel of
-      BotcPanel -> s { botcProgram = prog }
-      TbPanel -> s { tbProgram = prog }
-      PlayersPanel -> s { playersProgram = prog }
-      InstancePanel -> s { instanceProgram = prog }
+  SelectFile fileName -> do
+    H.modify_ \s -> s { currentFile = fileName, showFileDirectory = false }
+
+  SetFileContent content -> do
+    H.modify_ \s -> s { files = Map.insert s.currentFile content s.files }
+
+  ToggleFileDirectory ->
+    H.modify_ \s -> s { showFileDirectory = not s.showFileDirectory }
 
   SetModelLimit limit ->
     H.modify_ \s -> s { modelLimit = limit }
@@ -503,21 +595,12 @@ handleAction = case _ of
     state <- H.get
     -- Parse model limit (empty or invalid = 0 = all models)
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
-    -- Build file resolver for #include directives
-    -- Maps filenames to their content (from embedded files or current textarea state)
-    let fileMap = Map.fromFoldable
-          [ Tuple "botc.lp" state.botcProgram
-          , Tuple "tb.lp" state.tbProgram
-          , Tuple "players.lp" state.playersProgram
-          , Tuple "types.lp" EP.typesLp
-          ]
-    let resolver filename = Map.lookup filename fileMap
-    -- Concatenate all programs and resolve any #include directives
-    let rawProgram = state.botcProgram <> "\n\n"
-                  <> state.tbProgram <> "\n\n"
-                  <> state.playersProgram <> "\n\n"
-                  <> state.instanceProgram
-    let fullProgram = Clingo.resolveIncludes rawProgram resolver
+    -- Build file resolver for #include directives using the virtual filesystem
+    let resolver filename = Map.lookup filename state.files
+    -- Get inst.lp content (the entry point that #includes other files)
+    let instProgram = fromMaybe "" $ Map.lookup "inst.lp" state.files
+    -- Resolve #include directives recursively
+    let fullProgram = Clingo.resolveIncludes instProgram resolver
     result <- H.liftAff $ Clingo.run fullProgram numModels
     let display = case result of
           Clingo.Satisfiable res ->
@@ -561,12 +644,10 @@ handleAction = case _ of
     H.modify_ \s -> s { selectedPredicate = Nothing }
 
   JumpToReference sourceFile lineNumber -> do
-    -- Close modal and predicate panel
-    H.modify_ \s -> s { selectedPredicate = Nothing, showPredicateList = false }
-    -- Scroll to the line in the appropriate textarea
-    case sourceFileToTextareaId sourceFile of
-      Just textareaId -> liftEffect $ TU.scrollToLine textareaId lineNumber
-      Nothing -> pure unit
+    -- Close modal, predicate panel, and switch to the source file
+    H.modify_ \s -> s { selectedPredicate = Nothing, showPredicateList = false, currentFile = sourceFile }
+    -- Scroll to the line in the editor textarea
+    liftEffect $ TU.scrollToLine "editor-textarea" lineNumber
 
   HandleTimelineEvent output -> case output of
     TG.TimelineEventClicked { sourceAtom } -> do
