@@ -150,7 +150,7 @@
   <!-- File info -->
   <rect x="15" y="685" width="250" height="60" rx="5" fill="#1a202c"/>
   <text x="25" y="705" font-family="system-ui, sans-serif" font-size="11" fill="#718096">Role File:</text>
-  <text x="25" y="722" font-family="system-ui, sans-serif" font-size="11" fill="#63b3ed" font-family="monospace">roles/washerwoman.lp</text>
+  <text x="25" y="722" font-family="monospace" font-size="11" fill="#63b3ed">roles/washerwoman.lp</text>
   <text x="25" y="738" font-family="system-ui, sans-serif" font-size="10" fill="#4a5568">Click to view/edit source</text>
 
   <!-- ===== MAIN CONTENT AREA ===== -->
