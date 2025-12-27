@@ -82,8 +82,8 @@ initialState :: State
 initialState =
   { botcProgram: EP.botcLp
   , tbProgram: EP.tbLp
-  , playersProgram: defaultPlayers  -- Use smaller player set for demo
-  , instanceProgram: defaultInstance
+  , playersProgram: EP.playersLp
+  , instanceProgram: EP.instLp
   , modelLimit: ""  -- Empty = 0 = all models
   , result: Nothing
   , isLoading: false
@@ -93,48 +93,6 @@ initialState =
   , showPredicateList: false
   , selectedPredicate: Nothing
   }
-
--- | Smaller player configuration for demo (8 players instead of 16)
-defaultPlayers :: String
-defaultPlayers = """% Player names and seating (8 players for demo)
-name(amanda; rob; taylor; courtney; steph; felix; neha; pratik).
-
-chair(amanda, 0).
-chair(rob, 1).
-chair(taylor, 2).
-chair(courtney, 3).
-chair(steph, 4).
-chair(felix, 5).
-chair(neha, 6).
-chair(pratik, 7).
-
-% Number of players in the game
-#const player_count = 8.
-"""
-
--- | Instance/demo fragment
-defaultInstance :: String
-defaultInstance = """% Instance: constraints and queries for this specific scenario
-% Edit this section to explore different game states
-
-% Example: Constrain who the demon might be
-% assigned(0, felix, imp).
-
-% Example: Constrain what the Chef learned
-% st_tells(chef, amanda, count(1), night(1, 5, 1)).
-
-% Show key derived facts
-#show assigned/3.
-#show received/2.
-#show st_tells/4.
-
-% Show additional predicates for timeline/grimoire view
-#show player_chooses/4.
-#show reminder_on/3.
-#show time/1.
-#show alive/2.
-#show chair/2.
-"""
 
 -- | The Halogen component
 component :: forall q i o m. MonadAff m => H.Component q i o m

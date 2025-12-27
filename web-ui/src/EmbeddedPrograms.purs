@@ -4,6 +4,7 @@ module EmbeddedPrograms
   ( botcLp
   , tbLp
   , playersLp
+  , instLp
   , typesLp
   ) where
 
@@ -15,6 +16,9 @@ foreign import tbLp :: String
 
 -- | Player configuration from players.lp
 foreign import playersLp :: String
+
+-- | Instance/query constraints from inst.lp
+foreign import instLp :: String
 
 -- | Type checking constraints from types.lp
 foreign import typesLp :: String
