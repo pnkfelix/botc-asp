@@ -4,11 +4,13 @@ import Prelude
 
 import AspParser as ASP
 import Clingo as Clingo
+import Data.Map as Map
 import Component.TimelineGrimoire as TG
 import Data.Array (index, length, mapWithIndex, null, slice)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Tuple (Tuple(..))
 import Data.Void (Void)
 import Data.String (trim)
 import Effect.Class (liftEffect)
@@ -501,11 +503,21 @@ handleAction = case _ of
     state <- H.get
     -- Parse model limit (empty or invalid = 0 = all models)
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
-    -- Concatenate all programs
-    let fullProgram = state.botcProgram <> "\n\n"
-                   <> state.tbProgram <> "\n\n"
-                   <> state.playersProgram <> "\n\n"
-                   <> state.instanceProgram
+    -- Build file resolver for #include directives
+    -- Maps filenames to their content (from embedded files or current textarea state)
+    let fileMap = Map.fromFoldable
+          [ Tuple "botc.lp" state.botcProgram
+          , Tuple "tb.lp" state.tbProgram
+          , Tuple "players.lp" state.playersProgram
+          , Tuple "types.lp" EP.typesLp
+          ]
+    let resolver filename = Map.lookup filename fileMap
+    -- Concatenate all programs and resolve any #include directives
+    let rawProgram = state.botcProgram <> "\n\n"
+                  <> state.tbProgram <> "\n\n"
+                  <> state.playersProgram <> "\n\n"
+                  <> state.instanceProgram
+    let fullProgram = Clingo.resolveIncludes rawProgram resolver
     result <- H.liftAff $ Clingo.run fullProgram numModels
     let display = case result of
           Clingo.Satisfiable res ->

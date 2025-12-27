@@ -17,3 +17,37 @@ export const restartImpl = (wasmUrl) => () => {
   const absoluteUrl = new URL(wasmUrl, window.location.href).href;
   return clingo.restart(absoluteUrl);
 };
+
+// Resolve #include directives in a program string
+// fileResolver is a function: filename -> content (or null if not found)
+// Returns the program with all includes inlined
+export const resolveIncludesImpl = (program) => (fileResolver) => {
+  const seen = new Set();
+
+  function resolve(content, depth = 0) {
+    if (depth > 10) {
+      return "% [max include depth exceeded]\n";
+    }
+
+    // Match #include "filename".
+    return content.replace(/#include\s+"([^"]+)"\s*\./g, (match, filename) => {
+      // Prevent infinite loops
+      if (seen.has(filename)) {
+        return `% [circular include skipped: ${filename}]\n`;
+      }
+      seen.add(filename);
+
+      // Get file content from resolver
+      const fileContent = fileResolver(filename);
+      if (fileContent === null) {
+        return `% [file not found: ${filename}]\n`;
+      }
+
+      // Recursively resolve includes in the included file
+      const resolved = resolve(fileContent, depth + 1);
+      return `% === Begin included: ${filename} ===\n${resolved}\n% === End included: ${filename} ===\n`;
+    });
+  }
+
+  return resolve(program);
+};
