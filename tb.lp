@@ -105,12 +105,12 @@ first_night_substep(washerwoman, 3, st_tells(ww_info)).
    reminder_on(ww_wrong, P, T2).
 
 % Washerwoman validity constraint:
-% If washerwoman is functioning, the townsfolk token must be on someone
-% who registers as townsfolk at that time
-% FIXME: Due to reminder token inertia, this constraint applies at ALL times
-% the token exists, not just when the washerwoman receives info. We probably
-% only care about the time when st_tells(ww_info) occurs.
-:- reminder_on(ww_townsfolk, P, T),
+% If washerwoman is functioning when receiving info, the townsfolk token must be
+% on someone who registers as townsfolk at that time.
+% This constraint only applies at the moment of info delivery (substep 3).
+:- T = night(1, RoleOrd, 3),
+   first_night_role_order(washerwoman, RoleOrd),
+   reminder_on(ww_townsfolk, P, T),
    assigned(0, WasherwomanPlayer, washerwoman),
    functioning(WasherwomanPlayer, T),
    not registers_as(P, townsfolk, T).
@@ -173,10 +173,12 @@ first_night_substep(librarian, 3, st_tells(lib_info)).
 :- reminder_on(lib_outsider, P, _),
    reminder_on(lib_wrong, P, _).
 
-% If librarian is functioning, the outsider token must be on someone
-% who registers as outsider at that time
-% FIXME: Same issue as washerwoman - applies at all times, not just info time
-:- reminder_on(lib_outsider, P, T),
+% If librarian is functioning when receiving info, the outsider token must be
+% on someone who registers as outsider at that time.
+% This constraint only applies at the moment of info delivery (substep 3).
+:- T = night(1, RoleOrd, 3),
+   first_night_role_order(librarian, RoleOrd),
+   reminder_on(lib_outsider, P, T),
    assigned(0, LibrarianPlayer, librarian),
    functioning(LibrarianPlayer, T),
    not registers_as(P, outsider, T).
@@ -229,10 +231,12 @@ first_night_substep(investigator, 3, st_tells(inv_info)).
 :- reminder_on(inv_minion, P, _),
    reminder_on(inv_wrong, P, _).
 
-% If investigator is functioning, the minion token must be on someone
-% who registers as minion at that time
-% FIXME: Same issue as washerwoman - applies at all times, not just info time
-:- reminder_on(inv_minion, P, T),
+% If investigator is functioning when receiving info, the minion token must be
+% on someone who registers as minion at that time.
+% This constraint only applies at the moment of info delivery (substep 3).
+:- T = night(1, RoleOrd, 3),
+   first_night_role_order(investigator, RoleOrd),
+   reminder_on(inv_minion, P, T),
    assigned(0, InvestigatorPlayer, investigator),
    functioning(InvestigatorPlayer, T),
    not registers_as(P, minion, T).
