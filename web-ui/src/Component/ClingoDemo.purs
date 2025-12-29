@@ -5,13 +5,15 @@ import Prelude
 import AspParser as ASP
 import Clingo as Clingo
 import Data.Map as Map
+import Data.Set as Set
 import Component.TimelineGrimoire as TG
-import Data.Array (index, length, mapWithIndex, null, slice)
-import Data.Foldable (intercalate)
+import Data.Array (filter, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
+import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
-import Data.String (trim)
+import Data.String (Pattern(..), split, trim)
+import Data.String as String
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
@@ -30,9 +32,10 @@ _timelineGrimoire = Proxy
 
 -- | Component state
 type State =
-  { files :: Map.Map String String  -- Virtual filesystem: filename -> content
-  , currentFile :: String           -- Currently selected file for editing
+  { files :: Map.Map String String  -- Virtual filesystem: filepath -> content
+  , currentFile :: String           -- Currently selected file for editing (full path)
   , showFileDirectory :: Boolean    -- Is file directory popup visible
+  , expandedDirs :: Set.Set String  -- Which directories are expanded in the tree view
   , modelLimit :: String            -- Max models to return (empty = 0 = all)
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
@@ -54,9 +57,10 @@ data ResultDisplay
 -- | Component actions
 data Action
   = Initialize
-  | SelectFile String           -- Switch to editing a different file
+  | SelectFile String           -- Switch to editing a different file (full path)
   | SetFileContent String       -- Update current file's content
   | ToggleFileDirectory         -- Show/hide file directory popup
+  | ToggleDirectory String      -- Expand/collapse a directory in tree view
   | SetModelLimit String
   | RunClingo
   | CancelSolve
@@ -74,22 +78,48 @@ data Action
 answerSetPageSize :: Int
 answerSetPageSize = 20
 
--- | List of available files in order
+-- | List of available file paths derived from embedded files
 availableFiles :: Array String
-availableFiles = ["inst.lp", "botc.lp", "tb.lp", "players.lp", "types.lp"]
+availableFiles = map _.path EP.embeddedFileList
+
+-- | Get list of all unique directories from file paths
+getDirectories :: Array String -> Array String
+getDirectories paths =
+  nub $ paths >>= \path ->
+    case getParentDir path of
+      "" -> []
+      dir -> [dir]
+
+-- | Get parent directory of a path (empty string for root files)
+getParentDir :: String -> String
+getParentDir path =
+  let parts = filter (_ /= "") $ split (Pattern "/") path
+  in if length parts <= 1
+     then ""
+     else intercalate "/" (slice 0 (length parts - 1) parts)
+
+-- | Get just the filename from a path
+getFileName :: String -> String
+getFileName path =
+  let parts = filter (_ /= "") $ split (Pattern "/") path
+  in fromMaybe path $ index parts (length parts - 1)
+
+-- | Check if a file is in a directory (directly, not nested)
+isInDirectory :: String -> String -> Boolean
+isInDirectory dir path =
+  getParentDir path == dir
+
+-- | Check if a file is at root level (no parent directory)
+isRootFile :: String -> Boolean
+isRootFile path = getParentDir path == ""
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { files: Map.fromFoldable
-      [ Tuple "botc.lp" EP.botcLp
-      , Tuple "tb.lp" EP.tbLp
-      , Tuple "players.lp" EP.playersLp
-      , Tuple "inst.lp" EP.instLp
-      , Tuple "types.lp" EP.typesLp
-      ]
+  { files: foldl (\m f -> Map.insert f.path f.content m) Map.empty EP.embeddedFileList
   , currentFile: "inst.lp"  -- Start with instance file selected
   , showFileDirectory: false
+  , expandedDirs: Set.empty  -- All directories collapsed initially
   , modelLimit: ""  -- Empty = 0 = all models
   , result: Nothing
   , isLoading: false
@@ -99,6 +129,16 @@ initialState =
   , showPredicateList: false
   , selectedPredicate: Nothing
   }
+
+-- | Get files to show in tabs: root files + current file if it's in a subdirectory
+getVisibleTabs :: String -> Array String
+getVisibleTabs currentFile =
+  let
+    rootFiles = filter isRootFile availableFiles
+  in
+    if isRootFile currentFile
+      then rootFiles
+      else rootFiles <> [currentFile]
 
 -- | The Halogen component
 component :: forall q i o m. MonadAff m => H.Component q i o m
@@ -118,7 +158,7 @@ getCurrentFileContent state = fromMaybe "" $ Map.lookup state.currentFile state.
 
 -- | Build sources array from files Map for parsing
 getSources :: State -> Array { name :: String, content :: String }
-getSources state = map (\name -> { name, content: fromMaybe "" $ Map.lookup name state.files }) availableFiles
+getSources state = map (\path -> { name: path, content: fromMaybe "" $ Map.lookup path state.files }) availableFiles
 
 -- | Render the component
 render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
@@ -159,10 +199,10 @@ render state =
     -- Single file editor with file tabs
     , HH.div
         [ HP.style "margin: 20px 0;" ]
-        [ -- File tabs
+        [ -- File tabs (show root files + current file if in a subdirectory)
           HH.div
             [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;" ]
-            (map (renderFileTab state.currentFile) availableFiles)
+            (map (renderFileTab state.currentFile) (getVisibleTabs state.currentFile))
         , -- Editor textarea
           HH.textarea
             [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
@@ -218,8 +258,8 @@ render state =
     -- Results display
     , renderResult state
 
-    -- File directory popup
-    , renderFileDirectory state.showFileDirectory state.currentFile
+    -- File directory popup with tree view
+    , renderFileDirectory state.showFileDirectory state.currentFile state.expandedDirs
 
     -- Predicate list panel (slide-in from right)
     , renderPredicatePanel state.showPredicateList parsed.predicates
@@ -230,9 +270,12 @@ render state =
 
 -- | Render a file tab button
 renderFileTab :: forall m. String -> String -> H.ComponentHTML Action Slots m
-renderFileTab currentFile fileName =
+renderFileTab currentFile filePath =
   let
-    isSelected = fileName == currentFile
+    isSelected = filePath == currentFile
+    displayName = getFileName filePath
+    -- Add directory prefix if file is not at root
+    prefix = if isRootFile filePath then "" else getParentDir filePath <> "/"
     baseStyle = "padding: 8px 16px; font-size: 14px; cursor: pointer; border: none; border-radius: 4px 4px 0 0; "
     selectedStyle = if isSelected
       then "background: #4CAF50; color: white; font-weight: bold;"
@@ -240,13 +283,26 @@ renderFileTab currentFile fileName =
   in
   HH.button
     [ HP.style $ baseStyle <> selectedStyle
-    , HE.onClick \_ -> SelectFile fileName
+    , HE.onClick \_ -> SelectFile filePath
+    , HP.title filePath  -- Tooltip shows full path
     ]
-    [ HH.text fileName ]
+    [ if prefix /= ""
+      then HH.span
+        [ HP.style "font-size: 10px; opacity: 0.7;" ]
+        [ HH.text prefix ]
+      else HH.text ""
+    , HH.text displayName
+    ]
 
--- | Render the file directory popup
-renderFileDirectory :: forall m. Boolean -> String -> H.ComponentHTML Action Slots m
-renderFileDirectory isVisible currentFile =
+-- | Render the file directory popup with tree view
+renderFileDirectory :: forall m. Boolean -> String -> Set.Set String -> H.ComponentHTML Action Slots m
+renderFileDirectory isVisible currentFile expandedDirs =
+  let
+    -- Get all unique directories sorted
+    allDirs = sort $ getDirectories availableFiles
+    -- Get root-level files
+    rootFiles = sort $ filter isRootFile availableFiles
+  in
   HH.div_
     [ -- Backdrop (click to close)
       HH.div
@@ -263,61 +319,140 @@ renderFileDirectory isVisible currentFile =
         [ HP.style $ "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); "
             <> "background: white; border-radius: 8px; padding: 20px; "
             <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 99; "
-            <> "min-width: 300px; "
+            <> "min-width: 350px; max-width: 500px; max-height: 80vh; "
             <> "opacity: " <> (if isVisible then "1" else "0") <> "; "
             <> "pointer-events: " <> (if isVisible then "auto" else "none") <> "; "
-            <> "transition: opacity 0.3s ease;"
+            <> "transition: opacity 0.3s ease; "
+            <> "display: flex; flex-direction: column;"
         , HE.onClick \_ -> NoOp  -- Prevent clicks from closing via backdrop
         ]
         [ -- Header
           HH.div
-            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;" ]
+            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0;" ]
             [ HH.h3
                 [ HP.style "margin: 0; color: #333;" ]
-                [ HH.text "Files" ]
+                [ HH.text $ "Files (" <> show (length availableFiles) <> ")" ]
             , HH.button
                 [ HP.style "background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 0 5px;"
                 , HE.onClick \_ -> ToggleFileDirectory
                 ]
                 [ HH.text "×" ]
             ]
-        -- File list
+        -- Tree view (scrollable)
         , HH.div
-            [ HP.style "display: flex; flex-direction: column; gap: 8px;" ]
-            (map (renderFileItem currentFile) availableFiles)
+            [ HP.style "overflow-y: auto; flex: 1;" ]
+            [ HH.div
+                [ HP.style "display: flex; flex-direction: column; gap: 2px;" ]
+                ( -- Root files first
+                  map (renderFileItem currentFile 0) rootFiles
+                  -- Then directories with their contents
+                  <> (allDirs >>= \dir -> renderDirectoryNode currentFile expandedDirs dir 0)
+                )
+            ]
         ]
     ]
 
--- | Render a file item in the directory popup
-renderFileItem :: forall m. String -> String -> H.ComponentHTML Action Slots m
-renderFileItem currentFile fileName =
+-- | Render a directory node with its contents
+renderDirectoryNode :: forall m. String -> Set.Set String -> String -> Int -> Array (H.ComponentHTML Action Slots m)
+renderDirectoryNode currentFile expandedDirs dir depth =
   let
-    isSelected = fileName == currentFile
-    description = case fileName of
-      "inst.lp" -> "Instance/scenario configuration"
-      "botc.lp" -> "Core game rules"
-      "tb.lp" -> "Trouble Brewing script"
-      "players.lp" -> "Player names and seating"
-      "types.lp" -> "Type validation rules"
-      _ -> ""
+    isExpanded = Set.member dir expandedDirs
+    dirFiles = sort $ filter (isInDirectory dir) availableFiles
+    indent = depth * 16
+    -- Check if current file is in this directory (to highlight directory)
+    hasSelectedFile = getParentDir currentFile == dir
+  in
+  [ -- Directory header (clickable to expand/collapse)
+    HH.div
+      [ HP.style $ "display: flex; align-items: center; padding: 8px 12px; "
+          <> "margin-left: " <> show indent <> "px; "
+          <> "background: " <> (if hasSelectedFile then "#fff3e0" else "#f0f0f0") <> "; "
+          <> "border: 1px solid " <> (if hasSelectedFile then "#FF9800" else "#ddd") <> "; "
+          <> "border-radius: 4px; cursor: pointer; "
+          <> "font-weight: bold; color: #555;"
+      , HE.onClick \_ -> ToggleDirectory dir
+      ]
+      [ -- Expand/collapse icon
+        HH.span
+          [ HP.style "margin-right: 8px; font-family: monospace; width: 12px;" ]
+          [ HH.text $ if isExpanded then "▼" else "▶" ]
+      , -- Folder icon
+        HH.span
+          [ HP.style "margin-right: 8px;" ]
+          [ HH.text $ if isExpanded then "📂" else "📁" ]
+      , -- Directory name
+        HH.span_
+          [ HH.text $ getFileName dir <> "/" ]
+      , -- File count badge
+        HH.span
+          [ HP.style "margin-left: auto; font-size: 11px; color: #888; font-weight: normal;" ]
+          [ HH.text $ "(" <> show (length dirFiles) <> ")" ]
+      ]
+  ] <>
+  -- Contents (only if expanded)
+  if isExpanded
+    then map (renderFileItem currentFile (depth + 1)) dirFiles
+    else []
+
+-- | Render a file item in the directory tree
+renderFileItem :: forall m. String -> Int -> String -> H.ComponentHTML Action Slots m
+renderFileItem currentFile depth filePath =
+  let
+    isSelected = filePath == currentFile
+    displayName = getFileName filePath
+    indent = depth * 16
+    description = getFileDescription filePath
   in
   HH.button
-    [ HP.style $ "display: block; width: 100%; text-align: left; "
-        <> "padding: 12px 15px; "
-        <> "background: " <> (if isSelected then "#e8f5e9" else "#f5f5f5") <> "; "
-        <> "border: " <> (if isSelected then "2px solid #4CAF50" else "1px solid #ddd") <> "; "
+    [ HP.style $ "display: flex; align-items: center; width: 100%; text-align: left; "
+        <> "padding: 8px 12px; margin-left: " <> show indent <> "px; "
+        <> "background: " <> (if isSelected then "#e8f5e9" else "white") <> "; "
+        <> "border: " <> (if isSelected then "2px solid #4CAF50" else "1px solid #eee") <> "; "
         <> "border-radius: 4px; cursor: pointer;"
-    , HE.onClick \_ -> SelectFile fileName
+    , HE.onClick \_ -> SelectFile filePath
+    , HP.title filePath  -- Full path as tooltip
     ]
-    [ HH.div
-        [ HP.style $ "font-weight: " <> (if isSelected then "bold" else "normal") <> "; "
-            <> "font-family: monospace; font-size: 14px;"
+    [ -- File icon
+      HH.span
+        [ HP.style "margin-right: 8px; opacity: 0.6;" ]
+        [ HH.text "📄" ]
+    , -- File info
+      HH.div
+        [ HP.style "flex: 1; min-width: 0;" ]
+        [ HH.div
+            [ HP.style $ "font-weight: " <> (if isSelected then "bold" else "normal") <> "; "
+                <> "font-family: monospace; font-size: 13px; "
+                <> "white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+            ]
+            [ HH.text displayName ]
+        , if description /= ""
+            then HH.div
+              [ HP.style "font-size: 11px; color: #888; margin-top: 2px;" ]
+              [ HH.text description ]
+            else HH.text ""
         ]
-        [ HH.text fileName ]
-    , HH.div
-        [ HP.style "font-size: 12px; color: #666; margin-top: 4px;" ]
-        [ HH.text description ]
     ]
+
+-- | Get description for a file based on its path
+getFileDescription :: String -> String
+getFileDescription path = case path of
+  "inst.lp" -> "Instance/scenario configuration"
+  "botc.lp" -> "Core game rules"
+  "tb.lp" -> "Trouble Brewing script"
+  "players.lp" -> "Player names and seating"
+  "types.lp" -> "Type validation rules"
+  "bmr.lp" -> "Bad Moon Rising script"
+  "carousel.lp" -> "Carousel script"
+  _ ->
+    -- Try to infer from filename pattern
+    let name = getFileName path
+    in if String.take 4 name == "sat_"
+       then "Test: should be satisfiable"
+       else if String.take 6 name == "unsat_"
+         then "Test: should be unsatisfiable"
+         else if name == "base.lp"
+           then "Base rules for this directory"
+           else ""
 
 -- | Convert a source file name to textarea ID (now just one editor)
 sourceFileToTextareaId :: String -> Maybe String
@@ -587,6 +722,13 @@ handleAction = case _ of
   ToggleFileDirectory ->
     H.modify_ \s -> s { showFileDirectory = not s.showFileDirectory }
 
+  ToggleDirectory dir -> do
+    H.modify_ \s ->
+      let newExpanded = if Set.member dir s.expandedDirs
+            then Set.delete dir s.expandedDirs
+            else Set.insert dir s.expandedDirs
+      in s { expandedDirs = newExpanded }
+
   SetModelLimit limit ->
     H.modify_ \s -> s { modelLimit = limit }
 
@@ -597,10 +739,12 @@ handleAction = case _ of
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
     -- Build file resolver for #include directives using the virtual filesystem
     let resolver filename = Map.lookup filename state.files
-    -- Get inst.lp content (the entry point that #includes other files)
-    let instProgram = fromMaybe "" $ Map.lookup "inst.lp" state.files
-    -- Resolve #include directives recursively
-    let fullProgram = Clingo.resolveIncludes instProgram resolver
+    -- Get the current file's content (the entry point that #includes other files)
+    let entryFile = state.currentFile
+    let entryProgram = fromMaybe "" $ Map.lookup entryFile state.files
+    -- Resolve #include directives recursively, using path-aware resolution
+    -- This follows Clingo's behavior: try CWD first, then relative to including file
+    let fullProgram = Clingo.resolveIncludesWithPath entryProgram entryFile resolver
     result <- H.liftAff $ Clingo.run fullProgram numModels
     let display = case result of
           Clingo.Satisfiable res ->

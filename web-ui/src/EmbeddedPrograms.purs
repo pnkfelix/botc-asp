@@ -6,19 +6,27 @@ module EmbeddedPrograms
   , playersLp
   , instLp
   , typesLp
+  , embeddedFileList
+  , EmbeddedFile
   ) where
 
--- | Core game rules from botc.lp
+-- | An embedded file with its path and content
+type EmbeddedFile = { path :: String, content :: String }
+
+-- | All embedded files as an array of {path, content} records
+foreign import embeddedFileList :: Array EmbeddedFile
+
+-- | Core game rules from botc.lp (legacy export)
 foreign import botcLp :: String
 
--- | Trouble Brewing script from tb.lp
+-- | Trouble Brewing script from tb.lp (legacy export)
 foreign import tbLp :: String
 
--- | Player configuration from players.lp
+-- | Player configuration from players.lp (legacy export)
 foreign import playersLp :: String
 
--- | Instance/query constraints from inst.lp
+-- | Instance/query constraints from inst.lp (legacy export)
 foreign import instLp :: String
 
--- | Type checking constraints from types.lp
+-- | Type checking constraints from types.lp (legacy export)
 foreign import typesLp :: String

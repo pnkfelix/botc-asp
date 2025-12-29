@@ -9,6 +9,7 @@ module Clingo
   , init
   , restart
   , resolveIncludes
+  , resolveIncludesWithPath
   ) where
 
 import Prelude
@@ -70,6 +71,7 @@ foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
 foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
+foreign import resolveIncludesWithPathImpl :: String -> String -> Fn1 String (Nullable String) -> String
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
@@ -116,3 +118,12 @@ parseResult foreign' =
 resolveIncludes :: String -> (String -> Maybe String) -> String
 resolveIncludes program resolver =
   resolveIncludesImpl program (runFn1 \filename -> toNullable (resolver filename))
+
+-- | Resolve #include directives with path-aware resolution
+-- | currentFilePath: the path of the file being processed (for relative includes)
+-- | Path resolution follows Clingo's behavior:
+-- | 1. First try relative to the working directory (root)
+-- | 2. If not found, try relative to the directory of the including file
+resolveIncludesWithPath :: String -> String -> (String -> Maybe String) -> String
+resolveIncludesWithPath program currentFilePath resolver =
+  resolveIncludesWithPathImpl program currentFilePath (runFn1 \filename -> toNullable (resolver filename))
