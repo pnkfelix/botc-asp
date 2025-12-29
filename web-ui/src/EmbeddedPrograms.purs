@@ -7,8 +7,14 @@ module EmbeddedPrograms
   , instLp
   , typesLp
   , embeddedFileList
+  , embeddedFilesMap
   , EmbeddedFile
   ) where
+
+import Prelude
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Tuple (Tuple(..))
 
 -- | An embedded file with its path and content
 type EmbeddedFile = { path :: String, content :: String }
@@ -30,3 +36,7 @@ foreign import instLp :: String
 
 -- | Type checking constraints from types.lp (legacy export)
 foreign import typesLp :: String
+
+-- | Convert embeddedFileList to a Map for efficient path lookups
+embeddedFilesMap :: Map String String
+embeddedFilesMap = Map.fromFoldable $ map (\f -> Tuple f.path f.content) embeddedFileList

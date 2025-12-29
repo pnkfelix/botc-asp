@@ -116,7 +116,7 @@ isRootFile path = getParentDir path == ""
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { files: foldl (\m f -> Map.insert f.path f.content m) Map.empty EP.embeddedFileList
+  { files: EP.embeddedFilesMap  -- Use Map for efficient lookups
   , currentFile: "inst.lp"  -- Start with instance file selected
   , showFileDirectory: false
   , expandedDirs: Set.empty  -- All directories collapsed initially
