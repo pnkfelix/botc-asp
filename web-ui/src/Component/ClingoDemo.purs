@@ -572,7 +572,7 @@ renderResult state = case state.result of
                   ]
               , HH.span
                   [ HP.style "font-size: 11px; color: #888; font-style: italic;" ]
-                  [ HH.text "and, or, not, () for grouping" ]
+                  [ HH.text $ "Using: \"" <> state.outputFilter <> "\"" ]
               ]
           , HH.div
               [ HP.id "answer-set-display"
