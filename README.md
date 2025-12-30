@@ -1,5 +1,7 @@
 # Blood on the Clocktower - ASP Game Explorer
 
+> **🎮 Try it now: [pnkfx.org/botc-asp](https://pnkfx.org/botc-asp/)**
+
 A tool for exploring and analyzing [Blood on the Clocktower](https://bloodontheclocktower.com/) games using Answer Set Programming (ASP) with a web-based interface.
 
 ## What is this?
@@ -40,7 +42,7 @@ The web UI runs Clingo entirely in the browser via WebAssembly. Features:
 - Mobile-friendly predicate navigator for exploring code
 - Click-to-navigate references in ASP source
 
-**Live demo:** https://pnkfelix.github.io/botc-asp/
+**Live demo:** https://pnkfx.org/botc-asp/
 
 ## Building
 
