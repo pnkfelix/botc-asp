@@ -12,6 +12,11 @@ needs_night(3).
 :- not distrib(librarian).
 :- not distrib(investigator).
 
+% Anchor a few players to specific tokens to reduce solution jumping
+received(felix, chef).
+received(amanda, poisoner).
+received(rob, washerwoman).
+
 % ===========================================================================
 % Example: Player-visible constraints using simplified st_tells
 % ===========================================================================
