@@ -17,7 +17,7 @@ module AnswerSetParser
 import Prelude
 
 import Data.Array (filter, mapMaybe, sortBy, nub, head, findIndex, index)
-import Data.Foldable (elem, all)
+import Data.Foldable (elem, all, foldl)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
 import Data.Ord (comparing)
@@ -552,7 +552,9 @@ extractTimelineWithSources parsedAtoms =
   let
     stTellsEvents = mapMaybe toStTellsEvent parsedAtoms
     playerChoosesEvents = mapMaybe toPlayerChoosesEvent parsedAtoms
-    tokenPlacedEvents = mapMaybe toTokenPlacedEvent parsedAtoms
+    -- Only include TokenPlaced events for reminders that FIRST appear at each time
+    -- (reminder_on represents accumulated state, not the action of placing)
+    tokenPlacedEvents = filterNewTokenPlacements $ mapMaybe toTokenPlacedEvent parsedAtoms
     executionEvents = mapMaybe toExecutionEvent parsedAtoms
   in
     sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents)
@@ -572,6 +574,32 @@ extractTimelineWithSources parsedAtoms =
     toExecutionEvent { atom: Executed player day, original } =
       Just $ Execution { day, player, sourceAtom: original }
     toExecutionEvent _ = Nothing
+
+    -- Filter TokenPlaced events to only keep the earliest occurrence of each token+player
+    filterNewTokenPlacements :: Array TimelineEvent -> Array TimelineEvent
+    filterNewTokenPlacements events =
+      let
+        -- Group by token+player key, keeping only the earliest time for each
+        withKeys = map (\e -> case e of
+          TokenPlaced r -> { key: r.token <> ":" <> r.player, time: r.time, event: e }
+          _ -> { key: "", time: Night 0 0 0, event: e }) events
+        -- Find earliest time for each key
+        earliestTimes = foldl (\acc item ->
+          case lookup item.key acc of
+            Nothing -> acc <> [{ key: item.key, time: item.time }]
+            Just existingTime ->
+              if compareTimePoints item.time existingTime == LT
+                then map (\x -> if x.key == item.key then { key: item.key, time: item.time } else x) acc
+                else acc
+          ) [] withKeys
+        -- Filter to only keep events at their earliest time
+        isEarliest item = case lookup item.key earliestTimes of
+          Just t -> item.time == t
+          Nothing -> false
+      in
+        map _.event $ filter isEarliest withKeys
+
+    lookup key arr = map _.time $ head $ filter (\x -> x.key == key) arr
 
     compareEvents e1 e2 = case e1, e2 of
       RoleAction r1, RoleAction r2 -> compareTimePoints r1.time r2.time
