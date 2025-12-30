@@ -3,3 +3,4 @@
 # Host-specific timing history files
 *.timings.*.json
 web-ui/src/EmbeddedPrograms.js
+web-ui/src/BuildInfo.js
