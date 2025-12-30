@@ -889,21 +889,21 @@ handleAction = case _ of
                 H.modify_ \s -> s { scrollNotification = Just $ "Could not find '" <> sourceAtom <> "' in the answer set" }
                 -- Clear notification after 3 seconds
                 _ <- H.fork do
-                  Aff.delay (Milliseconds 3000.0)
+                  H.liftAff $ Aff.delay (Milliseconds 3000.0)
                   H.modify_ \s -> s { scrollNotification = Nothing }
                 pure unit
             else do
               -- Notify user that the model is not on the current page
               H.modify_ \s -> s { scrollNotification = Just $ "Model " <> show (selectedIdx + 1) <> " is not on the current page" }
               _ <- H.fork do
-                Aff.delay (Milliseconds 3000.0)
+                H.liftAff $ Aff.delay (Milliseconds 3000.0)
                 H.modify_ \s -> s { scrollNotification = Nothing }
               pure unit
         else do
           -- Empty sourceAtom - this shouldn't normally happen
           H.modify_ \s -> s { scrollNotification = Just $ "No source atom for " <> predicateName <> " event" }
           _ <- H.fork do
-            Aff.delay (Milliseconds 3000.0)
+            H.liftAff $ Aff.delay (Milliseconds 3000.0)
             H.modify_ \s -> s { scrollNotification = Nothing }
           pure unit
     TG.ReminderMoved { token, fromPlayer, toPlayer, time } -> do
