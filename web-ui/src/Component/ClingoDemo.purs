@@ -80,7 +80,7 @@ answerSetPageSize = 20
 
 -- | List of available file paths derived from embedded files
 availableFiles :: Array String
-availableFiles = map _.path EP.embeddedFileList
+availableFiles = Map.keys EP.lpFilesMap
 
 -- | Get list of all unique directories from file paths
 getDirectories :: Array String -> Array String
@@ -116,7 +116,7 @@ isRootFile path = getParentDir path == ""
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { files: EP.embeddedFilesMap  -- Use Map for efficient lookups
+  { files: EP.lpFilesMap  -- Use Map for efficient lookups
   , currentFile: "inst.lp"  -- Start with instance file selected
   , showFileDirectory: false
   , expandedDirs: Set.empty  -- All directories collapsed initially
