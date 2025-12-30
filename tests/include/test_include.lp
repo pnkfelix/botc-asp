@@ -1,8 +1,8 @@
 % Test file to verify #include directory traversal works
 % This should include a role from a subdirectory
 
-#include "roles/test/test_role.lp".
-#include "players.lp".
+#include "../../roles/test/test_role.lp".
+#include "../../players.lp".
 
 #const player_count = 7.
 
