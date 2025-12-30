@@ -17,38 +17,9 @@ received(felix, chef).
 received(amanda, poisoner).
 received(rob, washerwoman).
 
-% ===========================================================================
-% Example: Player-visible constraints using simplified st_tells
-% ===========================================================================
-% The simplified st_tells predicates let you express what players observed
-% without needing implementation details like timestamps or wrapper terms.
-%
-% Info values are unwrapped for convenience:
-%   count(N) -> N      (chef, empath)
-%   info(P1,P2,R) -> R, P1, P2 (washerwoman, librarian, investigator)
-%   point(R) -> R      (undertaker, ravenkeeper)
-%   yes/no -> yes/no   (fortune_teller)
-%
-% --- st_tells/2: for one-time info or when night doesn't matter ---
-%   :- not st_tells(chef, 2).             % chef was told 2
-%   :- not st_tells(washerwoman, chef).   % washerwoman was told "chef"
-%   :- not st_tells(washerwoman, alice).  % washerwoman pointed to alice
-%   :- not st_tells(washerwoman, bob).    % washerwoman pointed to bob
-%   :- not st_tells(undertaker, imp).     % undertaker learned "imp"
-%   :- not st_tells(fortune_teller, yes). % FT was told yes (at some point)
-%
-% --- st_tells/3: includes night number for recurring info roles ---
-%   :- not st_tells(empath, 1, 2).          % empath told 1 on night 2
-%   :- not st_tells(fortune_teller, yes, 1). % FT told yes on night 1
-%   :- not st_tells(fortune_teller, no, 3).  % FT told no on night 3
-%   :- not st_tells(undertaker, chef, 2).   % undertaker learned chef on night 2
-%
-% Can also query by player name:
-%   :- not st_tells(amanda, 2).      % amanda was told 2
-%   :- not st_tells(amanda, 1, 2).   % amanda was told 1 on night 2
-%
-% These derive from st_tells_core(Role, Player, Info, Time), the detailed form.
-% ===========================================================================
+% st_tells predicates for player-observed info (unwrapped for convenience):
+%   st_tells(role_or_player, value)           e.g. st_tells(chef, 2)
+%   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
 
 #show distrib/1.
 #show assigned/3.
