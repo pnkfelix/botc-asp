@@ -880,6 +880,23 @@ handleAction = case _ of
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
+    TG.RoleMoved { role, fromPlayer, toPlayer, time } -> do
+      -- Modify inst.lp to add a constraint for the new role assignment
+      state <- H.get
+      let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+      -- Convert time to an integer for assigned/3 predicate
+      -- For Night 1 (setup), use 0; otherwise use night number
+      let timeIdx = timePointToAssignedTime time
+      -- Create the new constraint (forces toPlayer to have this role at this time)
+      let newConstraint = ":- not assigned(" <> show timeIdx <> ", " <> toPlayer <> ", " <> role <> ")."
+      -- Create the old constraint pattern to comment out (the previous drag assignment for this role)
+      let oldConstraintPattern = ":- not assigned(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
+      -- Modify the content: comment out old constraint if present, add new one
+      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
+      -- Update the virtual filesystem
+      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
+      -- Re-run Clingo with the new constraints
+      handleAction RunClingo
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
@@ -923,3 +940,29 @@ commentOutIfMatches patternStr line =
     if trimmedLine == trimmedPattern && firstChar /= "%"
       then "% " <> line <> "  % commented out by drag"
       else line
+
+-- | Convert a TimePoint to an integer time index for assigned/3 predicate
+-- Night 1 (any phase) maps to 0 (initial assignment)
+-- Other nights map to their night number
+timePointToAssignedTime :: AnswerSet.TimePoint -> Int
+timePointToAssignedTime (AnswerSet.Night 1 _ _) = 0
+timePointToAssignedTime (AnswerSet.Night n _ _) = n
+timePointToAssignedTime (AnswerSet.Day n _) = n
+timePointToAssignedTime (AnswerSet.UnknownTime _) = 0
+
+-- | Modify inst.lp to add a new role assignment constraint and comment out conflicting one
+modifyInstLpForRole :: String -> String -> String -> String
+modifyInstLpForRole content oldPattern newConstraint =
+  let
+    -- Split content into lines
+    contentLines = String.split (String.Pattern "\n") content
+    -- Comment out any existing line matching the old pattern
+    modifiedLines = map (commentOutIfMatches oldPattern) contentLines
+    -- Check if the new constraint already exists
+    hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
+    -- Add the new constraint at the end if not already present
+    finalLines = if hasNewConstraint
+                   then modifiedLines
+                   else modifiedLines <> ["", "% Role assignment constraint (added by drag)", newConstraint]
+  in
+    intercalate "\n" finalLines
