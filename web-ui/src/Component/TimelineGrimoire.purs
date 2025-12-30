@@ -33,9 +33,6 @@ import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
-import Web.TouchEvent.TouchEvent (TouchEvent, toEvent, touches, changedTouches) as TE
-import Web.TouchEvent.TouchList (item) as TL
-import Web.TouchEvent.Touch (clientX, clientY) as Touch
 
 -- | Output events from the component
 data Output
@@ -85,10 +82,6 @@ data Action
   | DragMove MouseEvent
   | EndDrag MouseEvent
   | CancelDrag
-  -- Touch events for drag (mobile support)
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TE.TouchEvent }
-  | DragMoveTouch TE.TouchEvent
-  | EndDragTouch TE.TouchEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -285,10 +278,6 @@ renderGrimoire state =
                   then [ HE.onMouseMove DragMove
                        , HE.onMouseUp EndDrag
                        , HE.onMouseLeave \_ -> CancelDrag
-                       -- Touch events for mobile
-                       , HE.onTouchMove DragMoveTouch
-                       , HE.onTouchEnd EndDragTouch
-                       , HE.onTouchCancel \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -493,9 +482,8 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named (getReminderColor reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
-          , HP.style "cursor: grab; touch-action: none;"  -- touch-action: none prevents scroll during drag
+          , HP.style "cursor: grab;"
           , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
-          , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, touchEvent: evt }
           ]
       -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
@@ -819,60 +807,6 @@ handleAction = case _ of
   CancelDrag -> do
     H.modify_ \s -> s { dragging = Nothing }
 
-  -- Touch event handlers (mobile support)
-  StartDragReminderTouch { reminder, touchEvent } -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    let coords = getTouchCoords touchEvent
-    H.modify_ \s -> s
-      { dragging = Just
-          { reminder
-          , startX: coords.x
-          , startY: coords.y
-          , currentX: coords.x
-          , currentY: coords.y
-          , targetPlayer: Just reminder.player
-          }
-      }
-
-  DragMoveTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        let coords = getTouchCoords touchEvent
-        let gameState = case state.selectedTime of
-              Just t -> ASP.buildGameState state.atoms t
-              Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
-        let targetPlayer = findClosestPlayer coords.x coords.y 250.0 250.0 180.0 (length gameState.players) gameState.players
-        H.modify_ \s -> s
-          { dragging = Just ds
-              { currentX = coords.x
-              , currentY = coords.y
-              , targetPlayer = targetPlayer
-              }
-          }
-
-  EndDragTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        H.modify_ \s -> s { dragging = Nothing }
-        case ds.targetPlayer of
-          Just toPlayer | toPlayer /= ds.reminder.player -> do
-            case state.selectedTime of
-              Just time ->
-                H.raise $ ReminderMoved
-                  { token: ds.reminder.token
-                  , fromPlayer: ds.reminder.player
-                  , toPlayer
-                  , time
-                  }
-              Nothing -> pure unit
-          _ -> pure unit
-
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
   Number ->  -- mouseX
@@ -901,18 +835,3 @@ findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
   in case closest of
     Just p | p.dist < 60.0 -> Just p.name
     _ -> Nothing
-
--- | Extract clientX/clientY from a TouchEvent
--- Uses touches for touchstart/touchmove, changedTouches for touchend
-getTouchCoords :: TE.TouchEvent -> { x :: Number, y :: Number }
-getTouchCoords te =
-  let
-    -- Try touches first, fall back to changedTouches
-    touchList = TE.touches te
-    changedList = TE.changedTouches te
-    maybeTouch = case TL.item 0 touchList of
-      Just t -> Just t
-      Nothing -> TL.item 0 changedList
-  in case maybeTouch of
-    Just touch -> { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
-    Nothing -> { x: 0.0, y: 0.0 }
