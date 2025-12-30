@@ -31,11 +31,12 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
-import Web.Event.Event (preventDefault)
+import Web.Event.Event (Event, EventType(..), preventDefault)
+import Web.Event.Event as Event
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
-import Web.TouchEvent (TouchEvent)
-import Web.TouchEvent as TE
+import Web.TouchEvent.TouchEvent (TouchEvent, fromEvent)
+import Web.TouchEvent.TouchEvent as TE
 import Web.TouchEvent.TouchList as TL
 import Web.TouchEvent.Touch as Touch
 import ElementHitTest (findPlayerAtPoint)
@@ -94,10 +95,10 @@ data Action
   | StartDragReminderMouse { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: MouseEvent }
   | DragMoveMouse MouseEvent
   | EndDragMouse MouseEvent
-  -- Touch events for HTML view (mobile support)
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: TouchEvent }
-  | DragMoveTouch TouchEvent
-  | EndDragTouch TouchEvent
+  -- Touch events for HTML view (mobile support) - use raw Event, convert in handler
+  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: Event }
+  | DragMoveTouch Event
+  | EndDragTouch Event
   | CancelDrag
 
 -- | The Halogen component with output events
@@ -602,9 +603,9 @@ renderHtmlGrimoire state =
                   then [ HE.onMouseMove DragMoveMouse
                        , HE.onMouseUp EndDragMouse
                        , HE.onMouseLeave \_ -> CancelDrag
-                       , HE.onTouchMove DragMoveTouch
-                       , HE.onTouchEnd EndDragTouch
-                       , HE.onTouchCancel \_ -> CancelDrag
+                       , HE.handler (EventType "touchmove") DragMoveTouch
+                       , HE.handler (EventType "touchend") EndDragTouch
+                       , HE.handler (EventType "touchcancel") \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -956,9 +957,9 @@ handleAction = case _ of
 
   -- Touch events for HTML view (mobile support)
   StartDragReminderTouch { reminder, event } -> do
-    liftEffect $ preventDefault (TE.toEvent event)
-    -- Get coordinates from first touch
-    case getTouchCoords event of
+    liftEffect $ preventDefault event
+    -- Get coordinates from first touch (convert Event to TouchEvent)
+    case getTouchCoordsFromEvent event of
       Nothing -> pure unit
       Just { x: touchX, y: touchY } ->
         H.modify_ \s -> s
@@ -973,12 +974,12 @@ handleAction = case _ of
           }
 
   DragMoveTouch event -> do
-    liftEffect $ preventDefault (TE.toEvent event)
+    liftEffect $ preventDefault event
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        case getTouchCoords event of
+        case getTouchCoordsFromEvent event of
           Nothing -> pure unit
           Just { x: touchX, y: touchY } -> do
             targetPlayer <- liftEffect $ findPlayerAtPoint touchX touchY
@@ -991,7 +992,7 @@ handleAction = case _ of
               }
 
   EndDragTouch event -> do
-    liftEffect $ preventDefault (TE.toEvent event)
+    liftEffect $ preventDefault event
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
@@ -1045,10 +1046,13 @@ findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
     Just p | p.dist < 60.0 -> Just p.name
     _ -> Nothing
 
--- | Extract coordinates from first touch in a TouchEvent
-getTouchCoords :: TouchEvent -> Maybe { x :: Number, y :: Number }
-getTouchCoords event =
-  let touches = TE.touches event
-  in case TL.item 0 touches of
+-- | Extract coordinates from first touch in a raw Event (converts to TouchEvent first)
+getTouchCoordsFromEvent :: Event -> Maybe { x :: Number, y :: Number }
+getTouchCoordsFromEvent event =
+  case fromEvent event of
     Nothing -> Nothing
-    Just touch -> Just { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
+    Just touchEvent ->
+      let touches = TE.touches touchEvent
+      in case TL.item 0 touches of
+        Nothing -> Nothing
+        Just touch -> Just { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
