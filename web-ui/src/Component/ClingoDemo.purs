@@ -10,7 +10,7 @@ import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
 import FilterExpression as FE
-import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
+import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
 import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -35,6 +35,13 @@ type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
 _timelineGrimoire :: Proxy "timelineGrimoire"
 _timelineGrimoire = Proxy
 
+-- | An entry in the undo/redo stack for token drag operations
+-- Stores the inst.lp content before the change and a description
+type UndoEntry =
+  { instLpContent :: String   -- inst.lp content before the change
+  , description :: String     -- Human-readable description of the change
+  }
+
 -- | Component state
 type State =
   { files :: Map.Map String String  -- Virtual filesystem: filepath -> content
@@ -55,6 +62,9 @@ type State =
   , outputFilter :: String          -- Boolean expression to filter atoms
   -- Scroll notification (shown briefly when timeline click can't find the atom)
   , scrollNotification :: Maybe String
+  -- Undo/redo stacks for token drag operations
+  , undoStack :: Array UndoEntry
+  , redoStack :: Array UndoEntry
   }
 
 -- | How to display results
@@ -83,6 +93,8 @@ data Action
   | JumpToReference String Int  -- sourceFile, lineNumber
   | HandleTimelineEvent TG.Output  -- Handle timeline event clicks
   | ClearScrollNotification     -- Clear the scroll notification message
+  | Undo                        -- Undo the last token drag operation
+  | Redo                        -- Redo the last undone token drag operation
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -141,6 +153,8 @@ initialState =
   , selectedPredicate: Nothing
   , outputFilter: ""       -- No filtering by default
   , scrollNotification: Nothing  -- No notification initially
+  , undoStack: []          -- Empty undo stack
+  , redoStack: []          -- Empty redo stack
   }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
@@ -551,6 +565,42 @@ renderResult state = case state.result of
               , HH.p
                   [ HP.style "font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic;" ]
                   [ HH.text "Click on timeline events to highlight the corresponding atom in the answer set below." ]
+              -- Undo/Redo buttons for token drag operations
+              , HH.div
+                  [ HP.style "display: flex; gap: 10px; margin-bottom: 10px;" ]
+                  [ HH.button
+                      [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
+                          <> "background: " <> (if null state.undoStack then "#ccc" else "#FF9800") <> "; "
+                          <> "color: white; border: none; border-radius: 4px; "
+                          <> "display: flex; align-items: center; gap: 6px;"
+                      , HE.onClick \_ -> Undo
+                      , HP.disabled (null state.undoStack)
+                      , HP.title $ if null state.undoStack then "Nothing to undo" else "Undo last token drag"
+                      ]
+                      [ HH.text "↩ Undo"
+                      , if not (null state.undoStack)
+                        then HH.span
+                          [ HP.style "font-size: 11px; opacity: 0.8;" ]
+                          [ HH.text $ "(" <> show (length state.undoStack) <> ")" ]
+                        else HH.text ""
+                      ]
+                  , HH.button
+                      [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
+                          <> "background: " <> (if null state.redoStack then "#ccc" else "#2196F3") <> "; "
+                          <> "color: white; border: none; border-radius: 4px; "
+                          <> "display: flex; align-items: center; gap: 6px;"
+                      , HE.onClick \_ -> Redo
+                      , HP.disabled (null state.redoStack)
+                      , HP.title $ if null state.redoStack then "Nothing to redo" else "Redo last undone action"
+                      ]
+                      [ HH.text "↪ Redo"
+                      , if not (null state.redoStack)
+                        then HH.span
+                          [ HP.style "font-size: 11px; opacity: 0.8;" ]
+                          [ HH.text $ "(" <> show (length state.redoStack) <> ")" ]
+                        else HH.text ""
+                      ]
+                  ]
               , HH.slot _timelineGrimoire unit TG.component atoms HandleTimelineEvent
               ]
           Nothing -> HH.text ""
@@ -910,6 +960,10 @@ handleAction = case _ of
       -- Modify inst.lp to add a constraint for the new reminder placement
       state <- H.get
       let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+      -- Push current state onto undo stack (before making changes)
+      let undoEntry = { instLpContent: instContent
+                      , description: "Move " <> token <> " from " <> fromPlayer <> " to " <> toPlayer
+                      }
       -- Format the time point for ASP
       let timeStr = formatTimePointForASP time
       -- Create the new constraint
@@ -918,14 +972,21 @@ handleAction = case _ of
       let oldConstraintPattern = ":- not reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
       -- Modify the content: comment out old constraint if present, add new one
       let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint
-      -- Update the virtual filesystem
-      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
+      -- Update the virtual filesystem, push undo entry, and clear redo stack
+      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                        , undoStack = snoc s.undoStack undoEntry
+                        , redoStack = []  -- Clear redo stack on new action
+                        }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
     TG.RoleMoved { role, fromPlayer, toPlayer, time } -> do
       -- Modify inst.lp to add a constraint for the new role assignment
       state <- H.get
       let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+      -- Push current state onto undo stack (before making changes)
+      let undoEntry = { instLpContent: instContent
+                      , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                      }
       -- Convert time to an integer for assigned/3 predicate
       -- For Night 1 (setup), use 0; otherwise use night number
       let timeIdx = timePointToAssignedTime time
@@ -935,13 +996,52 @@ handleAction = case _ of
       let oldConstraintPattern = ":- not assigned(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
       -- Modify the content: comment out old constraint if present, add new one
       let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
-      -- Update the virtual filesystem
-      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
+      -- Update the virtual filesystem, push undo entry, and clear redo stack
+      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                        , undoStack = snoc s.undoStack undoEntry
+                        , redoStack = []  -- Clear redo stack on new action
+                        }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
 
   ClearScrollNotification ->
     H.modify_ \s -> s { scrollNotification = Nothing }
+
+  Undo -> do
+    state <- H.get
+    case unsnoc state.undoStack of
+      Nothing -> pure unit  -- Nothing to undo
+      Just { init: remainingUndo, last: undoEntry } -> do
+        -- Save current state to redo stack before restoring
+        let currentInstLp = fromMaybe "" $ Map.lookup "inst.lp" state.files
+        let redoEntry = { instLpContent: currentInstLp
+                        , description: undoEntry.description
+                        }
+        -- Restore the previous inst.lp content
+        H.modify_ \s -> s { files = Map.insert "inst.lp" undoEntry.instLpContent s.files
+                          , undoStack = remainingUndo
+                          , redoStack = snoc s.redoStack redoEntry
+                          }
+        -- Re-run Clingo to update the grimoire
+        handleAction RunClingo
+
+  Redo -> do
+    state <- H.get
+    case unsnoc state.redoStack of
+      Nothing -> pure unit  -- Nothing to redo
+      Just { init: remainingRedo, last: redoEntry } -> do
+        -- Save current state to undo stack before re-applying
+        let currentInstLp = fromMaybe "" $ Map.lookup "inst.lp" state.files
+        let undoEntry = { instLpContent: currentInstLp
+                        , description: redoEntry.description
+                        }
+        -- Restore the redo'd inst.lp content
+        H.modify_ \s -> s { files = Map.insert "inst.lp" redoEntry.instLpContent s.files
+                          , undoStack = snoc s.undoStack undoEntry
+                          , redoStack = remainingRedo
+                          }
+        -- Re-run Clingo to update the grimoire
+        handleAction RunClingo
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
