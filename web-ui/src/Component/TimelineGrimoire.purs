@@ -579,7 +579,7 @@ renderDragFeedback (Just ds) centerX centerY radius playerCount players =
           ]
       ]
 
--- | Render HTML-based grimoire with grid layout (supports pointer events for mouse/touch/pen)
+-- | Render HTML-based grimoire with hollow rectangle layout (players on perimeter, empty center)
 renderHtmlGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
 renderHtmlGrimoire state =
   let
@@ -588,13 +588,22 @@ renderHtmlGrimoire state =
       Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
     playerCount = length gameState.players
     isDragging = isJust state.dragging
+    -- Calculate grid dimensions for hollow rectangle
+    -- For n players, we want a grid where perimeter = n
+    -- Perimeter of a×b grid = 2a + 2b - 4 (corners counted once)
+    -- We aim for roughly square grids
+    gridDims = calculateGridDimensions playerCount
+    cols = gridDims.cols
+    rows = gridDims.rows
+    -- Assign players to perimeter positions (clockwise from top-left)
+    playerPositions = assignPerimeterPositions playerCount cols rows
   in
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 15px;" ]
-      [ -- Player grid
+      [ -- Player grid with hollow center
         HH.div
-          ( [ HP.style $ "display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); "
-                <> "gap: 12px; min-height: 200px;"
+          ( [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
+                <> "gap: 8px; min-height: 200px;"
                 <> if isDragging then " touch-action: none;" else ""
             ] <> (if isDragging
                   then [ HE.onMouseMove DragMoveMouse
@@ -607,7 +616,7 @@ renderHtmlGrimoire state =
                   else [])
           )
           ( if playerCount > 0
-              then map (renderHtmlPlayer gameState.reminders state.dragging) gameState.players
+              then renderHollowGrid gameState.reminders state.dragging gameState.players playerPositions cols rows
               else [ HH.div
                        [ HP.style "grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;" ]
                        [ HH.text "No player data - add #show chair/2." ]
@@ -1013,6 +1022,67 @@ handleAction = case _ of
 
   ToggleViewMode -> do
     H.modify_ \s -> s { viewMode = if s.viewMode == SvgView then HtmlView else SvgView }
+
+-- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
+-- For n players, perimeter = 2*cols + 2*rows - 4 = n
+-- We want roughly square grids, so cols ≈ rows
+calculateGridDimensions :: Int -> { cols :: Int, rows :: Int }
+calculateGridDimensions n
+  | n <= 4 = { cols: n, rows: 1 }  -- Single row for small player counts
+  | n <= 6 = { cols: 3, rows: 2 }  -- 3x2 = perimeter of 6
+  | n <= 8 = { cols: 3, rows: 3 }  -- 3x3 = perimeter of 8
+  | n <= 10 = { cols: 4, rows: 3 } -- 4x3 = perimeter of 10
+  | n <= 12 = { cols: 4, rows: 4 } -- 4x4 = perimeter of 12
+  | n <= 14 = { cols: 5, rows: 4 } -- 5x4 = perimeter of 14
+  | n <= 16 = { cols: 5, rows: 5 } -- 5x5 = perimeter of 16
+  | otherwise = { cols: 6, rows: 5 } -- 6x5 = perimeter of 18 (max supported nicely)
+
+-- | Assign grid positions to players around the perimeter (clockwise from top-left)
+-- Returns array of {row, col} for each player index
+assignPerimeterPositions :: Int -> Int -> Int -> Array { row :: Int, col :: Int }
+assignPerimeterPositions playerCount cols rows =
+  let
+    -- Walk around the perimeter: top row (left to right), right column (top to bottom),
+    -- bottom row (right to left), left column (bottom to top)
+    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
+    rightCol = map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
+    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
+    leftCol = map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
+    allPositions = topRow <> rightCol <> bottomRow <> leftCol
+  in
+    take playerCount allPositions
+
+-- | Render the hollow grid with players on perimeter and empty center
+renderHollowGrid :: forall cs m.
+  Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
+  Maybe DragState ->
+  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  Array { row :: Int, col :: Int } ->
+  Int ->  -- cols
+  Int ->  -- rows
+  Array (H.ComponentHTML Action cs m)
+renderHollowGrid reminders dragState players positions cols rows =
+  let
+    -- Create a lookup from position to player
+    positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
+    -- Generate all grid cells
+    allCells = do
+      r <- 0 .. (rows - 1)
+      c <- 0 .. (cols - 1)
+      pure { row: r, col: c }
+    -- For each cell, either render a player or empty/center cell
+    renderCell cell =
+      case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
+        Just { player } -> renderHtmlPlayer reminders dragState player
+        Nothing ->
+          -- Empty center cell
+          if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
+            then HH.div
+              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;" ]
+              []
+            else HH.div [] []  -- Edge position with no player (shouldn't happen normally)
+  in
+    map renderCell allCells
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
