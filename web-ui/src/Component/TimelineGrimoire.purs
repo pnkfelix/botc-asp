@@ -370,9 +370,17 @@ renderGrimoire state =
               [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #4CAF50; margin-right: 4px; vertical-align: middle;" ] []
               , HH.text "Alive"
               ]
-          , HH.span_
-              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #9e9e9e; margin-right: 4px; vertical-align: middle;" ] []
+          , HH.span [ HP.style "margin-right: 12px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #9e9e9e; position: relative; margin-right: 4px; vertical-align: middle;" ]
+                  [ HH.span [ HP.style "position: absolute; width: 14px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);" ] [] ]
               , HH.text "Dead"
+              ]
+          , HH.span_
+              [ HH.span [ HP.style "display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 3px solid #9e9e9e; position: relative; margin-right: 4px; vertical-align: middle;" ]
+                  [ HH.span [ HP.style "position: absolute; width: 14px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);" ] []
+                  , HH.span [ HP.style "position: absolute; width: 14px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);" ] []
+                  ]
+              , HH.text "No Vote"
               ]
           ]
       ]
@@ -403,7 +411,7 @@ renderPlayer :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->  -- reminders (sorted by placedAt)
   Maybe DragState ->  -- current drag state
   Int ->     -- index
-  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   H.ComponentHTML Action cs m
 renderPlayer centerX centerY radius playerCount reminders dragState idx player =
   let
@@ -449,6 +457,32 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
                      , SA.stroke (Named "#FFD700")
                      , SA.strokeWidth 2.0
                      , SA.strokeDashArray "4,4"
+                     ]
+                 ]
+            else [])
+      -- Death slash (downward \ from top-right to bottom-left)
+      <> (if not player.alive
+            then [ SE.line
+                     [ SA.x1 20.0
+                     , SA.y1 (-20.0)
+                     , SA.x2 (-20.0)
+                     , SA.y2 20.0
+                     , SA.stroke (Named "#1a1a1a")
+                     , SA.strokeWidth 4.0
+                     , SA.strokeLinecap "round"
+                     ]
+                 ]
+            else [])
+      -- Ghost vote used slash (upward / from top-left to bottom-right, forming X with death slash)
+      <> (if not player.alive && player.ghostVoteUsed
+            then [ SE.line
+                     [ SA.x1 (-20.0)
+                     , SA.y1 (-20.0)
+                     , SA.x2 20.0
+                     , SA.y2 20.0
+                     , SA.stroke (Named "#1a1a1a")
+                     , SA.strokeWidth 4.0
+                     , SA.strokeLinecap "round"
                      ]
                  ]
             else [])
@@ -543,7 +577,7 @@ renderDragFeedback :: forall cs m.
   Number ->  -- centerY
   Number ->  -- radius
   Int ->     -- playerCount
-  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   Array (H.ComponentHTML Action cs m)
 renderDragFeedback Nothing _ _ _ _ _ = []
 renderDragFeedback (Just ds) centerX centerY radius playerCount players =
@@ -628,9 +662,17 @@ renderHtmlGrimoire state =
               [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #4CAF50; margin-right: 3px; vertical-align: middle;" ] []
               , HH.text "Alive"
               ]
-          , HH.span_
-              [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #9e9e9e; margin-right: 3px; vertical-align: middle;" ] []
+          , HH.span [ HP.style "margin-right: 10px;" ]
+              [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #9e9e9e; position: relative; margin-right: 3px; vertical-align: middle;" ]
+                  [ HH.span [ HP.style "position: absolute; width: 10px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);" ] [] ]
               , HH.text "Dead"
+              ]
+          , HH.span_
+              [ HH.span [ HP.style "display: inline-block; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #9e9e9e; position: relative; margin-right: 3px; vertical-align: middle;" ]
+                  [ HH.span [ HP.style "position: absolute; width: 10px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);" ] []
+                  , HH.span [ HP.style "position: absolute; width: 10px; height: 2px; background: #1a1a1a; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg);" ] []
+                  ]
+              , HH.text "No Vote"
               ]
           ]
       ]
@@ -639,7 +681,7 @@ renderHtmlGrimoire state =
 renderHtmlPlayer :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   Maybe ASP.TimePoint ->  -- selected time for data attributes
-  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   H.ComponentHTML Action cs m
 renderHtmlPlayer reminders selectedTime player =
   let
@@ -649,13 +691,51 @@ renderHtmlPlayer reminders selectedTime player =
     timeStr = case selectedTime of
       Just t -> formatTimePoint t
       Nothing -> ""
+    -- Death/ghost vote slashes using CSS pseudo-element style gradient lines
+    deathSlashStyle = if not player.alive
+      then "position: relative; "
+      else ""
   in
     HH.div
       [ HP.style $ "background: " <> roleColor <> "; border-radius: 8px; padding: 10px; "
           <> "border: 3px solid " <> aliveColor <> "; "
-          <> "text-align: center; min-height: 80px;"
+          <> "text-align: center; min-height: 80px; "
+          <> deathSlashStyle
       , HP.attr (HH.AttrName "data-player") player.name
       ]
+      (
+      -- Death/ghost vote overlay slashes (rendered as absolute positioned div)
+      (if not player.alive
+        then [ HH.div
+                 [ HP.style $ "position: absolute; top: 0; left: 0; right: 0; bottom: 0; "
+                     <> "pointer-events: none; overflow: hidden; border-radius: 5px;"
+                 ]
+                 ([ -- Downward slash (\)
+                    HH.div
+                      [ HP.style $ "position: absolute; top: 50%; left: 50%; "
+                          <> "width: 120%; height: 4px; "
+                          <> "background: #1a1a1a; "
+                          <> "transform: translate(-50%, -50%) rotate(45deg); "
+                          <> "border-radius: 2px;"
+                      ]
+                      []
+                  ] <>
+                  -- Ghost vote used slash (/) - forms X with death slash
+                  (if player.ghostVoteUsed
+                    then [ HH.div
+                             [ HP.style $ "position: absolute; top: 50%; left: 50%; "
+                                 <> "width: 120%; height: 4px; "
+                                 <> "background: #1a1a1a; "
+                                 <> "transform: translate(-50%, -50%) rotate(-45deg); "
+                                 <> "border-radius: 2px;"
+                             ]
+                             []
+                         ]
+                    else [])
+                 )
+             ]
+        else [])
+      <>
       [ -- Player name
         HH.div
           [ HP.style "color: white; font-weight: bold; font-size: 12px; margin-bottom: 2px;" ]
@@ -686,7 +766,7 @@ renderHtmlPlayer reminders selectedTime player =
           else HH.div
             [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px;" ]
             (map (renderHtmlReminderToken selectedTime) playerReminders)
-      ]
+      ])
 
 -- | Render a single reminder token in HTML view (draggable via JS pointer events)
 renderHtmlReminderToken :: forall cs m.
@@ -1041,7 +1121,7 @@ assignPerimeterPositions playerCount cols rows =
 renderHollowGrid :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   Maybe ASP.TimePoint ->  -- selected time for data attributes
-  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   Array { row :: Int, col :: Int } ->
   Int ->  -- cols
   Int ->  -- rows
