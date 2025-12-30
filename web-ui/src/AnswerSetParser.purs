@@ -552,9 +552,10 @@ extractTimelineWithSources parsedAtoms =
   let
     stTellsEvents = mapMaybe toStTellsEvent parsedAtoms
     playerChoosesEvents = mapMaybe toPlayerChoosesEvent parsedAtoms
+    tokenPlacedEvents = mapMaybe toTokenPlacedEvent parsedAtoms
     executionEvents = mapMaybe toExecutionEvent parsedAtoms
   in
-    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> executionEvents)
+    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
       Just $ RoleAction { time, role, eventType: "st_tells", player, message, sourceAtom: original }
@@ -563,6 +564,10 @@ extractTimelineWithSources parsedAtoms =
     toPlayerChoosesEvent { atom: PlayerChooses role player choice time, original } =
       Just $ RoleAction { time, role, eventType: "player_chooses", player, message: choice, sourceAtom: original }
     toPlayerChoosesEvent _ = Nothing
+
+    toTokenPlacedEvent { atom: ReminderOn token player time, original } =
+      Just $ TokenPlaced { time, token, player, sourceAtom: original }
+    toTokenPlacedEvent _ = Nothing
 
     toExecutionEvent { atom: Executed player day, original } =
       Just $ Execution { day, player, sourceAtom: original }
