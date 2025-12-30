@@ -3,25 +3,33 @@
 //
 // Syntax:
 //   term       = literal substring to match (alphanumeric, underscore)
-//   !term      = negation (also -term)
-//   a | b      = OR
-//   a b        = AND (space-separated)
+//   !term      = negation (also -term, or "not term")
+//   a | b      = OR (also "a or b")
+//   a b        = AND (space-separated, also "a and b")
 //   (expr)     = grouping
 //
 // Examples:
 //   assigned           - atoms containing "assigned"
-//   !time              - atoms NOT containing "time"
-//   assigned | tells   - atoms containing "assigned" OR "tells"
-//   alice chef         - atoms containing both "alice" AND "chef"
-//   !(time | chair)    - atoms NOT containing "time" or "chair"
+//   not time           - atoms NOT containing "time"
+//   assigned or tells  - atoms containing "assigned" OR "tells"
+//   alice and chef     - atoms containing both "alice" AND "chef"
+//   not (time or chair) - atoms NOT containing "time" or "chair"
 
 // Token types
 const TOKEN_LITERAL = 'LITERAL';
 const TOKEN_NOT = 'NOT';
+const TOKEN_AND = 'AND';
 const TOKEN_OR = 'OR';
 const TOKEN_LPAREN = 'LPAREN';
 const TOKEN_RPAREN = 'RPAREN';
 const TOKEN_EOF = 'EOF';
+
+// Keywords (case-insensitive)
+const KEYWORDS = {
+  'and': TOKEN_AND,
+  'or': TOKEN_OR,
+  'not': TOKEN_NOT
+};
 
 // Tokenize input string
 function tokenize(input) {
@@ -81,7 +89,13 @@ function tokenize(input) {
         literal += input[i];
         i++;
       }
-      tokens.push({ type: TOKEN_LITERAL, value: literal });
+      // Check if it's a keyword (case-insensitive)
+      const keyword = KEYWORDS[literal.toLowerCase()];
+      if (keyword) {
+        tokens.push({ type: keyword, value: literal.toLowerCase() });
+      } else {
+        tokens.push({ type: TOKEN_LITERAL, value: literal });
+      }
       continue;
     }
 
@@ -138,6 +152,12 @@ function parse(input) {
       const term = parseUnary();
       if (!term) break;
       terms.push(term);
+
+      // Check for explicit 'and' keyword
+      if (peek().type === TOKEN_AND) {
+        consume(); // skip 'and'
+        continue;
+      }
 
       // Check if next token could start another term (for implicit AND)
       const next = peek();

@@ -565,14 +565,14 @@ renderResult state = case state.result of
                       [ HP.style $ "flex: 1; padding: 6px 8px; font-size: 12px; font-family: monospace; "
                           <> "border: 1px solid #ccc; border-radius: 4px; min-width: 150px;"
                       , HP.type_ HP.InputText
-                      , HP.placeholder "e.g., assigned | st_tells, !time, alice chef"
+                      , HP.placeholder "e.g., assigned or tells, not time, alice and chef"
                       , HP.value state.outputFilter
                       , HE.onValueInput SetOutputFilter
                       ]
                   ]
               , HH.span
                   [ HP.style "font-size: 11px; color: #888; font-style: italic;" ]
-                  [ HH.text "Syntax: term, !not, a | b (or), a b (and), (group)" ]
+                  [ HH.text "and, or, not (or: a b, a|b, !a)" ]
               ]
           , HH.div
               [ HP.id "answer-set-display"
