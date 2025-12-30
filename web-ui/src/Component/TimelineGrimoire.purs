@@ -32,6 +32,8 @@ import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 import Web.Event.Event (preventDefault)
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as ME
 import Web.PointerEvent (PointerEvent)
 import Web.PointerEvent as PE
 import ElementHitTest (findPlayerAtPoint)
@@ -86,10 +88,14 @@ data Action
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
-  -- Pointer events for drag (unified: works for mouse, touch, and pen)
-  | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: PointerEvent }
-  | DragMove PointerEvent
-  | EndDrag PointerEvent
+  -- Mouse events for SVG view (halogen-svg-elems doesn't support pointer/touch events)
+  | StartDragReminderMouse { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: MouseEvent }
+  | DragMoveMouse MouseEvent
+  | EndDragMouse MouseEvent
+  -- Pointer events for HTML view (unified: works for mouse, touch, and pen)
+  | StartDragReminderPointer { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: PointerEvent }
+  | DragMovePointer PointerEvent
+  | EndDragPointer PointerEvent
   | CancelDrag
 
 -- | The Halogen component with output events
@@ -297,12 +303,11 @@ renderGrimoire state =
             , SA.width width
             , SA.height height
             , HP.id "grimoire-svg"
-            , HP.style $ if isDragging then "cursor: grabbing; touch-action: none;" else ""
+            , HP.style $ if isDragging then "cursor: grabbing;" else ""
             ] <> (if isDragging
-                  then [ HE.onPointerMove DragMove
-                       , HE.onPointerUp EndDrag
-                       , HE.onPointerLeave \_ -> CancelDrag
-                       , HE.onPointerCancel \_ -> CancelDrag
+                  then [ HE.onMouseMove DragMoveMouse
+                       , HE.onMouseUp EndDragMouse
+                       , HE.onMouseLeave \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -507,8 +512,8 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named (getReminderColor reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
-          , HP.style "cursor: grab; touch-action: none;"
-          , HE.onPointerDown \evt -> StartDragReminder { reminder, event: evt }
+          , HP.style "cursor: grab;"
+          , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
           ]
       -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
@@ -592,8 +597,8 @@ renderHtmlGrimoire state =
                 <> "gap: 12px; min-height: 200px;"
                 <> if isDragging then " touch-action: none;" else ""
             ] <> (if isDragging
-                  then [ HE.onPointerMove DragMove
-                       , HE.onPointerUp EndDrag
+                  then [ HE.onPointerMove DragMovePointer
+                       , HE.onPointerUp EndDragPointer
                        , HE.onPointerLeave \_ -> CancelDrag
                        , HE.onPointerCancel \_ -> CancelDrag
                        ]
@@ -678,7 +683,7 @@ renderHtmlReminderToken _playerName reminder =
         <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
         <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
         <> "touch-action: none; user-select: none;"
-    , HE.onPointerDown \evt -> StartDragReminder { reminder, event: evt }
+    , HE.onPointerDown \evt -> StartDragReminderPointer { reminder, event: evt }
     ]
     [ HH.text $ abbreviateToken reminder.token ]
 
@@ -888,13 +893,67 @@ handleAction = case _ of
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo
 
-  StartDragReminder { reminder, event } -> do
-    -- Prevent default to avoid text selection during drag
+  -- Mouse events for SVG view (halogen-svg-elems doesn't support pointer events)
+  StartDragReminderMouse { reminder, event } -> do
+    liftEffect $ preventDefault (ME.toEvent event)
+    let mouseX = toNumber (ME.clientX event)
+    let mouseY = toNumber (ME.clientY event)
+    H.modify_ \s -> s
+      { dragging = Just
+          { reminder
+          , startX: mouseX
+          , startY: mouseY
+          , currentX: mouseX
+          , currentY: mouseY
+          , targetPlayer: Just reminder.player
+          }
+      }
+
+  DragMoveMouse event -> do
+    liftEffect $ preventDefault (ME.toEvent event)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        let mouseX = toNumber (ME.clientX event)
+        let mouseY = toNumber (ME.clientY event)
+        let gameState = case state.selectedTime of
+              Just t -> ASP.buildGameState state.atoms t
+              Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
+        let targetPlayer = findClosestPlayer mouseX mouseY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        H.modify_ \s -> s
+          { dragging = Just ds
+              { currentX = mouseX
+              , currentY = mouseY
+              , targetPlayer = targetPlayer
+              }
+          }
+
+  EndDragMouse event -> do
+    liftEffect $ preventDefault (ME.toEvent event)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        H.modify_ \s -> s { dragging = Nothing }
+        case ds.targetPlayer of
+          Just toPlayer | toPlayer /= ds.reminder.player -> do
+            case state.selectedTime of
+              Just time ->
+                H.raise $ ReminderMoved
+                  { token: ds.reminder.token
+                  , fromPlayer: ds.reminder.player
+                  , toPlayer
+                  , time
+                  }
+              Nothing -> pure unit
+          _ -> pure unit
+
+  -- Pointer events for HTML view (works with mouse, touch, and pen)
+  StartDragReminderPointer { reminder, event } -> do
     liftEffect $ preventDefault (PE.toEvent event)
-    -- Get coordinates from pointer event
     let pointerX = toNumber (PE.clientX event)
     let pointerY = toNumber (PE.clientY event)
-    -- Calculate initial target (the player currently owning the token)
     H.modify_ \s -> s
       { dragging = Just
           { reminder
@@ -906,7 +965,7 @@ handleAction = case _ of
           }
       }
 
-  DragMove event -> do
+  DragMovePointer event -> do
     liftEffect $ preventDefault (PE.toEvent event)
     state <- H.get
     case state.dragging of
@@ -914,14 +973,7 @@ handleAction = case _ of
       Just ds -> do
         let pointerX = toNumber (PE.clientX event)
         let pointerY = toNumber (PE.clientY event)
-        -- Find target player based on view mode
-        targetPlayer <- case state.viewMode of
-          HtmlView -> liftEffect $ findPlayerAtPoint pointerX pointerY
-          SvgView -> do
-            let gameState = case state.selectedTime of
-                  Just t -> ASP.buildGameState state.atoms t
-                  Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
-            pure $ findClosestPlayer pointerX pointerY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        targetPlayer <- liftEffect $ findPlayerAtPoint pointerX pointerY
         H.modify_ \s -> s
           { dragging = Just ds
               { currentX = pointerX
@@ -930,15 +982,13 @@ handleAction = case _ of
               }
           }
 
-  EndDrag event -> do
+  EndDragPointer event -> do
     liftEffect $ preventDefault (PE.toEvent event)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        -- Clear drag state first
         H.modify_ \s -> s { dragging = Nothing }
-        -- If there's a valid target and it's different from source, emit event
         case ds.targetPlayer of
           Just toPlayer | toPlayer /= ds.reminder.player -> do
             case state.selectedTime of
