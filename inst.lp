@@ -33,5 +33,6 @@ received(rob, washerwoman).
 % For grimoire/timeline rendering
 #show game_chair/2.
 #show alive/2.
+#show dead/2.
 #show st_tells/4.
 #show player_chooses/4.
