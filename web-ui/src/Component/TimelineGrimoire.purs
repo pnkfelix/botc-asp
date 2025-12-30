@@ -77,6 +77,7 @@ data Action
   = ReceiveAtoms (Array String)
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
+  -- Mouse events for drag
   | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, mouseEvent :: MouseEvent }
   | DragMove MouseEvent
   | EndDrag MouseEvent
@@ -472,11 +473,8 @@ renderReminderToken angleToCenter _total idx reminder =
     ry = dist * sin angleToCenter
   in
     SE.g
-      [ SA.transform [ SA.Translate rx ry ]
-      , HP.style "cursor: grab;"
-      , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
-      ]
-      [ -- Reminder circle
+      [ SA.transform [ SA.Translate rx ry ] ]
+      [ -- Reminder circle - attach drag handler here (circles have geometry, receive events)
         SE.circle
           [ SA.cx 0.0
           , SA.cy 0.0
@@ -484,8 +482,10 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named (getReminderColor reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
+          , HP.style "cursor: grab;"
+          , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
           ]
-      -- Reminder abbreviation
+      -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
           [ SA.x 0.0
           , SA.y 3.0
@@ -493,6 +493,7 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named "white")
           , SA.fontWeight FWeightBold
           , SA.fontSize (FontSizeLength (Px 6.0))
+          , HP.style "cursor: grab; pointer-events: none;"
           ]
           [ HH.text $ abbreviateToken reminder.token ]
       ]
