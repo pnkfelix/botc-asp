@@ -496,6 +496,7 @@ abbreviateToken t = case t of
   "inv_wrong" -> "INV?"
   "but_master" -> "BUT"
   "sla_no_ability" -> "SLA"
+  "drunk_is_drunk" -> "DRUNK"
   _ -> takeChars 3 t
   where
     takeChars n s = if S.length s <= n then s else fold (take n (S.split (Pattern "") s))
