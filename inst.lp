@@ -5,11 +5,12 @@
 #const player_count = 8.
 % We are demoing three nights, so we write needs_night(3).
 needs_night(3).
-assigned(0, felix, drunk).
-assigned(0, amanda, poisoner).
-assigned(0, rob, washerwoman).
-assigned(0, taylor, librarian).
-assigned(0, courtney, investigator).
+% These roles must be in play, but the solver chooses which players get them
+:- not distrib(drunk).
+:- not distrib(poisoner).
+:- not distrib(washerwoman).
+:- not distrib(librarian).
+:- not distrib(investigator).
 
 % ===========================================================================
 % Example: Player-visible constraints using simplified st_tells
