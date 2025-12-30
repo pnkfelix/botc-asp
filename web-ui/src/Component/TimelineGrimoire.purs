@@ -31,9 +31,12 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
-import Web.Event.Event (preventDefault)
+import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
-import TouchUtils (TouchEvent, touchClientX, touchClientY, touchToEvent)
+import Web.TouchEvent.TouchEvent (TouchEvent)
+import Web.TouchEvent.TouchEvent as TE
+import Web.TouchEvent.TouchList as TL
+import Web.TouchEvent.Touch as Touch
 
 -- | Output events from the component
 data Output
@@ -819,42 +822,40 @@ handleAction = case _ of
 
   -- Touch event handlers (mobile support)
   StartDragReminderTouch { reminder, touchEvent } -> do
-    liftEffect $ preventDefault (touchToEvent touchEvent)
-    let touchX = toNumber (touchClientX touchEvent)
-    let touchY = toNumber (touchClientY touchEvent)
+    liftEffect $ preventDefault (TE.toEvent touchEvent)
+    let coords = getTouchCoords touchEvent
     H.modify_ \s -> s
       { dragging = Just
           { reminder
-          , startX: touchX
-          , startY: touchY
-          , currentX: touchX
-          , currentY: touchY
+          , startX: coords.x
+          , startY: coords.y
+          , currentX: coords.x
+          , currentY: coords.y
           , targetPlayer: Just reminder.player
           }
       }
 
   DragMoveTouch touchEvent -> do
-    liftEffect $ preventDefault (touchToEvent touchEvent)
+    liftEffect $ preventDefault (TE.toEvent touchEvent)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        let touchX = toNumber (touchClientX touchEvent)
-        let touchY = toNumber (touchClientY touchEvent)
+        let coords = getTouchCoords touchEvent
         let gameState = case state.selectedTime of
               Just t -> ASP.buildGameState state.atoms t
               Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
-        let targetPlayer = findClosestPlayer touchX touchY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        let targetPlayer = findClosestPlayer coords.x coords.y 250.0 250.0 180.0 (length gameState.players) gameState.players
         H.modify_ \s -> s
           { dragging = Just ds
-              { currentX = touchX
-              , currentY = touchY
+              { currentX = coords.x
+              , currentY = coords.y
               , targetPlayer = targetPlayer
               }
           }
 
   EndDragTouch touchEvent -> do
-    liftEffect $ preventDefault (touchToEvent touchEvent)
+    liftEffect $ preventDefault (TE.toEvent touchEvent)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
@@ -901,3 +902,18 @@ findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
   in case closest of
     Just p | p.dist < 60.0 -> Just p.name
     _ -> Nothing
+
+-- | Extract clientX/clientY from a TouchEvent
+-- Uses touches for touchstart/touchmove, changedTouches for touchend
+getTouchCoords :: TouchEvent -> { x :: Number, y :: Number }
+getTouchCoords te =
+  let
+    -- Try touches first, fall back to changedTouches
+    touches = TE.touches te
+    changedTouches = TE.changedTouches te
+    maybeTouch = case TL.item 0 touches of
+      Just t -> Just t
+      Nothing -> TL.item 0 changedTouches
+  in case maybeTouch of
+    Just touch -> { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
+    Nothing -> { x: 0.0, y: 0.0 }
