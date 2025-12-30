@@ -65,12 +65,15 @@ derive instance eqPredicateCategory :: Eq PredicateCategory
 -- | Categorize an atom by its semantic meaning
 atomCategory :: Atom -> PredicateCategory
 atomCategory = case _ of
-  -- Event predicates: actions that happen at a time point
+  -- Event predicates: discrete actions that happen at a time point
   StTells _ _ _ _       -> EventPredicate
   PlayerChooses _ _ _ _ -> EventPredicate
   Executed _ _          -> EventPredicate
-  ReminderOn _ _ _      -> EventPredicate
   -- State predicates: ongoing state, not events
+  -- Note: reminder_on(token,player,time) represents accumulated state
+  -- ("reminder is on player at time"), not the action of placing it.
+  -- The timeline display has separate logic to show only first placement.
+  ReminderOn _ _ _      -> StatePredicate
   Alive _ _             -> StatePredicate
   Dead _ _              -> StatePredicate
   GhostVoteUsed _ _     -> StatePredicate
