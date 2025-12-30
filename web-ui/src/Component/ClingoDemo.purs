@@ -795,11 +795,21 @@ handleAction = case _ of
 
   HandleTimelineEvent output -> case output of
     TG.TimelineEventClicked { sourceAtom } -> do
-      -- Scroll to the atom in the answer set display
+      -- Scroll to the atom in the currently selected answer set
       if sourceAtom /= ""
         then do
-          _ <- liftEffect $ TU.scrollToText "answer-set-display" sourceAtom
-          pure unit
+          state <- H.get
+          -- Calculate which child index corresponds to the selected model on the current page
+          let pageStart = state.answerSetPage * answerSetPageSize
+          let pageEnd = pageStart + answerSetPageSize
+          let selectedIdx = state.selectedModelIndex
+          -- Only highlight if the selected model is visible on the current page
+          if selectedIdx >= pageStart && selectedIdx < pageEnd
+            then do
+              let childIndex = selectedIdx - pageStart
+              _ <- liftEffect $ TU.scrollToTextInChild "answer-set-display" childIndex sourceAtom
+              pure unit
+            else pure unit
         else pure unit
 
   NoOp ->

@@ -45,6 +45,63 @@ export const focusTextareaImpl = (elementId) => () => {
   }
 };
 
+// Scroll to and highlight text within a specific child element of a container
+// childIndex specifies which child div to search within (0-indexed)
+// Returns true if the text was found and highlighted, false otherwise
+export const scrollToTextInChildImpl = (elementId) => (childIndex) => (searchText) => () => {
+  const container = document.getElementById(elementId);
+  if (!container || !searchText) return false;
+
+  // Find all answer set divs (direct children of the inner wrapper div)
+  const wrapper = container.firstElementChild;
+  if (!wrapper) return false;
+
+  const answerSetDivs = wrapper.children;
+  if (childIndex < 0 || childIndex >= answerSetDivs.length) return false;
+
+  // Get the specific answer set div and find its code element
+  const targetDiv = answerSetDivs[childIndex];
+  const codeElement = targetDiv.querySelector('code') || targetDiv;
+  const fullText = codeElement.textContent || '';
+
+  // Find the position of the search text
+  const position = fullText.indexOf(searchText);
+  if (position === -1) return false;
+
+  // Clear any existing highlights
+  const existingHighlight = document.getElementById('timeline-highlight');
+  if (existingHighlight) {
+    existingHighlight.remove();
+  }
+
+  // Create a highlight by wrapping the matched text
+  const textContent = codeElement.textContent;
+  const beforeText = textContent.substring(0, position);
+  const matchedText = textContent.substring(position, position + searchText.length);
+  const afterText = textContent.substring(position + searchText.length);
+
+  // Use CSS highlight approach - update the code element with a marked span
+  codeElement.innerHTML =
+    escapeHtml(beforeText) +
+    '<span id="timeline-highlight" style="background-color: #ffeb3b; padding: 2px 0; border-radius: 2px; animation: highlight-pulse 1s ease-in-out;">' +
+    escapeHtml(matchedText) +
+    '</span>' +
+    escapeHtml(afterText);
+
+  // Scroll the highlight into view
+  const highlight = document.getElementById('timeline-highlight');
+  if (highlight) {
+    highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Remove highlight after a delay
+    setTimeout(() => {
+      codeElement.textContent = textContent;
+    }, 3000);
+  }
+
+  return true;
+};
+
 // Scroll to and highlight text within a scrollable element
 // Returns true if the text was found and highlighted, false otherwise
 export const scrollToTextImpl = (elementId) => (searchText) => () => {
