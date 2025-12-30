@@ -2,6 +2,7 @@ module Component.ClingoDemo where
 
 import Prelude
 
+import AnswerSetParser as AnswerSet
 import AspParser as ASP
 import Clingo as Clingo
 import Data.Map as Map
@@ -12,8 +13,8 @@ import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
+import Data.String (Pattern(..), split, trim, take) as String
 import Data.String (Pattern(..), split, trim)
-import Data.String as String
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
@@ -811,6 +812,22 @@ handleAction = case _ of
               pure unit
             else pure unit
         else pure unit
+    TG.ReminderMoved { token, fromPlayer, toPlayer, time } -> do
+      -- Modify inst.lp to add a constraint for the new reminder placement
+      state <- H.get
+      let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+      -- Format the time point for ASP
+      let timeStr = formatTimePointForASP time
+      -- Create the new constraint
+      let newConstraint = ":- not reminder_on(" <> token <> ", " <> toPlayer <> ", " <> timeStr <> ")."
+      -- Create the old constraint pattern to comment out
+      let oldConstraintPattern = ":- not reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
+      -- Modify the content: comment out old constraint if present, add new one
+      let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint
+      -- Update the virtual filesystem
+      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
+      -- Re-run Clingo with the new constraints
+      handleAction RunClingo
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
@@ -819,3 +836,38 @@ handleAction = case _ of
 extractWitnesses :: Clingo.ClingoResult -> Array (Array String)
 extractWitnesses res =
   res."Call" >>= \call -> call."Witnesses" <#> \w -> w."Value"
+
+-- | Format a TimePoint for ASP syntax
+formatTimePointForASP :: AnswerSet.TimePoint -> String
+formatTimePointForASP (AnswerSet.Night n r s) = "night(" <> show n <> ", " <> show r <> ", " <> show s <> ")"
+formatTimePointForASP (AnswerSet.Day n phase) = "day(" <> show n <> ", " <> phase <> ")"
+formatTimePointForASP (AnswerSet.UnknownTime s) = s
+
+-- | Modify inst.lp to add a new reminder constraint and comment out conflicting one
+modifyInstLpForReminder :: String -> String -> String -> String
+modifyInstLpForReminder content oldPattern newConstraint =
+  let
+    -- Split content into lines
+    contentLines = String.split (String.Pattern "\n") content
+    -- Comment out any existing line matching the old pattern
+    modifiedLines = map (commentOutIfMatches oldPattern) contentLines
+    -- Check if the new constraint already exists
+    hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
+    -- Add the new constraint at the end if not already present
+    finalLines = if hasNewConstraint
+                   then modifiedLines
+                   else modifiedLines <> ["", "% Reminder token constraint (added by drag)", newConstraint]
+  in
+    intercalate "\n" finalLines
+
+-- | Comment out a line if it matches the pattern (case-sensitive, trimmed comparison)
+commentOutIfMatches :: String -> String -> String
+commentOutIfMatches patternStr line =
+  let
+    trimmedLine = trim line
+    trimmedPattern = trim patternStr
+    firstChar = String.take 1 trimmedLine
+  in
+    if trimmedLine == trimmedPattern && firstChar /= "%"
+      then "% " <> line <> "  % commented out by drag"
+      else line
