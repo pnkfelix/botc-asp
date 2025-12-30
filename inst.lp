@@ -19,13 +19,15 @@ assigned(0, courtney, investigator).
 %
 % Info values are unwrapped for convenience:
 %   count(N) -> N      (chef, empath)
-%   info(P1,P2,R) -> R (washerwoman, librarian, investigator)
+%   info(P1,P2,R) -> R, P1, P2 (washerwoman, librarian, investigator)
 %   point(R) -> R      (undertaker, ravenkeeper)
 %   yes/no -> yes/no   (fortune_teller)
 %
 % --- st_tells/2: for one-time info or when night doesn't matter ---
 %   :- not st_tells(chef, 2).             % chef was told 2
 %   :- not st_tells(washerwoman, chef).   % washerwoman was told "chef"
+%   :- not st_tells(washerwoman, alice).  % washerwoman pointed to alice
+%   :- not st_tells(washerwoman, bob).    % washerwoman pointed to bob
 %   :- not st_tells(undertaker, imp).     % undertaker learned "imp"
 %   :- not st_tells(fortune_teller, yes). % FT was told yes (at some point)
 %
