@@ -469,7 +469,6 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
                      , SA.y2 20.0
                      , SA.stroke (Named "#1a1a1a")
                      , SA.strokeWidth 4.0
-                     , SA.strokeLinecap "round"
                      ]
                  ]
             else [])
@@ -482,7 +481,6 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
                      , SA.y2 20.0
                      , SA.stroke (Named "#1a1a1a")
                      , SA.strokeWidth 4.0
-                     , SA.strokeLinecap "round"
                      ]
                  ]
             else [])
