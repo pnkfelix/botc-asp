@@ -35,8 +35,7 @@ import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.Event.Event as Event
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
-import Web.TouchEvent.TouchEvent (TouchEvent, fromEvent)
-import Web.TouchEvent.TouchEvent as TE
+import Web.TouchEvent.TouchEvent (TouchEvent, fromEvent, touches)
 import Web.TouchEvent.TouchList as TL
 import Web.TouchEvent.Touch as Touch
 import ElementHitTest (findPlayerAtPoint)
@@ -1052,7 +1051,7 @@ getTouchCoordsFromEvent event =
   case fromEvent event of
     Nothing -> Nothing
     Just touchEvent ->
-      let touches = TE.touches touchEvent
-      in case TL.item 0 touches of
+      let touchList = touches touchEvent
+      in case TL.item 0 touchList of
         Nothing -> Nothing
         Just touch -> Just { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
