@@ -39,7 +39,7 @@ type State =
   , currentFile :: String           -- Currently selected file for editing (full path)
   , showFileDirectory :: Boolean    -- Is file directory popup visible
   , expandedDirs :: Set.Set String  -- Which directories are expanded in the tree view
-  , modelLimit :: String            -- Max models to return (empty = 0 = all)
+  , modelLimit :: String            -- Max models to return (empty = 5, 0 = all)
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
@@ -126,7 +126,7 @@ initialState =
   , currentFile: "inst.lp"  -- Start with instance file selected
   , showFileDirectory: false
   , expandedDirs: Set.empty  -- All directories collapsed initially
-  , modelLimit: ""  -- Empty = 0 = all models
+  , modelLimit: ""  -- Empty = default to 5 models, 0 = all models
   , result: Nothing
   , isLoading: false
   , isInitialized: false
@@ -246,7 +246,7 @@ render state =
             , HH.input
                 [ HP.style "width: 80px; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;"
                 , HP.type_ HP.InputNumber
-                , HP.placeholder "0 = all"
+                , HP.placeholder "5 (0=all)"
                 , HP.value state.modelLimit
                 , HE.onValueInput SetModelLimit
                 , HP.disabled state.isLoading
@@ -789,8 +789,10 @@ handleAction = case _ of
     -- Keep previous result visible during loading (preserves TimelineGrimoire state)
     H.modify_ \s -> s { isLoading = true, selectedModelIndex = 0, answerSetPage = 0 }
     state <- H.get
-    -- Parse model limit (empty or invalid = 0 = all models)
-    let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
+    -- Parse model limit (empty = 5 default, 0 = all models)
+    let numModels = case trim state.modelLimit of
+          "" -> 5  -- Default to 5 models when field is empty
+          s -> fromMaybe 5 $ Int.fromString s
     -- Build file resolver for #include directives using the virtual filesystem
     let resolver filename = Map.lookup filename state.files
     -- Get the current file's content (the entry point that #includes other files)
