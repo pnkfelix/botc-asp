@@ -7,6 +7,7 @@ import Clingo as Clingo
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
+import FilterExpression as FE
 import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
 import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
@@ -46,6 +47,8 @@ type State =
   -- Predicate navigator state
   , showPredicateList :: Boolean
   , selectedPredicate :: Maybe ASP.Predicate
+  -- Output filter expression (for filtering displayed atoms)
+  , outputFilter :: String          -- Boolean expression to filter atoms
   }
 
 -- | How to display results
@@ -62,6 +65,7 @@ data Action
   | ToggleFileDirectory         -- Show/hide file directory popup
   | ToggleDirectory String      -- Expand/collapse a directory in tree view
   | SetModelLimit String
+  | SetOutputFilter String      -- Update output filter expression
   | RunClingo
   | CancelSolve
   | SelectModel Int             -- Select which model to display in Timeline/Grimoire
@@ -128,6 +132,7 @@ initialState =
   , answerSetPage: 0       -- First page of answer sets
   , showPredicateList: false
   , selectedPredicate: Nothing
+  , outputFilter: ""       -- No filtering by default
   }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
@@ -548,6 +553,27 @@ renderResult state = case state.result of
                   [ HH.text "Next →" ]
               ]
             else HH.text ""
+          -- Filter input
+          , HH.div
+              [ HP.style "margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;" ]
+              [ HH.label
+                  [ HP.style "display: flex; align-items: center; gap: 6px; flex: 1; min-width: 200px;" ]
+                  [ HH.span
+                      [ HP.style "font-size: 12px; color: #666; white-space: nowrap;" ]
+                      [ HH.text "Filter:" ]
+                  , HH.input
+                      [ HP.style $ "flex: 1; padding: 6px 8px; font-size: 12px; font-family: monospace; "
+                          <> "border: 1px solid #ccc; border-radius: 4px; min-width: 150px;"
+                      , HP.type_ HP.InputText
+                      , HP.placeholder "e.g., assigned or tells, not time, alice and chef"
+                      , HP.value state.outputFilter
+                      , HE.onValueInput SetOutputFilter
+                      ]
+                  ]
+              , HH.span
+                  [ HP.style "font-size: 11px; color: #888; font-style: italic;" ]
+                  [ HH.text "and, or, not, () for grouping" ]
+              ]
           , HH.div
               [ HP.id "answer-set-display"
               , HP.style $ "max-height: 200px; overflow-y: scroll; margin-top: 10px; "
@@ -555,13 +581,18 @@ renderResult state = case state.result of
                   <> "touch-action: pan-y;"
               ]
               -- Render only the current page of answer sets (with correct global indices)
-              [ HH.div_ $ mapWithIndex (\pageIdx atoms -> renderAnswerSet selectedIdx (pageStart + pageIdx) atoms) pageItems ]
+              [ HH.div_ $ mapWithIndex (\pageIdx atoms -> renderAnswerSet state.outputFilter selectedIdx (pageStart + pageIdx) atoms) pageItems ]
           ]
       ]
     where
-      renderAnswerSet selectedIdx idx atoms =
+      renderAnswerSet filterExpr selectedIdx idx atoms =
         let
           isSelected = idx == selectedIdx
+          -- Apply filter to atoms
+          filteredAtoms = FE.filterAtoms filterExpr atoms
+          totalAtomCount = length atoms
+          filteredAtomCount = length filteredAtoms
+          isFiltered = filterExpr /= "" && filteredAtomCount /= totalAtomCount
           baseStyle = "margin-top: 8px; padding: 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; "
           selectedStyle = if isSelected
             then "background: #c8e6c9; border: 2px solid #4CAF50;"
@@ -576,12 +607,15 @@ renderResult state = case state.result of
               [ HP.style $ "font-weight: bold; margin-bottom: 4px; font-size: 12px; "
                   <> if isSelected then "color: #1b5e20;" else "color: #388e3c;"
               ]
-              [ HH.text $ "Answer Set " <> show (idx + 1) <> (if isSelected then " ✓" else "") ]
+              [ HH.text $ "Answer Set " <> show (idx + 1)
+                  <> (if isSelected then " ✓" else "")
+                  <> (if isFiltered then " (" <> show filteredAtomCount <> "/" <> show totalAtomCount <> " atoms)" else "")
+              ]
           , HH.code
               [ HP.style $ "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20; font-size: 11px; max-height: 60px; overflow-y: auto; "
                   <> "-webkit-overflow-scrolling: touch;"
               ]
-              [ HH.text $ intercalate " " atoms ]
+              [ HH.text $ intercalate " " filteredAtoms ]
           ]
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
@@ -731,6 +765,9 @@ handleAction = case _ of
 
   SetModelLimit limit ->
     H.modify_ \s -> s { modelLimit = limit }
+
+  SetOutputFilter filterExpr ->
+    H.modify_ \s -> s { outputFilter = filterExpr }
 
   RunClingo -> do
     H.modify_ \s -> s { isLoading = true, result = Nothing, selectedModelIndex = 0, answerSetPage = 0 }
