@@ -17,6 +17,7 @@ package:
     - strings
     - tuples
     - web-html
+    - web-pointerevents
     - web-touchevents
 
 workspace:

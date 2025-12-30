@@ -32,11 +32,8 @@ import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 import Web.Event.Event (preventDefault)
-import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
-import Web.TouchEvent.TouchEvent (TouchEvent)
-import Web.TouchEvent.TouchEvent as TE
-import Web.TouchEvent.TouchList as TL
-import Web.TouchEvent.Touch as Touch
+import Web.PointerEvent (PointerEvent)
+import Web.PointerEvent as PE
 import ElementHitTest (findPlayerAtPoint)
 
 -- | View mode for grimoire display
@@ -89,15 +86,11 @@ data Action
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
-  -- Mouse events for drag
-  | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, mouseEvent :: MouseEvent }
-  | DragMove MouseEvent
-  | EndDrag MouseEvent
+  -- Pointer events for drag (unified: works for mouse, touch, and pen)
+  | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: PointerEvent }
+  | DragMove PointerEvent
+  | EndDrag PointerEvent
   | CancelDrag
-  -- Touch events for drag (HTML view only - SVG doesn't support these)
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TouchEvent }
-  | DragMoveTouch TouchEvent
-  | EndDragTouch TouchEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -304,11 +297,12 @@ renderGrimoire state =
             , SA.width width
             , SA.height height
             , HP.id "grimoire-svg"
-            , HP.style $ if isDragging then "cursor: grabbing;" else ""
+            , HP.style $ if isDragging then "cursor: grabbing; touch-action: none;" else ""
             ] <> (if isDragging
-                  then [ HE.onMouseMove DragMove
-                       , HE.onMouseUp EndDrag
-                       , HE.onMouseLeave \_ -> CancelDrag
+                  then [ HE.onPointerMove DragMove
+                       , HE.onPointerUp EndDrag
+                       , HE.onPointerLeave \_ -> CancelDrag
+                       , HE.onPointerCancel \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -513,8 +507,8 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named (getReminderColor reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
-          , HP.style "cursor: grab;"
-          , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
+          , HP.style "cursor: grab; touch-action: none;"
+          , HE.onPointerDown \evt -> StartDragReminder { reminder, event: evt }
           ]
       -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
@@ -580,7 +574,7 @@ renderDragFeedback (Just ds) centerX centerY radius playerCount players =
           ]
       ]
 
--- | Render HTML-based grimoire with grid layout (supports touch events)
+-- | Render HTML-based grimoire with grid layout (supports pointer events for mouse/touch/pen)
 renderHtmlGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
 renderHtmlGrimoire state =
   let
@@ -596,13 +590,12 @@ renderHtmlGrimoire state =
         HH.div
           ( [ HP.style $ "display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); "
                 <> "gap: 12px; min-height: 200px;"
+                <> if isDragging then " touch-action: none;" else ""
             ] <> (if isDragging
-                  then [ HE.onMouseMove DragMove
-                       , HE.onMouseUp EndDrag
-                       , HE.onMouseLeave \_ -> CancelDrag
-                       , HE.onTouchMove DragMoveTouch
-                       , HE.onTouchEnd EndDragTouch
-                       , HE.onTouchCancel \_ -> CancelDrag
+                  then [ HE.onPointerMove DragMove
+                       , HE.onPointerUp EndDrag
+                       , HE.onPointerLeave \_ -> CancelDrag
+                       , HE.onPointerCancel \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -685,8 +678,7 @@ renderHtmlReminderToken _playerName reminder =
         <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
         <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
         <> "touch-action: none; user-select: none;"
-    , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
-    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, touchEvent: evt }
+    , HE.onPointerDown \evt -> StartDragReminder { reminder, event: evt }
     ]
     [ HH.text $ abbreviateToken reminder.token ]
 
@@ -896,55 +888,50 @@ handleAction = case _ of
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo
 
-  StartDragReminder { reminder, mouseEvent } -> do
+  StartDragReminder { reminder, event } -> do
     -- Prevent default to avoid text selection during drag
-    liftEffect $ preventDefault (toEvent mouseEvent)
-    -- Get SVG coordinates from mouse event
-    state <- H.get
-    let mouseX = toNumber (clientX mouseEvent)
-    let mouseY = toNumber (clientY mouseEvent)
-    -- Convert to SVG coordinates (simplified - assumes SVG fills container)
-    -- We'll store client coordinates and do conversion during render
-    let svgX = mouseX
-    let svgY = mouseY
+    liftEffect $ preventDefault (PE.toEvent event)
+    -- Get coordinates from pointer event
+    let pointerX = toNumber (PE.clientX event)
+    let pointerY = toNumber (PE.clientY event)
     -- Calculate initial target (the player currently owning the token)
     H.modify_ \s -> s
       { dragging = Just
           { reminder
-          , startX: svgX
-          , startY: svgY
-          , currentX: svgX
-          , currentY: svgY
+          , startX: pointerX
+          , startY: pointerY
+          , currentX: pointerX
+          , currentY: pointerY
           , targetPlayer: Just reminder.player
           }
       }
 
-  DragMove mouseEvent -> do
-    liftEffect $ preventDefault (toEvent mouseEvent)
+  DragMove event -> do
+    liftEffect $ preventDefault (PE.toEvent event)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        let mouseX = toNumber (clientX mouseEvent)
-        let mouseY = toNumber (clientY mouseEvent)
+        let pointerX = toNumber (PE.clientX event)
+        let pointerY = toNumber (PE.clientY event)
         -- Find target player based on view mode
         targetPlayer <- case state.viewMode of
-          HtmlView -> liftEffect $ findPlayerAtPoint mouseX mouseY
+          HtmlView -> liftEffect $ findPlayerAtPoint pointerX pointerY
           SvgView -> do
             let gameState = case state.selectedTime of
                   Just t -> ASP.buildGameState state.atoms t
                   Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
-            pure $ findClosestPlayer mouseX mouseY 250.0 250.0 180.0 (length gameState.players) gameState.players
+            pure $ findClosestPlayer pointerX pointerY 250.0 250.0 180.0 (length gameState.players) gameState.players
         H.modify_ \s -> s
           { dragging = Just ds
-              { currentX = mouseX
-              , currentY = mouseY
+              { currentX = pointerX
+              , currentY = pointerY
               , targetPlayer = targetPlayer
               }
           }
 
-  EndDrag mouseEvent -> do
-    liftEffect $ preventDefault (toEvent mouseEvent)
+  EndDrag event -> do
+    liftEffect $ preventDefault (PE.toEvent event)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
@@ -970,71 +957,6 @@ handleAction = case _ of
 
   ToggleViewMode -> do
     H.modify_ \s -> s { viewMode = if s.viewMode == SvgView then HtmlView else SvgView }
-
-  -- Touch event handlers (for HTML view)
-  StartDragReminderTouch { reminder, touchEvent } -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    let coords = getTouchCoords touchEvent
-    H.modify_ \s -> s
-      { dragging = Just
-          { reminder
-          , startX: coords.x
-          , startY: coords.y
-          , currentX: coords.x
-          , currentY: coords.y
-          , targetPlayer: Just reminder.player
-          }
-      }
-
-  DragMoveTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        let coords = getTouchCoords touchEvent
-        -- Use element-based hit testing (touch is only used in HTML view)
-        targetPlayer <- liftEffect $ findPlayerAtPoint coords.x coords.y
-        H.modify_ \s -> s
-          { dragging = Just ds
-              { currentX = coords.x
-              , currentY = coords.y
-              , targetPlayer = targetPlayer
-              }
-          }
-
-  EndDragTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        H.modify_ \s -> s { dragging = Nothing }
-        case ds.targetPlayer of
-          Just toPlayer | toPlayer /= ds.reminder.player -> do
-            case state.selectedTime of
-              Just time ->
-                H.raise $ ReminderMoved
-                  { token: ds.reminder.token
-                  , fromPlayer: ds.reminder.player
-                  , toPlayer
-                  , time
-                  }
-              Nothing -> pure unit
-          _ -> pure unit
-
--- | Get touch coordinates from a TouchEvent
-getTouchCoords :: TouchEvent -> { x :: Number, y :: Number }
-getTouchCoords te =
-  let
-    touchList = TE.touches te
-    changedList = TE.changedTouches te
-    maybeTouch = case TL.item 0 touchList of
-      Just t -> Just t
-      Nothing -> TL.item 0 changedList
-  in case maybeTouch of
-    Just touch -> { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
-    Nothing -> { x: 0.0, y: 0.0 }
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
