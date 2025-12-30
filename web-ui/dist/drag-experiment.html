@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Drag & Drop Experiment</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 15px;
+      background: #f0f0f0;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 10px 0;
+    }
+
+    .debug {
+      background: #333;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      min-height: 60px;
+      white-space: pre-wrap;
+    }
+
+    .player-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .player-card {
+      background: #4a7c59;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      color: white;
+      min-height: 90px;
+      border: 3px solid #2d5a3d;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .player-card.drop-target {
+      border-color: #FFD700;
+      box-shadow: 0 0 12px #FFD700;
+    }
+
+    .player-name {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .reminder-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      min-height: 28px;
+    }
+
+    .reminder-token {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #8B4513;
+      border: 2px solid white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: bold;
+      color: white;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .reminder-token:active {
+      cursor: grabbing;
+    }
+
+    .reminder-token.dragging {
+      opacity: 0.4;
+    }
+
+    .floating-token {
+      position: fixed;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #8B4513;
+      border: 3px solid #FFD700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: bold;
+      color: white;
+      pointer-events: none;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+
+    .floating-token.visible {
+      display: flex;
+    }
+
+    .method-selector {
+      margin-bottom: 15px;
+      padding: 10px;
+      background: white;
+      border-radius: 8px;
+    }
+
+    .method-selector label {
+      display: block;
+      margin: 5px 0;
+      font-size: 13px;
+    }
+
+    .method-selector input[type="radio"] {
+      margin-right: 8px;
+    }
+
+    .instructions {
+      background: #fff3cd;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Drag & Drop Experiment</h1>
+
+  <div class="instructions">
+    <strong>Instructions:</strong> Try dragging the brown reminder tokens between player cards.
+    Select different methods below to test which works best on your device.
+  </div>
+
+  <div class="method-selector">
+    <strong>Drag Method:</strong>
+    <label><input type="radio" name="method" value="touch" checked> Touch Events (touchstart/move/end)</label>
+    <label><input type="radio" name="method" value="pointer"> Pointer Events (pointerdown/move/up)</label>
+    <label><input type="radio" name="method" value="mouse"> Mouse Events (mousedown/move/up)</label>
+    <label><input type="radio" name="method" value="drag"> HTML5 Drag API (dragstart/dragover/drop)</label>
+  </div>
+
+  <div class="debug" id="debug">Ready. Touch a reminder token to start dragging.</div>
+
+  <div class="player-grid" id="playerGrid">
+    <div class="player-card" data-player="Alice">
+      <div class="player-name">Alice</div>
+      <div class="reminder-container">
+        <div class="reminder-token" data-token="POI" data-owner="Alice">POI</div>
+      </div>
+    </div>
+    <div class="player-card" data-player="Bob">
+      <div class="player-name">Bob</div>
+      <div class="reminder-container">
+        <div class="reminder-token" data-token="RH" data-owner="Bob">RH</div>
+      </div>
+    </div>
+    <div class="player-card" data-player="Carol">
+      <div class="player-name">Carol</div>
+      <div class="reminder-container"></div>
+    </div>
+    <div class="player-card" data-player="Dave">
+      <div class="player-name">Dave</div>
+      <div class="reminder-container"></div>
+    </div>
+    <div class="player-card" data-player="Eve">
+      <div class="player-name">Eve</div>
+      <div class="reminder-container">
+        <div class="reminder-token" data-token="PRO" data-owner="Eve">PRO</div>
+      </div>
+    </div>
+    <div class="player-card" data-player="Frank">
+      <div class="player-name">Frank</div>
+      <div class="reminder-container"></div>
+    </div>
+  </div>
+
+  <div class="floating-token" id="floatingToken"></div>
+
+  <script>
+    const debug = document.getElementById('debug');
+    const playerGrid = document.getElementById('playerGrid');
+    const floatingToken = document.getElementById('floatingToken');
+
+    let dragState = null;
+    let currentMethod = 'touch';
+
+    function log(msg) {
+      const now = new Date().toLocaleTimeString();
+      debug.textContent = `[${now}] ${msg}\n` + debug.textContent.split('\n').slice(0, 5).join('\n');
+    }
+
+    // Method selector
+    document.querySelectorAll('input[name="method"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        currentMethod = e.target.value;
+        log(`Switched to: ${currentMethod}`);
+        setupEventListeners();
+      });
+    });
+
+    function getPlayerAtPoint(x, y) {
+      // Hide floating token temporarily to not interfere with elementFromPoint
+      const wasVisible = floatingToken.classList.contains('visible');
+      floatingToken.classList.remove('visible');
+
+      const element = document.elementFromPoint(x, y);
+
+      if (wasVisible) floatingToken.classList.add('visible');
+
+      if (!element) return null;
+
+      // Walk up to find player card
+      let current = element;
+      while (current && current !== document.body) {
+        if (current.classList.contains('player-card')) {
+          return current.dataset.player;
+        }
+        current = current.parentElement;
+      }
+      return null;
+    }
+
+    function updateDropTarget(playerName) {
+      document.querySelectorAll('.player-card').forEach(card => {
+        card.classList.toggle('drop-target', card.dataset.player === playerName);
+      });
+    }
+
+    function startDrag(token, x, y) {
+      dragState = {
+        token: token,
+        tokenText: token.dataset.token,
+        originalOwner: token.dataset.owner,
+        startX: x,
+        startY: y
+      };
+
+      token.classList.add('dragging');
+      floatingToken.textContent = dragState.tokenText;
+      floatingToken.style.left = x + 'px';
+      floatingToken.style.top = y + 'px';
+      floatingToken.classList.add('visible');
+
+      log(`START drag: ${dragState.tokenText} from ${dragState.originalOwner} at (${Math.round(x)}, ${Math.round(y)})`);
+    }
+
+    function moveDrag(x, y) {
+      if (!dragState) return;
+
+      floatingToken.style.left = x + 'px';
+      floatingToken.style.top = y + 'px';
+
+      const targetPlayer = getPlayerAtPoint(x, y);
+      updateDropTarget(targetPlayer);
+      dragState.targetPlayer = targetPlayer;
+
+      log(`MOVE: (${Math.round(x)}, ${Math.round(y)}) -> ${targetPlayer || 'none'}`);
+    }
+
+    function endDrag(x, y) {
+      if (!dragState) return;
+
+      const targetPlayer = getPlayerAtPoint(x, y);
+
+      log(`END drag: ${dragState.tokenText} -> ${targetPlayer || 'cancelled'}`);
+
+      if (targetPlayer && targetPlayer !== dragState.originalOwner) {
+        // Move the token to new player
+        const targetCard = document.querySelector(`.player-card[data-player="${targetPlayer}"]`);
+        const targetContainer = targetCard.querySelector('.reminder-container');
+
+        dragState.token.dataset.owner = targetPlayer;
+        targetContainer.appendChild(dragState.token);
+
+        log(`SUCCESS: Moved ${dragState.tokenText} from ${dragState.originalOwner} to ${targetPlayer}`);
+      }
+
+      // Cleanup
+      dragState.token.classList.remove('dragging');
+      floatingToken.classList.remove('visible');
+      updateDropTarget(null);
+      dragState = null;
+    }
+
+    function cancelDrag() {
+      if (!dragState) return;
+
+      log(`CANCEL drag: ${dragState.tokenText}`);
+
+      dragState.token.classList.remove('dragging');
+      floatingToken.classList.remove('visible');
+      updateDropTarget(null);
+      dragState = null;
+    }
+
+    // ========== TOUCH EVENTS ==========
+    function setupTouchEvents() {
+      document.querySelectorAll('.reminder-token').forEach(token => {
+        token.addEventListener('touchstart', handleTouchStart, { passive: false });
+      });
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd, { passive: false });
+      document.addEventListener('touchcancel', handleTouchCancel, { passive: false });
+    }
+
+    function handleTouchStart(e) {
+      if (currentMethod !== 'touch') return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      startDrag(e.currentTarget, touch.clientX, touch.clientY);
+    }
+
+    function handleTouchMove(e) {
+      if (currentMethod !== 'touch' || !dragState) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      moveDrag(touch.clientX, touch.clientY);
+    }
+
+    function handleTouchEnd(e) {
+      if (currentMethod !== 'touch' || !dragState) return;
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      endDrag(touch.clientX, touch.clientY);
+    }
+
+    function handleTouchCancel(e) {
+      if (currentMethod !== 'touch') return;
+      cancelDrag();
+    }
+
+    // ========== POINTER EVENTS ==========
+    function setupPointerEvents() {
+      document.querySelectorAll('.reminder-token').forEach(token => {
+        token.addEventListener('pointerdown', handlePointerDown);
+      });
+      document.addEventListener('pointermove', handlePointerMove);
+      document.addEventListener('pointerup', handlePointerUp);
+      document.addEventListener('pointercancel', handlePointerCancel);
+    }
+
+    function handlePointerDown(e) {
+      if (currentMethod !== 'pointer') return;
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      startDrag(e.currentTarget, e.clientX, e.clientY);
+    }
+
+    function handlePointerMove(e) {
+      if (currentMethod !== 'pointer' || !dragState) return;
+      moveDrag(e.clientX, e.clientY);
+    }
+
+    function handlePointerUp(e) {
+      if (currentMethod !== 'pointer' || !dragState) return;
+      endDrag(e.clientX, e.clientY);
+    }
+
+    function handlePointerCancel(e) {
+      if (currentMethod !== 'pointer') return;
+      cancelDrag();
+    }
+
+    // ========== MOUSE EVENTS ==========
+    function setupMouseEvents() {
+      document.querySelectorAll('.reminder-token').forEach(token => {
+        token.addEventListener('mousedown', handleMouseDown);
+      });
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    function handleMouseDown(e) {
+      if (currentMethod !== 'mouse') return;
+      e.preventDefault();
+      startDrag(e.currentTarget, e.clientX, e.clientY);
+    }
+
+    function handleMouseMove(e) {
+      if (currentMethod !== 'mouse' || !dragState) return;
+      moveDrag(e.clientX, e.clientY);
+    }
+
+    function handleMouseUp(e) {
+      if (currentMethod !== 'mouse' || !dragState) return;
+      endDrag(e.clientX, e.clientY);
+    }
+
+    // ========== HTML5 DRAG API ==========
+    function setupDragEvents() {
+      document.querySelectorAll('.reminder-token').forEach(token => {
+        token.setAttribute('draggable', 'true');
+        token.addEventListener('dragstart', handleDragStart);
+        token.addEventListener('dragend', handleDragEnd);
+      });
+
+      document.querySelectorAll('.player-card').forEach(card => {
+        card.addEventListener('dragover', handleDragOver);
+        card.addEventListener('dragleave', handleDragLeave);
+        card.addEventListener('drop', handleDrop);
+      });
+    }
+
+    function handleDragStart(e) {
+      if (currentMethod !== 'drag') {
+        e.preventDefault();
+        return;
+      }
+      dragState = {
+        token: e.currentTarget,
+        tokenText: e.currentTarget.dataset.token,
+        originalOwner: e.currentTarget.dataset.owner
+      };
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', dragState.tokenText);
+      log(`DRAGSTART: ${dragState.tokenText}`);
+    }
+
+    function handleDragOver(e) {
+      if (currentMethod !== 'drag' || !dragState) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const playerName = e.currentTarget.dataset.player;
+      updateDropTarget(playerName);
+      log(`DRAGOVER: ${playerName}`);
+    }
+
+    function handleDragLeave(e) {
+      if (currentMethod !== 'drag') return;
+      e.currentTarget.classList.remove('drop-target');
+    }
+
+    function handleDrop(e) {
+      if (currentMethod !== 'drag' || !dragState) return;
+      e.preventDefault();
+
+      const targetPlayer = e.currentTarget.dataset.player;
+
+      if (targetPlayer !== dragState.originalOwner) {
+        const targetContainer = e.currentTarget.querySelector('.reminder-container');
+        dragState.token.dataset.owner = targetPlayer;
+        targetContainer.appendChild(dragState.token);
+        log(`DROP: Moved ${dragState.tokenText} to ${targetPlayer}`);
+      }
+
+      updateDropTarget(null);
+    }
+
+    function handleDragEnd(e) {
+      if (currentMethod !== 'drag') return;
+      if (dragState) {
+        dragState.token.classList.remove('dragging');
+        log(`DRAGEND: ${dragState.tokenText}`);
+        dragState = null;
+      }
+      updateDropTarget(null);
+    }
+
+    // ========== SETUP ==========
+    function setupEventListeners() {
+      // Remove draggable attribute when not using drag API
+      document.querySelectorAll('.reminder-token').forEach(token => {
+        token.setAttribute('draggable', currentMethod === 'drag' ? 'true' : 'false');
+      });
+    }
+
+    // Initialize all event listeners (they check currentMethod internally)
+    setupTouchEvents();
+    setupPointerEvents();
+    setupMouseEvents();
+    setupDragEvents();
+    setupEventListeners();
+
+    log('Initialized. Using touch events by default.');
+  </script>
+</body>
+</html>
