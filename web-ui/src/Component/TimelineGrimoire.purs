@@ -140,7 +140,7 @@ initialState atomStrings =
 
 -- | Get all unique time points from atoms
 -- | Only includes time points from event predicates and structural predicates (time, acting_role).
--- | Excludes state predicates (alive, dead) since those represent ongoing state, not events.
+-- | Excludes state predicates (alive, dead, reminder_on) since those represent ongoing state.
 getAllTimePoints :: Array ASP.Atom -> Array ASP.TimePoint
 getAllTimePoints atoms =
   nub $ sortBy ASP.compareTimePoints $ Array.mapMaybe getTimeFromAtom atoms
@@ -150,7 +150,7 @@ getAllTimePoints atoms =
         -- Include events and structural predicates
         ASP.EventPredicate -> getTimePointFromAtom atom
         ASP.StructuralPredicate -> getTimePointFromAtom atom
-        -- Exclude state predicates (alive, dead, ghost_vote_used)
+        -- Exclude state predicates (alive, dead, ghost_vote_used, reminder_on)
         -- These represent ongoing state, not discrete events
         ASP.StatePredicate -> Nothing
         ASP.OtherPredicate -> Nothing
@@ -158,7 +158,6 @@ getAllTimePoints atoms =
     getTimePointFromAtom (ASP.Time t) = Just t
     getTimePointFromAtom (ASP.StTells _ _ _ t) = Just t
     getTimePointFromAtom (ASP.PlayerChooses _ _ _ t) = Just t
-    getTimePointFromAtom (ASP.ReminderOn _ _ t) = Just t
     getTimePointFromAtom (ASP.ActingRole t _) = Just t
     getTimePointFromAtom (ASP.Executed _ d) = Just (ASP.Day d "exec")  -- Executions happen during day
     getTimePointFromAtom _ = Nothing
@@ -166,9 +165,9 @@ getAllTimePoints atoms =
 -- | Find the original source string for an atom matching a given time point
 -- | Preference order:
 -- | 1. time(T) - explicit time marker
--- | 2. Event predicates at time T (st_tells, player_chooses, reminder_on)
+-- | 2. Event predicates at time T (st_tells, player_chooses)
 -- | 3. acting_role(T, _) - structural but time-specific
--- | This ensures we never scroll to state predicates like alive/dead
+-- | This ensures we never scroll to state predicates like alive/dead/reminder_on
 findTimeAtomSource :: Array ASP.ParsedAtom -> ASP.TimePoint -> Maybe String
 findTimeAtomSource parsedAtoms targetTime =
   -- First try: explicit time atom
@@ -196,7 +195,6 @@ findTimeAtomSource parsedAtoms targetTime =
 
     getTimeFromEventAtom (ASP.StTells _ _ _ t) = Just t
     getTimeFromEventAtom (ASP.PlayerChooses _ _ _ t) = Just t
-    getTimeFromEventAtom (ASP.ReminderOn _ _ t) = Just t
     getTimeFromEventAtom _ = Nothing
 
 -- | Main render function
