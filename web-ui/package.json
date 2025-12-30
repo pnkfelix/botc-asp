@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "embed-lp": "node scripts/embed-lp.js",
+    "build-info": "node scripts/generate-build-info.js",
     "build:purs": "spago build",
     "bundle": "spago bundle --bundle-type app --platform browser --outfile dist/app.js",
     "copy:wasm": "cp node_modules/clingo-wasm/dist/clingo.wasm dist/ && cp node_modules/clingo-wasm/dist/clingo.web.worker.js dist/",
-    "build": "npm run embed-lp && npm run build:purs && npm run bundle && npm run copy:wasm",
+    "build": "npm run build-info && npm run embed-lp && npm run build:purs && npm run bundle && npm run copy:wasm",
     "dev": "npm run build && npx serve dist",
     "clean": "rm -rf output .spago"
   },

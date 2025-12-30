@@ -54,6 +54,9 @@ jobs:
             web-ui/.spago
           key: spago-${{ hashFiles('web-ui/spago.yaml', 'web-ui/spago.lock') }}
 
+      - name: Generate build info
+        run: npm run build-info
+
       - name: Embed .lp files
         run: npm run embed-lp
 

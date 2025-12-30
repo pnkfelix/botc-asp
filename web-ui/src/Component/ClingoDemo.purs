@@ -4,6 +4,7 @@ import Prelude
 
 import AnswerSetParser as AnswerSet
 import AspParser as ASP
+import BuildInfo as BI
 import Clingo as Clingo
 import Data.Map as Map
 import Data.Set as Set
@@ -180,6 +181,20 @@ render state =
     , HH.p
         [ HP.style "color: #666;" ]
         [ HH.text "Blood on the Clocktower ASP Explorer" ]
+    , case BI.latestMergedPR of
+        Just prNum ->
+          HH.p
+            [ HP.style "color: #999; font-size: 12px; margin-top: -10px;" ]
+            [ HH.text "Latest merged: "
+            , HH.a
+                [ HP.href $ "https://github.com/pnkfelix/botc-asp/pull/" <> show prNum
+                , HP.target "_blank"
+                , HP.style "color: #4CAF50; text-decoration: none;"
+                ]
+                [ HH.text $ "PR #" <> show prNum ]
+            ]
+        Nothing ->
+          HH.text ""
 
     -- Floating action buttons (bottom right)
     , HH.div
