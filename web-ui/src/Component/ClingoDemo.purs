@@ -15,7 +15,7 @@ import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
-import Data.String (Pattern(..), split, trim, take) as String
+import Data.String (Pattern(..), split, trim, take, length) as String
 import Data.String (Pattern(..), split, trim)
 import Effect.Class (liftEffect)
 import Effect.Aff.Class (class MonadAff)
@@ -894,8 +894,11 @@ handleAction = case _ of
       let newConstraint = ":- not assigned(" <> show timeIdx <> ", " <> toPlayer <> ", " <> role <> ")."
       -- Create the old constraint pattern to comment out (the previous drag assignment for this role)
       let oldConstraintPattern = ":- not assigned(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
-      -- Modify the content: comment out old constraint if present, add new one
-      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
+      -- Also need to comment out any existing role constraint for the target player
+      -- (a player can only have one role, so we must remove their old role when assigning a new one)
+      let targetPlayerPrefix = ":- not assigned(" <> show timeIdx <> ", " <> toPlayer <> ","
+      -- Modify the content: comment out old constraints and add new one
+      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern targetPlayerPrefix newConstraint
       -- Update the virtual filesystem
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
       -- Re-run Clingo with the new constraints
@@ -953,14 +956,17 @@ timePointToAssignedTime (AnswerSet.Night n _ _) = n
 timePointToAssignedTime (AnswerSet.Day n _) = n
 timePointToAssignedTime (AnswerSet.UnknownTime _) = 0
 
--- | Modify inst.lp to add a new role assignment constraint and comment out conflicting one
-modifyInstLpForRole :: String -> String -> String -> String
-modifyInstLpForRole content oldPattern newConstraint =
+-- | Modify inst.lp to add a new role assignment constraint and comment out conflicting ones
+-- Takes: content, oldPattern (exact match for source player's role), targetPlayerPrefix (prefix match for target player's any role), newConstraint
+modifyInstLpForRole :: String -> String -> String -> String -> String
+modifyInstLpForRole content oldPattern targetPlayerPrefix newConstraint =
   let
     -- Split content into lines
     contentLines = String.split (String.Pattern "\n") content
-    -- Comment out any existing line matching the old pattern
-    modifiedLines = map (commentOutIfMatches oldPattern) contentLines
+    -- Comment out any existing line matching the old pattern (source player had this role)
+    step1 = map (commentOutIfMatches oldPattern) contentLines
+    -- Also comment out any existing role constraint for the target player (they can only have one role)
+    modifiedLines = map (commentOutIfStartsWith targetPlayerPrefix) step1
     -- Check if the new constraint already exists
     hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
     -- Add the new constraint at the end if not already present
@@ -969,3 +975,16 @@ modifyInstLpForRole content oldPattern newConstraint =
                    else modifiedLines <> ["", "% Role assignment constraint (added by drag)", newConstraint]
   in
     intercalate "\n" finalLines
+
+-- | Comment out a line if it starts with a given prefix (for matching any role for a player)
+commentOutIfStartsWith :: String -> String -> String
+commentOutIfStartsWith prefix line =
+  let
+    trimmedLine = trim line
+    firstChar = String.take 1 trimmedLine
+    -- Check if line starts with prefix and is not already commented
+    startsWithPrefix = String.take (String.length prefix) trimmedLine == prefix
+  in
+    if startsWithPrefix && firstChar /= "%"
+      then "% " <> line <> "  % commented out by drag"
+      else line
