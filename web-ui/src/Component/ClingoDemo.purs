@@ -7,7 +7,7 @@ import Clingo as Clingo
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
-import Data.Array (filter, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
+import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
 import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -80,7 +80,7 @@ answerSetPageSize = 20
 
 -- | List of available file paths derived from embedded files
 availableFiles :: Array String
-availableFiles = Map.keys EP.lpFilesMap
+availableFiles = fromFoldable $ Map.keys EP.lpFilesMap
 
 -- | Get list of all unique directories from file paths
 getDirectories :: Array String -> Array String
