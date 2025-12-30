@@ -35,6 +35,7 @@ import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
 import ReminderDrag as Drag
+import RoleDrag as RoleDrag
 import Halogen.Subscription as HS
 
 -- | View mode for grimoire display
@@ -54,6 +55,12 @@ data Output
       , fromPlayer :: String      -- Original player the token was on
       , toPlayer :: String        -- New player the token is being moved to
       , time :: ASP.TimePoint     -- The time point at which this reminder applies
+      }
+  | RoleMoved
+      { role :: String            -- The role being moved (e.g., "drunk")
+      , fromPlayer :: String      -- Original player who had the role
+      , toPlayer :: String        -- New player receiving the role
+      , time :: ASP.TimePoint     -- The time point at which this role assignment applies
       }
 
 -- | Drag state for reminder tokens
@@ -95,6 +102,8 @@ data Action
   | CancelDrag
   -- Drop event from JS drag handler (for HTML view)
   | HandleReminderDrop Drag.DropEvent
+  -- Drop event from JS role drag handler (for HTML view)
+  | HandleRoleDrop RoleDrag.DropEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -179,7 +188,7 @@ render state =
             ]
         , HH.p
             [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
-            [ HH.text $ "Drag reminder tokens to move them between players"
+            [ HH.text $ "Drag role or reminder tokens to move them between players"
                 <> if state.viewMode == HtmlView then " (touch supported)" else ""
             ]
         , if state.viewMode == SvgView
@@ -637,6 +646,9 @@ renderHtmlPlayer reminders selectedTime player =
     playerReminders = filter (\r -> r.player == player.name) reminders
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
     roleColor = getRoleColor player.role
+    timeStr = case selectedTime of
+      Just t -> formatTimePoint t
+      Nothing -> ""
   in
     HH.div
       [ HP.style $ "background: " <> roleColor <> "; border-radius: 8px; padding: 10px; "
@@ -648,11 +660,21 @@ renderHtmlPlayer reminders selectedTime player =
         HH.div
           [ HP.style "color: white; font-weight: bold; font-size: 12px; margin-bottom: 2px;" ]
           [ HH.text player.name ]
-      -- Role name
+      -- Role token (draggable via JS pointer events)
       , HH.div
-          [ HP.style "color: rgba(255,255,255,0.9); font-size: 10px;" ]
+          [ HP.style $ "color: rgba(255,255,255,0.9); font-size: 10px; "
+              <> "cursor: grab; touch-action: none; user-select: none; "
+              <> "padding: 4px 8px; border-radius: 4px; "
+              <> "background: rgba(0,0,0,0.2); display: inline-block;"
+          -- Data attributes for JS role drag handler
+          , HP.attr (HH.AttrName "data-role-token") player.role
+          , HP.attr (HH.AttrName "data-role-player") player.name
+          , HP.attr (HH.AttrName "data-role-time") timeStr
+          , HP.attr (HH.AttrName "data-role-color") roleColor
+          , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.role)
+          ]
           [ HH.text $ formatRoleName player.role ]
-      -- Token (if different from role)
+      -- Token (if different from role, shows what they think they are)
       , if player.token /= player.role
           then HH.div
             [ HP.style "color: #ffeb3b; font-size: 9px; margin-top: 2px;" ]
@@ -834,14 +856,21 @@ formatTimePoint (ASP.UnknownTime s) = s
 handleAction :: forall cs m. MonadEffect m => Action -> H.HalogenM State Action cs Output m Unit
 handleAction = case _ of
   Initialize -> do
-    -- Set up JS drag handler for HTML view
+    -- Set up JS drag handlers for HTML view
     liftEffect Drag.initDragHandler
-    -- Subscribe to drop events from JS using Halogen subscription
-    { emitter, listener } <- liftEffect HS.create
-    _ <- H.subscribe emitter
-    -- When JS fires a drop event, notify the listener which emits an action
+    liftEffect RoleDrag.initDragHandler
+    -- Subscribe to reminder drop events from JS using Halogen subscription
+    { emitter: reminderEmitter, listener: reminderListener } <- liftEffect HS.create
+    _ <- H.subscribe reminderEmitter
+    -- When JS fires a reminder drop event, notify the listener which emits an action
     liftEffect $ void $ Drag.subscribeToDrops \dropEvent ->
-      HS.notify listener (HandleReminderDrop dropEvent)
+      HS.notify reminderListener (HandleReminderDrop dropEvent)
+    -- Subscribe to role drop events from JS using Halogen subscription
+    { emitter: roleEmitter, listener: roleListener } <- liftEffect HS.create
+    _ <- H.subscribe roleEmitter
+    -- When JS fires a role drop event, notify the listener which emits an action
+    liftEffect $ void $ RoleDrag.subscribeToDrops \dropEvent ->
+      HS.notify roleListener (HandleRoleDrop dropEvent)
 
   ReceiveAtoms atomStrings -> do
     currentState <- H.get
@@ -960,6 +989,19 @@ handleAction = case _ of
       Just time ->
         H.raise $ ReminderMoved
           { token: dropEvent.token
+          , fromPlayer: dropEvent.fromPlayer
+          , toPlayer: dropEvent.toPlayer
+          , time
+          }
+      Nothing -> pure unit
+
+  HandleRoleDrop dropEvent -> do
+    -- Handle role drop event from JS drag handler
+    state <- H.get
+    case state.selectedTime of
+      Just time ->
+        H.raise $ RoleMoved
+          { role: dropEvent.role
           , fromPlayer: dropEvent.fromPlayer
           , toPlayer: dropEvent.toPlayer
           , time
