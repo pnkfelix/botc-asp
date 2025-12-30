@@ -152,6 +152,16 @@ getAllTimePoints atoms =
     getTimeFromAtom (ASP.ActingRole t _) = Just t
     getTimeFromAtom _ = Nothing
 
+-- | Find the original source string for a time atom matching a given time point
+findTimeAtomSource :: Array ASP.ParsedAtom -> ASP.TimePoint -> Maybe String
+findTimeAtomSource parsedAtoms targetTime =
+  case Array.find isMatchingTimeAtom parsedAtoms of
+    Just { original } -> if original == "" then Nothing else Just original
+    Nothing -> Nothing
+  where
+    isMatchingTimeAtom { atom: ASP.Time t } = t == targetTime
+    isMatchingTimeAtom _ = false
+
 -- | Main render function
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
@@ -244,7 +254,8 @@ renderTimePoint state timePoint =
 eventAtTime :: ASP.TimePoint -> ASP.TimelineEvent -> Boolean
 eventAtTime t (ASP.RoleAction r) = r.time == t
 eventAtTime t (ASP.TokenPlaced r) = r.time == t
-eventAtTime _ (ASP.Execution _) = false  -- Executions happen at day end
+eventAtTime (ASP.Day d _) (ASP.Execution e) = e.day == d  -- Executions appear under their day
+eventAtTime _ (ASP.Execution _) = false
 
 -- | Render a single event (clickable for navigation)
 renderEvent :: forall cs m. ASP.TimelineEvent -> H.ComponentHTML Action cs m
@@ -896,8 +907,17 @@ handleAction = case _ of
       , selectedTime = preservedTime
       }
 
-  SelectTimePoint t ->
+  SelectTimePoint t -> do
+    state <- H.get
     H.modify_ \s -> s { selectedTime = Just t }
+    -- Find the time atom's original string to enable scrolling to it
+    let timeAtomSource = findTimeAtomSource state.parsedAtoms t
+    -- Emit output event to scroll to the time atom in the answer set
+    H.raise $ TimelineEventClicked
+      { sourceAtom: fromMaybe (show t) timeAtomSource  -- Fallback to show representation
+      , predicateName: "time"
+      , predicateArity: 1
+      }
 
   ClickTimelineEvent event -> do
     -- Extract source atom and predicate info from the event

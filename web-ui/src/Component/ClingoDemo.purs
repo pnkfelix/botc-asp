@@ -18,6 +18,8 @@ import Data.Tuple (Tuple(..))
 import Data.String (Pattern(..), split, trim, take) as String
 import Data.String (Pattern(..), split, trim)
 import Effect.Class (liftEffect)
+import Effect.Aff (Milliseconds(..))
+import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import EmbeddedPrograms as EP
 import Halogen as H
@@ -51,6 +53,8 @@ type State =
   , selectedPredicate :: Maybe ASP.Predicate
   -- Output filter expression (for filtering displayed atoms)
   , outputFilter :: String          -- Boolean expression to filter atoms
+  -- Scroll notification (shown briefly when timeline click can't find the atom)
+  , scrollNotification :: Maybe String
   }
 
 -- | How to display results
@@ -78,6 +82,7 @@ data Action
   | ClosePredicateModal
   | JumpToReference String Int  -- sourceFile, lineNumber
   | HandleTimelineEvent TG.Output  -- Handle timeline event clicks
+  | ClearScrollNotification     -- Clear the scroll notification message
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -135,6 +140,7 @@ initialState =
   , showPredicateList: false
   , selectedPredicate: Nothing
   , outputFilter: ""       -- No filtering by default
+  , scrollNotification: Nothing  -- No notification initially
   }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
@@ -216,6 +222,20 @@ render state =
             ]
             [ HH.text $ if state.showPredicateList then "Hide Predicates" else "Predicates" ]
         ]
+
+    -- Scroll notification toast (top center, appears briefly when scrolling fails)
+    , case state.scrollNotification of
+        Just msg ->
+          HH.div
+            [ HP.style $ "position: fixed; top: 20px; left: 50%; transform: translateX(-50%); "
+                <> "z-index: 1000; padding: 12px 24px; background: #f44336; color: white; "
+                <> "border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); "
+                <> "font-size: 14px; max-width: 80%; text-align: center;"
+            , HE.onClick \_ -> ClearScrollNotification
+            ]
+            [ HH.text msg ]
+        Nothing ->
+          HH.text ""
 
     -- Single file editor with file tabs
     , HH.div
@@ -850,7 +870,7 @@ handleAction = case _ of
     liftEffect $ TU.scrollToLine "editor-textarea" lineNumber
 
   HandleTimelineEvent output -> case output of
-    TG.TimelineEventClicked { sourceAtom } -> do
+    TG.TimelineEventClicked { sourceAtom, predicateName } -> do
       -- Scroll to the atom in the currently selected answer set
       if sourceAtom /= ""
         then do
@@ -863,10 +883,29 @@ handleAction = case _ of
           if selectedIdx >= pageStart && selectedIdx < pageEnd
             then do
               let childIndex = selectedIdx - pageStart
-              _ <- liftEffect $ TU.scrollToTextInChild "answer-set-display" childIndex sourceAtom
+              found <- liftEffect $ TU.scrollToTextInChild "answer-set-display" childIndex sourceAtom
+              -- Show notification if atom not found in answer set
+              when (not found) do
+                H.modify_ \s -> s { scrollNotification = Just $ "Could not find '" <> sourceAtom <> "' in the answer set" }
+                -- Clear notification after 3 seconds
+                _ <- H.fork do
+                  Aff.delay (Milliseconds 3000.0)
+                  H.modify_ \s -> s { scrollNotification = Nothing }
+                pure unit
+            else do
+              -- Notify user that the model is not on the current page
+              H.modify_ \s -> s { scrollNotification = Just $ "Model " <> show (selectedIdx + 1) <> " is not on the current page" }
+              _ <- H.fork do
+                Aff.delay (Milliseconds 3000.0)
+                H.modify_ \s -> s { scrollNotification = Nothing }
               pure unit
-            else pure unit
-        else pure unit
+        else do
+          -- Empty sourceAtom - this shouldn't normally happen
+          H.modify_ \s -> s { scrollNotification = Just $ "No source atom for " <> predicateName <> " event" }
+          _ <- H.fork do
+            Aff.delay (Milliseconds 3000.0)
+            H.modify_ \s -> s { scrollNotification = Nothing }
+          pure unit
     TG.ReminderMoved { token, fromPlayer, toPlayer, time } -> do
       -- Modify inst.lp to add a constraint for the new reminder placement
       state <- H.get
@@ -900,6 +939,9 @@ handleAction = case _ of
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
+
+  ClearScrollNotification ->
+    H.modify_ \s -> s { scrollNotification = Nothing }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
