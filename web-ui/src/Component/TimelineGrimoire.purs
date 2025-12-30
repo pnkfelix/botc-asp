@@ -35,10 +35,8 @@ import Web.Event.Event (Event, EventType(..), preventDefault)
 import Web.Event.Event as Event
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
-import Web.TouchEvent.TouchEvent (TouchEvent, fromEvent, touches)
-import Web.TouchEvent.TouchList as TL
-import Web.TouchEvent.Touch as Touch
-import ElementHitTest (findPlayerAtPoint)
+import ElementHitTest (findPlayerAtPoint, getTouchCoordsFromEvent)
+import Web.TouchEvent.TouchEvent as TouchEvent
 
 -- | View mode for grimoire display
 data ViewMode = SvgView | HtmlView
@@ -688,7 +686,7 @@ renderHtmlReminderToken _playerName reminder =
         <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
         <> "touch-action: none; user-select: none;"
     , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
-    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, event: evt }
+    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, event: TouchEvent.toEvent evt }
     ]
     [ HH.text $ abbreviateToken reminder.token ]
 
@@ -1044,14 +1042,3 @@ findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
   in case closest of
     Just p | p.dist < 60.0 -> Just p.name
     _ -> Nothing
-
--- | Extract coordinates from first touch in a raw Event (converts to TouchEvent first)
-getTouchCoordsFromEvent :: Event -> Maybe { x :: Number, y :: Number }
-getTouchCoordsFromEvent event =
-  case fromEvent event of
-    Nothing -> Nothing
-    Just touchEvent ->
-      let touchList = touches touchEvent
-      in case TL.item 0 touchList of
-        Nothing -> Nothing
-        Just touch -> Just { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
