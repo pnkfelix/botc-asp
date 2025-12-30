@@ -240,6 +240,13 @@ st_tells(P, N) :- st_tells_core(_, P, count(N), _).
 st_tells(R, Role) :- st_tells_core(R, _, info(_, _, Role), _).
 st_tells(P, Role) :- st_tells_core(_, P, info(_, _, Role), _).
 
+% Also extract the players pointed to from info tuples
+% st_tells(washerwoman, alice) means "washerwoman pointed to player alice"
+st_tells(R, P1) :- st_tells_core(R, _, info(P1, _, _), _).
+st_tells(R, P2) :- st_tells_core(R, _, info(_, P2, _), _).
+st_tells(P, P1) :- st_tells_core(_, P, info(P1, _, _), _).
+st_tells(P, P2) :- st_tells_core(_, P, info(_, P2, _), _).
+
 % For point info (undertaker, ravenkeeper): st_tells(undertaker, poisoner)
 st_tells(R, Role) :- st_tells_core(R, _, point(Role), _).
 st_tells(P, Role) :- st_tells_core(_, P, point(Role), _).
