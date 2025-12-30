@@ -471,6 +471,12 @@ died_during_day(P, N) :- died(P, day(N, _)).
 % A player dies when executed
 died(P, day(N, exec)) :- executed(P, N).
 
+% A player is dead at the moment they die
+dead(P, T) :- died(P, T).
+
+% Once dead, stay dead (death persists through all subsequent time points)
+dead(P, T2) :- dead(P, T1), next(T1, T2).
+
 % Validate: executed player must have been alive at start of day
 :- executed(P, N), not alive(P, day(N, 0)).
 
