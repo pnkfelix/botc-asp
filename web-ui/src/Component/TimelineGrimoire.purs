@@ -7,16 +7,18 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, foldl, head, last, length, mapWithIndex, nub, null, sortBy, take)
+import Data.Array (elem, filter, foldl, head, last, length, mapWithIndex, nub, null, sortBy, take, (..), findIndex)
 import Data.Array as Array
 import Data.Char (toCharCode)
-import Data.Foldable (fold, intercalate)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Foldable (fold, intercalate, minimumBy)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Int (toNumber)
 import Data.Ord (comparing)
 import Data.String (Pattern(..))
 import Data.String.CodeUnits (toCharArray)
 import Data.String as S
+import Data.Number (sqrt)
+import Effect.Class (class MonadEffect, liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -29,6 +31,8 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
+import Web.Event.Event (preventDefault)
+import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
 
 -- | Output events from the component
 data Output
@@ -37,6 +41,22 @@ data Output
       , predicateName :: String   -- Predicate name for finding rules (e.g., "st_tells")
       , predicateArity :: Int     -- Arity for finding rules
       }
+  | ReminderMoved
+      { token :: String           -- The reminder token being moved (e.g., "poi_poisoned")
+      , fromPlayer :: String      -- Original player the token was on
+      , toPlayer :: String        -- New player the token is being moved to
+      , time :: ASP.TimePoint     -- The time point at which this reminder applies
+      }
+
+-- | Drag state for reminder tokens
+type DragState =
+  { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }
+  , startX :: Number           -- Mouse X when drag started (SVG coords)
+  , startY :: Number           -- Mouse Y when drag started (SVG coords)
+  , currentX :: Number         -- Current mouse X (SVG coords)
+  , currentY :: Number         -- Current mouse Y (SVG coords)
+  , targetPlayer :: Maybe String  -- Player the token would be assigned to if dropped
+  }
 
 -- | Component state
 type State =
@@ -45,6 +65,8 @@ type State =
   , timeline :: Array ASP.TimelineEvent
   , selectedTime :: Maybe ASP.TimePoint
   , allTimePoints :: Array ASP.TimePoint
+  , dragging :: Maybe DragState          -- Current drag operation
+  , svgBounds :: Maybe { left :: Number, top :: Number, width :: Number, height :: Number }
   }
 
 -- | Component query type (empty - no queries supported)
@@ -55,9 +77,13 @@ data Action
   = ReceiveAtoms (Array String)
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
+  | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, mouseEvent :: MouseEvent }
+  | DragMove MouseEvent
+  | EndDrag MouseEvent
+  | CancelDrag
 
 -- | The Halogen component with output events
-component :: forall m. H.Component Query (Array String) Output m
+component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
 component =
   H.mkComponent
     { initialState
@@ -83,6 +109,8 @@ initialState atomStrings =
     , timeline
     , selectedTime: firstTime
     , allTimePoints: allTimes
+    , dragging: Nothing
+    , svgBounds: Nothing
     }
 
 -- | Get all unique time points from atoms
@@ -114,13 +142,18 @@ render state =
         ]
     -- Grimoire panel (right)
     , HH.div
-        [ HP.style "flex: 2; min-width: 400px;" ]
+        [ HP.style $ "flex: 2; min-width: 400px;"
+            <> if isJust state.dragging then " cursor: grabbing;" else ""
+        ]
         [ HH.h3
             [ HP.style "margin: 0 0 10px 0; color: #333;" ]
             [ HH.text $ "Grimoire" <> case state.selectedTime of
                 Just t -> " @ " <> formatTimePoint t
                 Nothing -> ""
             ]
+        , HH.p
+            [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
+            [ HH.text "Drag reminder tokens to move them between players" ]
         , renderGrimoire state
         ]
     ]
@@ -226,15 +259,27 @@ renderGrimoire state =
     centerX = width / 2.0
     centerY = height / 2.0
     radius = 180.0
+    -- Calculate player positions for target detection
+    playerPositions = mapWithIndex (calcPlayerPosition centerX centerY radius playerCount) gameState.players
+    -- Drag state
+    isDragging = isJust state.dragging
   in
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 20px;" ]
-      [ -- SVG grimoire
+      [ -- SVG grimoire with drag event handlers
         SE.svg
-          [ SA.viewBox 0.0 0.0 width height
-          , SA.width width
-          , SA.height height
-          ]
+          ( [ SA.viewBox 0.0 0.0 width height
+            , SA.width width
+            , SA.height height
+            , HP.id "grimoire-svg"
+            , HP.style $ if isDragging then "cursor: grabbing;" else ""
+            ] <> (if isDragging
+                  then [ HE.onMouseMove DragMove
+                       , HE.onMouseUp EndDrag
+                       , HE.onMouseLeave \_ -> CancelDrag
+                       ]
+                  else [])
+          )
           (
             -- Draw dashed circle showing table edge
             [ SE.circle
@@ -249,7 +294,7 @@ renderGrimoire state =
             ]
             -- Draw players
             <> (if playerCount > 0
-                then mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders) gameState.players
+                then mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders state.dragging) gameState.players
                 else [ SE.text
                          [ SA.x centerX
                          , SA.y centerY
@@ -258,6 +303,8 @@ renderGrimoire state =
                          ]
                          [ HH.text "No player data - add #show chair/2." ]
                      ])
+            -- Draw drag visual feedback
+            <> renderDragFeedback state.dragging centerX centerY radius playerCount gameState.players
           )
       -- Legend
       , HH.div
@@ -291,6 +338,23 @@ renderGrimoire state =
           ]
       ]
 
+-- | Calculate player position on the circle
+calcPlayerPosition :: forall r.
+  Number ->  -- centerX
+  Number ->  -- centerY
+  Number ->  -- radius
+  Int ->     -- total players
+  Int ->     -- index
+  { name :: String | r } ->
+  { name :: String, x :: Number, y :: Number }
+calcPlayerPosition centerX centerY radius playerCount idx player =
+  let
+    angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
+    x = centerX + radius * cos angle
+    y = centerY + radius * sin angle
+  in
+    { name: player.name, x, y }
+
 -- | Render a single player token
 renderPlayer :: forall cs m.
   Number ->  -- centerX
@@ -298,18 +362,19 @@ renderPlayer :: forall cs m.
   Number ->  -- radius
   Int ->     -- total players
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->  -- reminders (sorted by placedAt)
+  Maybe DragState ->  -- current drag state
   Int ->     -- index
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
   H.ComponentHTML Action cs m
-renderPlayer centerX centerY radius playerCount reminders idx player =
+renderPlayer centerX centerY radius playerCount reminders dragState idx player =
   let
     -- Calculate position on circle (start from top, go clockwise)
     angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
     x = centerX + radius * cos angle
     y = centerY + radius * sin angle
 
-    -- Player's reminders
-    playerReminders = filter (\r -> r.player == player.name) reminders
+    -- Player's reminders (filter out the one being dragged)
+    playerReminders = filter (\r -> r.player == player.name && not (isDraggingReminder dragState r)) reminders
 
     -- Direction toward center (angle + pi points inward)
     angleToCenter = angle + pi
@@ -317,21 +382,40 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
     -- Colors
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
     roleColor = getRoleColor player.role
+
+    -- Is this player the drop target?
+    isDropTarget = case dragState of
+      Just ds -> ds.targetPlayer == Just player.name
+      Nothing -> false
   in
     SE.g
       [ SA.transform [ SA.Translate x y ] ]
       ( [
-        -- Main role token (outer circle)
+        -- Main role token (outer circle) - highlight if drop target
         SE.circle
           [ SA.cx 0.0
           , SA.cy 0.0
           , SA.r 35.0
           , SA.fill (Named roleColor)
-          , SA.stroke (Named aliveColor)
-          , SA.strokeWidth 3.0
+          , SA.stroke (Named $ if isDropTarget then "#FFD700" else aliveColor)
+          , SA.strokeWidth (if isDropTarget then 5.0 else 3.0)
           ]
+      -- Drop target indicator (dashed inner circle)
+      ] <> (if isDropTarget
+            then [ SE.circle
+                     [ SA.cx 0.0
+                     , SA.cy 0.0
+                     , SA.r 42.0
+                     , SA.fill NoColor
+                     , SA.stroke (Named "#FFD700")
+                     , SA.strokeWidth 2.0
+                     , SA.strokeDashArray "4,4"
+                     ]
+                 ]
+            else [])
+      <> [
       -- Player name
-      , SE.text
+        SE.text
           [ SA.x 0.0
           , SA.y (-8.0)
           , SA.textAnchor AnchorMiddle
@@ -364,7 +448,13 @@ renderPlayer centerX centerY radius playerCount reminders idx player =
       ] <> mapWithIndex (renderReminderToken angleToCenter (length playerReminders)) playerReminders
       )
 
--- | Render a reminder token
+-- | Check if a reminder is currently being dragged
+isDraggingReminder :: Maybe DragState -> { token :: String, player :: String, placedAt :: ASP.TimePoint } -> Boolean
+isDraggingReminder Nothing _ = false
+isDraggingReminder (Just ds) r =
+  ds.reminder.token == r.token && ds.reminder.player == r.player && ds.reminder.placedAt == r.placedAt
+
+-- | Render a reminder token (draggable)
 renderReminderToken :: forall cs m.
   Number -> -- angle toward center
   Int ->    -- total reminders for this player
@@ -382,7 +472,10 @@ renderReminderToken angleToCenter _total idx reminder =
     ry = dist * sin angleToCenter
   in
     SE.g
-      [ SA.transform [ SA.Translate rx ry ] ]
+      [ SA.transform [ SA.Translate rx ry ]
+      , HP.style "cursor: grab;"
+      , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
+      ]
       [ -- Reminder circle
         SE.circle
           [ SA.cx 0.0
@@ -403,6 +496,76 @@ renderReminderToken angleToCenter _total idx reminder =
           ]
           [ HH.text $ abbreviateToken reminder.token ]
       ]
+
+-- | Render visual feedback for dragging (dotted line + floating token)
+renderDragFeedback :: forall cs m.
+  Maybe DragState ->
+  Number ->  -- centerX
+  Number ->  -- centerY
+  Number ->  -- radius
+  Int ->     -- playerCount
+  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  Array (H.ComponentHTML Action cs m)
+renderDragFeedback Nothing _ _ _ _ _ = []
+renderDragFeedback (Just ds) centerX centerY radius playerCount players =
+  let
+    -- Calculate start position (where the token was originally)
+    sourcePlayerPos = findPlayerPosition ds.reminder.player centerX centerY radius playerCount players
+    -- Draw from source to current mouse position
+  in case sourcePlayerPos of
+    Nothing -> []
+    Just { x: srcX, y: srcY } ->
+      [ -- Dotted line from source to current position
+        SE.line
+          [ SA.x1 srcX
+          , SA.y1 srcY
+          , SA.x2 ds.currentX
+          , SA.y2 ds.currentY
+          , SA.stroke (Named "#666")
+          , SA.strokeWidth 2.0
+          , SA.strokeDashArray "5,5"
+          ]
+      -- Floating token at current mouse position
+      , SE.g
+          [ SA.transform [ SA.Translate ds.currentX ds.currentY ] ]
+          [ SE.circle
+              [ SA.cx 0.0
+              , SA.cy 0.0
+              , SA.r 14.0
+              , SA.fill (Named (getReminderColor ds.reminder.token))
+              , SA.stroke (Named "#FFD700")
+              , SA.strokeWidth 2.0
+              ]
+          , SE.text
+              [ SA.x 0.0
+              , SA.y 4.0
+              , SA.textAnchor AnchorMiddle
+              , SA.fill (Named "white")
+              , SA.fontWeight FWeightBold
+              , SA.fontSize (FontSizeLength (Px 7.0))
+              ]
+              [ HH.text $ abbreviateToken ds.reminder.token ]
+          ]
+      ]
+
+-- | Find a player's position on the circle
+findPlayerPosition :: forall r.
+  String ->  -- player name
+  Number ->  -- centerX
+  Number ->  -- centerY
+  Number ->  -- radius
+  Int ->     -- playerCount
+  Array { name :: String | r } ->
+  Maybe { x :: Number, y :: Number }
+findPlayerPosition playerName centerX centerY radius playerCount players =
+  case findIndex (\p -> p.name == playerName) players of
+    Nothing -> Nothing
+    Just idx ->
+      let
+        angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
+        x = centerX + radius * cos angle
+        y = centerY + radius * sin angle
+      in Just { x, y }
 
 -- | Simple hash function for strings
 -- Returns a positive integer derived from the string
@@ -524,7 +687,7 @@ formatTimePoint (ASP.Day n p) = "Day " <> show n <> " (" <> p <> ")"
 formatTimePoint (ASP.UnknownTime s) = s
 
 -- | Handle actions
-handleAction :: forall cs m. Action -> H.HalogenM State Action cs Output m Unit
+handleAction :: forall cs m. MonadEffect m => Action -> H.HalogenM State Action cs Output m Unit
 handleAction = case _ of
   ReceiveAtoms atomStrings -> do
     currentState <- H.get
@@ -573,3 +736,101 @@ handleAction = case _ of
             }
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo
+
+  StartDragReminder { reminder, mouseEvent } -> do
+    -- Prevent default to avoid text selection during drag
+    liftEffect $ preventDefault (toEvent mouseEvent)
+    -- Get SVG coordinates from mouse event
+    state <- H.get
+    let mouseX = toNumber (clientX mouseEvent)
+    let mouseY = toNumber (clientY mouseEvent)
+    -- Convert to SVG coordinates (simplified - assumes SVG fills container)
+    -- We'll store client coordinates and do conversion during render
+    let svgX = mouseX
+    let svgY = mouseY
+    -- Calculate initial target (the player currently owning the token)
+    H.modify_ \s -> s
+      { dragging = Just
+          { reminder
+          , startX: svgX
+          , startY: svgY
+          , currentX: svgX
+          , currentY: svgY
+          , targetPlayer: Just reminder.player
+          }
+      }
+
+  DragMove mouseEvent -> do
+    liftEffect $ preventDefault (toEvent mouseEvent)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        let mouseX = toNumber (clientX mouseEvent)
+        let mouseY = toNumber (clientY mouseEvent)
+        -- Find the closest player to the mouse position
+        let gameState = case state.selectedTime of
+              Just t -> ASP.buildGameState state.atoms t
+              Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
+        let targetPlayer = findClosestPlayer mouseX mouseY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        H.modify_ \s -> s
+          { dragging = Just ds
+              { currentX = mouseX
+              , currentY = mouseY
+              , targetPlayer = targetPlayer
+              }
+          }
+
+  EndDrag mouseEvent -> do
+    liftEffect $ preventDefault (toEvent mouseEvent)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        -- Clear drag state first
+        H.modify_ \s -> s { dragging = Nothing }
+        -- If there's a valid target and it's different from source, emit event
+        case ds.targetPlayer of
+          Just toPlayer | toPlayer /= ds.reminder.player -> do
+            case state.selectedTime of
+              Just time ->
+                H.raise $ ReminderMoved
+                  { token: ds.reminder.token
+                  , fromPlayer: ds.reminder.player
+                  , toPlayer
+                  , time
+                  }
+              Nothing -> pure unit
+          _ -> pure unit
+
+  CancelDrag -> do
+    H.modify_ \s -> s { dragging = Nothing }
+
+-- | Find the closest player to a given screen position
+findClosestPlayer :: forall r.
+  Number ->  -- mouseX
+  Number ->  -- mouseY
+  Number ->  -- centerX
+  Number ->  -- centerY
+  Number ->  -- radius
+  Int ->     -- playerCount
+  Array { name :: String | r } ->
+  Maybe String
+findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
+  let
+    -- Calculate positions for all players
+    playerDists = mapWithIndex calcDist players
+    calcDist idx p =
+      let
+        angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
+        px = centerX + radius * cos angle
+        py = centerY + radius * sin angle
+        dx = mouseX - px
+        dy = mouseY - py
+        dist = sqrt (dx * dx + dy * dy)
+      in { name: p.name, dist }
+    -- Find the closest one (within a threshold of 50 pixels)
+    closest = minimumBy (comparing _.dist) playerDists
+  in case closest of
+    Just p | p.dist < 60.0 -> Just p.name
+    _ -> Nothing
