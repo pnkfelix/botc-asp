@@ -44,7 +44,7 @@ assigned(0, courtney, investigator).
 
 #show distrib/1.
 #show assigned/3.
-%#show received/2.
+#show received/2.
 %#show time/1.
 %#show next/2.
 #show reminder_on/3.
