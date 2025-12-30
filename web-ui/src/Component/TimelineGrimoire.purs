@@ -31,12 +31,11 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
-import Web.Event.Event (Event, EventType(..), preventDefault)
-import Web.Event.Event as Event
+import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
-import ElementHitTest (findPlayerAtPoint, getTouchCoordsFromEvent)
-import Web.TouchEvent.TouchEvent as TouchEvent
+import ReminderDrag as Drag
+import Halogen.Subscription as HS
 
 -- | View mode for grimoire display
 data ViewMode = SvgView | HtmlView
@@ -84,19 +83,18 @@ data Query a
 
 -- | Component actions
 data Action
-  = ReceiveAtoms (Array String)
+  = Initialize                            -- Set up JS drag handler
+  | ReceiveAtoms (Array String)
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
-  -- Mouse events (work in both views)
+  -- Mouse events for SVG view (HTML view uses JS pointer events)
   | StartDragReminderMouse { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: MouseEvent }
   | DragMoveMouse MouseEvent
   | EndDragMouse MouseEvent
-  -- Touch events for HTML view (mobile support) - use raw Event, convert in handler
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: Event }
-  | DragMoveTouch Event
-  | EndDragTouch Event
   | CancelDrag
+  -- Drop event from JS drag handler (for HTML view)
+  | HandleReminderDrop Drag.DropEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -107,6 +105,7 @@ component =
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
         , receive = Just <<< ReceiveAtoms
+        , initialize = Just Initialize
         }
     }
 
@@ -601,29 +600,18 @@ renderHtmlGrimoire state =
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 15px;" ]
       [ -- Player grid with hollow center
+        -- Note: JS handles all drag events via pointer events on document
         HH.div
-          ( [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
-                <> "gap: 8px; min-height: 200px;"
-                <> if isDragging then " touch-action: none;" else ""
-            ] <> (if isDragging
-                  then [ HE.onMouseMove DragMoveMouse
-                       , HE.onMouseUp EndDragMouse
-                       , HE.onMouseLeave \_ -> CancelDrag
-                       , HE.handler (EventType "touchmove") DragMoveTouch
-                       , HE.handler (EventType "touchend") EndDragTouch
-                       , HE.handler (EventType "touchcancel") \_ -> CancelDrag
-                       ]
-                  else [])
-          )
+          [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
+              <> "gap: 8px; min-height: 200px;"
+          ]
           ( if playerCount > 0
-              then renderHollowGrid gameState.reminders state.dragging gameState.players playerPositions cols rows
+              then renderHollowGrid gameState.reminders state.selectedTime gameState.players playerPositions cols rows
               else [ HH.div
                        [ HP.style "grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;" ]
                        [ HH.text "No player data - add #show chair/2." ]
                    ]
           )
-      -- Drag feedback (floating token)
-      , renderHtmlDragFeedback state.dragging
       -- Compact legend
       , HH.div
           [ HP.style "margin-top: 12px; font-size: 11px; color: #666; text-align: center;" ]
@@ -641,23 +629,19 @@ renderHtmlGrimoire state =
 -- | Render a single player card in HTML grid view
 renderHtmlPlayer :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
-  Maybe DragState ->
+  Maybe ASP.TimePoint ->  -- selected time for data attributes
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
   H.ComponentHTML Action cs m
-renderHtmlPlayer reminders dragState player =
+renderHtmlPlayer reminders selectedTime player =
   let
-    playerReminders = filter (\r -> r.player == player.name && not (isDraggingReminder dragState r)) reminders
+    playerReminders = filter (\r -> r.player == player.name) reminders
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
     roleColor = getRoleColor player.role
-    isDropTarget = case dragState of
-      Just ds -> ds.targetPlayer == Just player.name
-      Nothing -> false
   in
     HH.div
       [ HP.style $ "background: " <> roleColor <> "; border-radius: 8px; padding: 10px; "
-          <> "border: 3px solid " <> (if isDropTarget then "#FFD700" else aliveColor) <> "; "
-          <> "text-align: center; min-height: 80px; "
-          <> (if isDropTarget then "box-shadow: 0 0 10px #FFD700; " else "")
+          <> "border: 3px solid " <> aliveColor <> "; "
+          <> "text-align: center; min-height: 80px;"
       , HP.attr (HH.AttrName "data-player") player.name
       ]
       [ -- Player name
@@ -674,47 +658,39 @@ renderHtmlPlayer reminders dragState player =
             [ HP.style "color: #ffeb3b; font-size: 9px; margin-top: 2px;" ]
             [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
           else HH.text ""
-      -- Reminder tokens
+      -- Reminder tokens (draggable via JS pointer events)
       , if null playerReminders
           then HH.text ""
           else HH.div
             [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px;" ]
-            (map (renderHtmlReminderToken player.name) playerReminders)
+            (map (renderHtmlReminderToken selectedTime) playerReminders)
       ]
 
--- | Render a single reminder token in HTML view (draggable)
+-- | Render a single reminder token in HTML view (draggable via JS pointer events)
 renderHtmlReminderToken :: forall cs m.
-  String ->  -- player name (for identifying drop target)
+  Maybe ASP.TimePoint ->  -- selected time for data attribute
   { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   H.ComponentHTML Action cs m
-renderHtmlReminderToken _playerName reminder =
-  HH.div
-    [ HP.style $ "width: 24px; height: 24px; border-radius: 50%; "
-        <> "background: " <> getReminderColor reminder.token <> "; "
-        <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
-        <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
-        <> "touch-action: none; user-select: none;"
-    , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
-    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, event: TouchEvent.toEvent evt }
-    ]
+renderHtmlReminderToken selectedTime reminder =
+  let
+    timeStr = case selectedTime of
+      Just t -> formatTimePoint t
+      Nothing -> ""
+  in
+    HH.div
+      [ HP.style $ "width: 24px; height: 24px; border-radius: 50%; "
+          <> "background: " <> getReminderColor reminder.token <> "; "
+          <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
+          <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
+          <> "touch-action: none; user-select: none;"
+      -- Data attributes for JS drag handler
+      , HP.attr (HH.AttrName "data-reminder-token") reminder.token
+      , HP.attr (HH.AttrName "data-reminder-player") reminder.player
+      , HP.attr (HH.AttrName "data-reminder-time") timeStr
+      , HP.attr (HH.AttrName "data-reminder-color") (getReminderColor reminder.token)
+      , HP.attr (HH.AttrName "data-reminder-abbrev") (abbreviateToken reminder.token)
+      ]
     [ HH.text $ abbreviateToken reminder.token ]
-
--- | Render floating drag feedback for HTML view
-renderHtmlDragFeedback :: forall cs m. Maybe DragState -> H.ComponentHTML Action cs m
-renderHtmlDragFeedback Nothing = HH.text ""
-renderHtmlDragFeedback (Just ds) =
-  HH.div
-    [ HP.style $ "position: fixed; pointer-events: none; z-index: 1000; "
-        <> "left: " <> show (ds.currentX - 14.0) <> "px; "
-        <> "top: " <> show (ds.currentY - 14.0) <> "px; "
-        <> "width: 28px; height: 28px; border-radius: 50%; "
-        <> "background: " <> getReminderColor ds.reminder.token <> "; "
-        <> "border: 2px solid #FFD700; "
-        <> "display: flex; align-items: center; justify-content: center; "
-        <> "font-size: 8px; font-weight: bold; color: white; "
-        <> "box-shadow: 0 2px 8px rgba(0,0,0,0.3);"
-    ]
-    [ HH.text $ abbreviateToken ds.reminder.token ]
 
 -- | Find a player's position on the circle
 findPlayerPosition :: forall r.
@@ -857,6 +833,16 @@ formatTimePoint (ASP.UnknownTime s) = s
 -- | Handle actions
 handleAction :: forall cs m. MonadEffect m => Action -> H.HalogenM State Action cs Output m Unit
 handleAction = case _ of
+  Initialize -> do
+    -- Set up JS drag handler for HTML view
+    liftEffect Drag.initDragHandler
+    -- Subscribe to drop events from JS using Halogen subscription
+    { emitter, listener } <- liftEffect HS.create
+    _ <- H.subscribe emitter
+    -- When JS fires a drop event, notify the listener which emits an action
+    liftEffect $ void $ Drag.subscribeToDrops \dropEvent ->
+      HS.notify listener (HandleReminderDrop dropEvent)
+
   ReceiveAtoms atomStrings -> do
     currentState <- H.get
     let parsedAtoms = ASP.parseAnswerSetWithOriginals atomStrings
@@ -961,67 +947,24 @@ handleAction = case _ of
               Nothing -> pure unit
           _ -> pure unit
 
-  -- Touch events for HTML view (mobile support)
-  StartDragReminderTouch { reminder, event } -> do
-    liftEffect $ preventDefault event
-    -- Get coordinates from first touch (convert Event to TouchEvent)
-    case getTouchCoordsFromEvent event of
-      Nothing -> pure unit
-      Just { x: touchX, y: touchY } ->
-        H.modify_ \s -> s
-          { dragging = Just
-              { reminder
-              , startX: touchX
-              , startY: touchY
-              , currentX: touchX
-              , currentY: touchY
-              , targetPlayer: Just reminder.player
-              }
-          }
-
-  DragMoveTouch event -> do
-    liftEffect $ preventDefault event
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        case getTouchCoordsFromEvent event of
-          Nothing -> pure unit
-          Just { x: touchX, y: touchY } -> do
-            targetPlayer <- liftEffect $ findPlayerAtPoint touchX touchY
-            H.modify_ \s -> s
-              { dragging = Just ds
-                  { currentX = touchX
-                  , currentY = touchY
-                  , targetPlayer = targetPlayer
-                  }
-              }
-
-  EndDragTouch event -> do
-    liftEffect $ preventDefault event
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        H.modify_ \s -> s { dragging = Nothing }
-        case ds.targetPlayer of
-          Just toPlayer | toPlayer /= ds.reminder.player -> do
-            case state.selectedTime of
-              Just time ->
-                H.raise $ ReminderMoved
-                  { token: ds.reminder.token
-                  , fromPlayer: ds.reminder.player
-                  , toPlayer
-                  , time
-                  }
-              Nothing -> pure unit
-          _ -> pure unit
-
   CancelDrag -> do
     H.modify_ \s -> s { dragging = Nothing }
 
   ToggleViewMode -> do
     H.modify_ \s -> s { viewMode = if s.viewMode == SvgView then HtmlView else SvgView }
+
+  HandleReminderDrop dropEvent -> do
+    -- Handle drop event from JS drag handler
+    state <- H.get
+    case state.selectedTime of
+      Just time ->
+        H.raise $ ReminderMoved
+          { token: dropEvent.token
+          , fromPlayer: dropEvent.fromPlayer
+          , toPlayer: dropEvent.toPlayer
+          , time
+          }
+      Nothing -> pure unit
 
 -- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
 -- For n players, perimeter = 2*cols + 2*rows - 4 = n
@@ -1055,13 +998,13 @@ assignPerimeterPositions playerCount cols rows =
 -- | Render the hollow grid with players on perimeter and empty center
 renderHollowGrid :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
-  Maybe DragState ->
+  Maybe ASP.TimePoint ->  -- selected time for data attributes
   Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
   Array { row :: Int, col :: Int } ->
   Int ->  -- cols
   Int ->  -- rows
   Array (H.ComponentHTML Action cs m)
-renderHollowGrid reminders dragState players positions cols rows =
+renderHollowGrid reminders selectedTime players positions cols rows =
   let
     -- Create a lookup from position to player
     positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
@@ -1073,7 +1016,7 @@ renderHollowGrid reminders dragState players positions cols rows =
     -- For each cell, either render a player or empty/center cell
     renderCell cell =
       case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
-        Just { player } -> renderHtmlPlayer reminders dragState player
+        Just { player } -> renderHtmlPlayer reminders selectedTime player
         Nothing ->
           -- Empty center cell
           if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
