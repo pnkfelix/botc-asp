@@ -31,13 +31,12 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
-import Web.Event.Event (preventDefault)
-import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
-import Web.TouchEvent.TouchEvent (TouchEvent)
-import Web.TouchEvent.TouchEvent as TE
-import Web.TouchEvent.TouchList as TL
-import Web.TouchEvent.Touch as Touch
-import ElementHitTest (findPlayerAtPoint)
+import Web.Event.Event (Event, EventType(..), preventDefault)
+import Web.Event.Event as Event
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as ME
+import ElementHitTest (findPlayerAtPoint, getTouchCoordsFromEvent)
+import Web.TouchEvent.TouchEvent as TouchEvent
 
 -- | View mode for grimoire display
 data ViewMode = SvgView | HtmlView
@@ -89,15 +88,15 @@ data Action
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
-  -- Mouse events for drag
-  | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, mouseEvent :: MouseEvent }
-  | DragMove MouseEvent
-  | EndDrag MouseEvent
+  -- Mouse events (work in both views)
+  | StartDragReminderMouse { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: MouseEvent }
+  | DragMoveMouse MouseEvent
+  | EndDragMouse MouseEvent
+  -- Touch events for HTML view (mobile support) - use raw Event, convert in handler
+  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: Event }
+  | DragMoveTouch Event
+  | EndDragTouch Event
   | CancelDrag
-  -- Touch events for drag (HTML view only - SVG doesn't support these)
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TouchEvent }
-  | DragMoveTouch TouchEvent
-  | EndDragTouch TouchEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -306,8 +305,8 @@ renderGrimoire state =
             , HP.id "grimoire-svg"
             , HP.style $ if isDragging then "cursor: grabbing;" else ""
             ] <> (if isDragging
-                  then [ HE.onMouseMove DragMove
-                       , HE.onMouseUp EndDrag
+                  then [ HE.onMouseMove DragMoveMouse
+                       , HE.onMouseUp EndDragMouse
                        , HE.onMouseLeave \_ -> CancelDrag
                        ]
                   else [])
@@ -514,7 +513,7 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
           , HP.style "cursor: grab;"
-          , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
+          , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
           ]
       -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
@@ -580,7 +579,7 @@ renderDragFeedback (Just ds) centerX centerY radius playerCount players =
           ]
       ]
 
--- | Render HTML-based grimoire with grid layout (supports touch events)
+-- | Render HTML-based grimoire with hollow rectangle layout (players on perimeter, empty center)
 renderHtmlGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
 renderHtmlGrimoire state =
   let
@@ -589,25 +588,35 @@ renderHtmlGrimoire state =
       Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
     playerCount = length gameState.players
     isDragging = isJust state.dragging
+    -- Calculate grid dimensions for hollow rectangle
+    -- For n players, we want a grid where perimeter = n
+    -- Perimeter of a×b grid = 2a + 2b - 4 (corners counted once)
+    -- We aim for roughly square grids
+    gridDims = calculateGridDimensions playerCount
+    cols = gridDims.cols
+    rows = gridDims.rows
+    -- Assign players to perimeter positions (clockwise from top-left)
+    playerPositions = assignPerimeterPositions playerCount cols rows
   in
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 15px;" ]
-      [ -- Player grid
+      [ -- Player grid with hollow center
         HH.div
-          ( [ HP.style $ "display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); "
-                <> "gap: 12px; min-height: 200px;"
+          ( [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
+                <> "gap: 8px; min-height: 200px;"
+                <> if isDragging then " touch-action: none;" else ""
             ] <> (if isDragging
-                  then [ HE.onMouseMove DragMove
-                       , HE.onMouseUp EndDrag
+                  then [ HE.onMouseMove DragMoveMouse
+                       , HE.onMouseUp EndDragMouse
                        , HE.onMouseLeave \_ -> CancelDrag
-                       , HE.onTouchMove DragMoveTouch
-                       , HE.onTouchEnd EndDragTouch
-                       , HE.onTouchCancel \_ -> CancelDrag
+                       , HE.handler (EventType "touchmove") DragMoveTouch
+                       , HE.handler (EventType "touchend") EndDragTouch
+                       , HE.handler (EventType "touchcancel") \_ -> CancelDrag
                        ]
                   else [])
           )
           ( if playerCount > 0
-              then map (renderHtmlPlayer gameState.reminders state.dragging) gameState.players
+              then renderHollowGrid gameState.reminders state.dragging gameState.players playerPositions cols rows
               else [ HH.div
                        [ HP.style "grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;" ]
                        [ HH.text "No player data - add #show chair/2." ]
@@ -685,8 +694,8 @@ renderHtmlReminderToken _playerName reminder =
         <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
         <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
         <> "touch-action: none; user-select: none;"
-    , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
-    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, touchEvent: evt }
+    , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
+    , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, event: TouchEvent.toEvent evt }
     ]
     [ HH.text $ abbreviateToken reminder.token ]
 
@@ -896,45 +905,34 @@ handleAction = case _ of
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo
 
-  StartDragReminder { reminder, mouseEvent } -> do
-    -- Prevent default to avoid text selection during drag
-    liftEffect $ preventDefault (toEvent mouseEvent)
-    -- Get SVG coordinates from mouse event
-    state <- H.get
-    let mouseX = toNumber (clientX mouseEvent)
-    let mouseY = toNumber (clientY mouseEvent)
-    -- Convert to SVG coordinates (simplified - assumes SVG fills container)
-    -- We'll store client coordinates and do conversion during render
-    let svgX = mouseX
-    let svgY = mouseY
-    -- Calculate initial target (the player currently owning the token)
+  -- Mouse events for SVG view (halogen-svg-elems doesn't support pointer events)
+  StartDragReminderMouse { reminder, event } -> do
+    liftEffect $ preventDefault (ME.toEvent event)
+    let mouseX = toNumber (ME.clientX event)
+    let mouseY = toNumber (ME.clientY event)
     H.modify_ \s -> s
       { dragging = Just
           { reminder
-          , startX: svgX
-          , startY: svgY
-          , currentX: svgX
-          , currentY: svgY
+          , startX: mouseX
+          , startY: mouseY
+          , currentX: mouseX
+          , currentY: mouseY
           , targetPlayer: Just reminder.player
           }
       }
 
-  DragMove mouseEvent -> do
-    liftEffect $ preventDefault (toEvent mouseEvent)
+  DragMoveMouse event -> do
+    liftEffect $ preventDefault (ME.toEvent event)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        let mouseX = toNumber (clientX mouseEvent)
-        let mouseY = toNumber (clientY mouseEvent)
-        -- Find target player based on view mode
-        targetPlayer <- case state.viewMode of
-          HtmlView -> liftEffect $ findPlayerAtPoint mouseX mouseY
-          SvgView -> do
-            let gameState = case state.selectedTime of
-                  Just t -> ASP.buildGameState state.atoms t
-                  Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
-            pure $ findClosestPlayer mouseX mouseY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        let mouseX = toNumber (ME.clientX event)
+        let mouseY = toNumber (ME.clientY event)
+        let gameState = case state.selectedTime of
+              Just t -> ASP.buildGameState state.atoms t
+              Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
+        let targetPlayer = findClosestPlayer mouseX mouseY 250.0 250.0 180.0 (length gameState.players) gameState.players
         H.modify_ \s -> s
           { dragging = Just ds
               { currentX = mouseX
@@ -943,15 +941,69 @@ handleAction = case _ of
               }
           }
 
-  EndDrag mouseEvent -> do
-    liftEffect $ preventDefault (toEvent mouseEvent)
+  EndDragMouse event -> do
+    liftEffect $ preventDefault (ME.toEvent event)
     state <- H.get
     case state.dragging of
       Nothing -> pure unit
       Just ds -> do
-        -- Clear drag state first
         H.modify_ \s -> s { dragging = Nothing }
-        -- If there's a valid target and it's different from source, emit event
+        case ds.targetPlayer of
+          Just toPlayer | toPlayer /= ds.reminder.player -> do
+            case state.selectedTime of
+              Just time ->
+                H.raise $ ReminderMoved
+                  { token: ds.reminder.token
+                  , fromPlayer: ds.reminder.player
+                  , toPlayer
+                  , time
+                  }
+              Nothing -> pure unit
+          _ -> pure unit
+
+  -- Touch events for HTML view (mobile support)
+  StartDragReminderTouch { reminder, event } -> do
+    liftEffect $ preventDefault event
+    -- Get coordinates from first touch (convert Event to TouchEvent)
+    case getTouchCoordsFromEvent event of
+      Nothing -> pure unit
+      Just { x: touchX, y: touchY } ->
+        H.modify_ \s -> s
+          { dragging = Just
+              { reminder
+              , startX: touchX
+              , startY: touchY
+              , currentX: touchX
+              , currentY: touchY
+              , targetPlayer: Just reminder.player
+              }
+          }
+
+  DragMoveTouch event -> do
+    liftEffect $ preventDefault event
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        case getTouchCoordsFromEvent event of
+          Nothing -> pure unit
+          Just { x: touchX, y: touchY } -> do
+            targetPlayer <- liftEffect $ findPlayerAtPoint touchX touchY
+            H.modify_ \s -> s
+              { dragging = Just ds
+                  { currentX = touchX
+                  , currentY = touchY
+                  , targetPlayer = targetPlayer
+                  }
+              }
+
+  EndDragTouch event -> do
+    liftEffect $ preventDefault event
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        H.modify_ \s -> s { dragging = Nothing }
         case ds.targetPlayer of
           Just toPlayer | toPlayer /= ds.reminder.player -> do
             case state.selectedTime of
@@ -971,70 +1023,66 @@ handleAction = case _ of
   ToggleViewMode -> do
     H.modify_ \s -> s { viewMode = if s.viewMode == SvgView then HtmlView else SvgView }
 
-  -- Touch event handlers (for HTML view)
-  StartDragReminderTouch { reminder, touchEvent } -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    let coords = getTouchCoords touchEvent
-    H.modify_ \s -> s
-      { dragging = Just
-          { reminder
-          , startX: coords.x
-          , startY: coords.y
-          , currentX: coords.x
-          , currentY: coords.y
-          , targetPlayer: Just reminder.player
-          }
-      }
+-- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
+-- For n players, perimeter = 2*cols + 2*rows - 4 = n
+-- We want roughly square grids, so cols ≈ rows
+calculateGridDimensions :: Int -> { cols :: Int, rows :: Int }
+calculateGridDimensions n
+  | n <= 4 = { cols: n, rows: 1 }  -- Single row for small player counts
+  | n <= 6 = { cols: 3, rows: 2 }  -- 3x2 = perimeter of 6
+  | n <= 8 = { cols: 3, rows: 3 }  -- 3x3 = perimeter of 8
+  | n <= 10 = { cols: 4, rows: 3 } -- 4x3 = perimeter of 10
+  | n <= 12 = { cols: 4, rows: 4 } -- 4x4 = perimeter of 12
+  | n <= 14 = { cols: 5, rows: 4 } -- 5x4 = perimeter of 14
+  | n <= 16 = { cols: 5, rows: 5 } -- 5x5 = perimeter of 16
+  | otherwise = { cols: 6, rows: 5 } -- 6x5 = perimeter of 18 (max supported nicely)
 
-  DragMoveTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        let coords = getTouchCoords touchEvent
-        -- Use element-based hit testing (touch is only used in HTML view)
-        targetPlayer <- liftEffect $ findPlayerAtPoint coords.x coords.y
-        H.modify_ \s -> s
-          { dragging = Just ds
-              { currentX = coords.x
-              , currentY = coords.y
-              , targetPlayer = targetPlayer
-              }
-          }
-
-  EndDragTouch touchEvent -> do
-    liftEffect $ preventDefault (TE.toEvent touchEvent)
-    state <- H.get
-    case state.dragging of
-      Nothing -> pure unit
-      Just ds -> do
-        H.modify_ \s -> s { dragging = Nothing }
-        case ds.targetPlayer of
-          Just toPlayer | toPlayer /= ds.reminder.player -> do
-            case state.selectedTime of
-              Just time ->
-                H.raise $ ReminderMoved
-                  { token: ds.reminder.token
-                  , fromPlayer: ds.reminder.player
-                  , toPlayer
-                  , time
-                  }
-              Nothing -> pure unit
-          _ -> pure unit
-
--- | Get touch coordinates from a TouchEvent
-getTouchCoords :: TouchEvent -> { x :: Number, y :: Number }
-getTouchCoords te =
+-- | Assign grid positions to players around the perimeter (clockwise from top-left)
+-- Returns array of {row, col} for each player index
+assignPerimeterPositions :: Int -> Int -> Int -> Array { row :: Int, col :: Int }
+assignPerimeterPositions playerCount cols rows =
   let
-    touchList = TE.touches te
-    changedList = TE.changedTouches te
-    maybeTouch = case TL.item 0 touchList of
-      Just t -> Just t
-      Nothing -> TL.item 0 changedList
-  in case maybeTouch of
-    Just touch -> { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
-    Nothing -> { x: 0.0, y: 0.0 }
+    -- Walk around the perimeter: top row (left to right), right column (top to bottom),
+    -- bottom row (right to left), left column (bottom to top)
+    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
+    rightCol = map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
+    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
+    leftCol = map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
+    allPositions = topRow <> rightCol <> bottomRow <> leftCol
+  in
+    take playerCount allPositions
+
+-- | Render the hollow grid with players on perimeter and empty center
+renderHollowGrid :: forall cs m.
+  Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
+  Maybe DragState ->
+  Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
+  Array { row :: Int, col :: Int } ->
+  Int ->  -- cols
+  Int ->  -- rows
+  Array (H.ComponentHTML Action cs m)
+renderHollowGrid reminders dragState players positions cols rows =
+  let
+    -- Create a lookup from position to player
+    positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
+    -- Generate all grid cells
+    allCells = do
+      r <- 0 .. (rows - 1)
+      c <- 0 .. (cols - 1)
+      pure { row: r, col: c }
+    -- For each cell, either render a player or empty/center cell
+    renderCell cell =
+      case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
+        Just { player } -> renderHtmlPlayer reminders dragState player
+        Nothing ->
+          -- Empty center cell
+          if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
+            then HH.div
+              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;" ]
+              []
+            else HH.div [] []  -- Edge position with no player (shouldn't happen normally)
+  in
+    map renderCell allCells
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.

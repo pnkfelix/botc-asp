@@ -16,3 +16,13 @@ export const findPlayerAtPointImpl = (x) => (y) => {
 
   return null;
 };
+
+// Get touch coordinates from a touch event
+// Returns null if no touches available, otherwise returns {x, y}
+export const getTouchCoordsImpl = (event) => {
+  if (!event || !event.touches || event.touches.length === 0) {
+    return null;
+  }
+  const touch = event.touches[0];
+  return { x: touch.clientX, y: touch.clientY };
+};
