@@ -581,7 +581,7 @@ renderDragFeedback (Just ds) centerX centerY radius playerCount players =
       ]
 
 -- | Render HTML-based grimoire with grid layout (supports touch events)
-renderHtmlGrimoire :: forall cs m. MonadEffect m => State -> H.ComponentHTML Action cs m
+renderHtmlGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
 renderHtmlGrimoire state =
   let
     gameState = case state.selectedTime of
@@ -630,7 +630,7 @@ renderHtmlGrimoire state =
       ]
 
 -- | Render a single player card in HTML grid view
-renderHtmlPlayer :: forall cs m. MonadEffect m =>
+renderHtmlPlayer :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   Maybe DragState ->
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean } ->
@@ -674,7 +674,7 @@ renderHtmlPlayer reminders dragState player =
       ]
 
 -- | Render a single reminder token in HTML view (draggable)
-renderHtmlReminderToken :: forall cs m. MonadEffect m =>
+renderHtmlReminderToken :: forall cs m.
   String ->  -- player name (for identifying drop target)
   { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   H.ComponentHTML Action cs m
