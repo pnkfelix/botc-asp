@@ -31,6 +31,7 @@ data Atom
   | ReminderOn String String TimePoint  -- reminder_on(token, player, time)
   | Alive String TimePoint              -- alive(player, time)
   | Dead String TimePoint               -- dead(player, time)
+  | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
@@ -108,7 +109,7 @@ derive instance eqTimelineEvent :: Eq TimelineEvent
 
 -- | Game state at a particular time point
 type GameState =
-  { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean }
+  { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
   , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
   }
@@ -127,6 +128,7 @@ parseAtom atomStr =
       parseReminderOn trimmed <|>
       parseAlive trimmed <|>
       parseDead trimmed <|>
+      parseGhostVoteUsed trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
       parseChair trimmed <|>
@@ -241,6 +243,17 @@ parseDead s = do
   case splitAtFirstComma rest of
     Just { before: player, after: timeStr } ->
       Just $ Dead (trim player) (parseTime (trim timeStr))
+    Nothing -> Nothing
+
+-- | Parse ghost_vote_used(Player, Time)
+parseGhostVoteUsed :: String -> Maybe Atom
+parseGhostVoteUsed s = do
+  let pattern = "ghost_vote_used("
+  _ <- if take (length pattern) s == pattern then Just unit else Nothing
+  let rest = drop (length pattern) (take (length s - 1) s)
+  case splitAtFirstComma rest of
+    Just { before: player, after: timeStr } ->
+      Just $ GhostVoteUsed (trim player) (parseTime (trim timeStr))
     Nothing -> Nothing
 
 -- | Parse time(TimePoint)
@@ -444,6 +457,10 @@ buildGameState atoms targetTime =
     deadAtoms = filter (isDeadAt targetTime) atoms
     deadPlayers = mapMaybe getDeadName deadAtoms
 
+    -- Get ghost vote used status at target time
+    ghostVoteAtoms = filter (isGhostVoteUsedAt targetTime) atoms
+    ghostVoteUsedPlayers = mapMaybe getGhostVoteUsedName ghostVoteAtoms
+
     -- Get all reminder atoms to find placement times
     allReminders = mapMaybe getReminder atoms
 
@@ -462,7 +479,8 @@ buildGameState atoms targetTime =
         role = fromMaybe "?" $ lookup c.name assignments
         token = fromMaybe role $ lookup c.name tokens
         isAlive = elem c.name alivePlayers && not (elem c.name deadPlayers)
-      in { name: c.name, chair: c.pos, role, token, alive: isAlive }
+        hasUsedGhostVote = elem c.name ghostVoteUsedPlayers
+      in { name: c.name, chair: c.pos, role, token, alive: isAlive, ghostVoteUsed: hasUsedGhostVote }
   in
     { players: sortBy (comparing _.chair) players
     , reminders: remindersAtTime
@@ -490,6 +508,12 @@ buildGameState atoms targetTime =
     getDeadName (Dead name _) = Just name
     getDeadName _ = Nothing
 
+    isGhostVoteUsedAt t (GhostVoteUsed _ voteTime) = voteTime == t || compareTimePoints voteTime t == LT
+    isGhostVoteUsedAt _ _ = false
+
+    getGhostVoteUsedName (GhostVoteUsed name _) = Just name
+    getGhostVoteUsedName _ = Nothing
+
     -- Extract all reminder atoms with their times
     getReminder (ReminderOn token player time) = Just { token, player, time }
     getReminder _ = Nothing
@@ -501,6 +525,7 @@ buildGameState atoms targetTime =
     getTimeFromAtom (ReminderOn _ _ t) = Just t
     getTimeFromAtom (Alive _ t) = Just t
     getTimeFromAtom (Dead _ t) = Just t
+    getTimeFromAtom (GhostVoteUsed _ t) = Just t
     getTimeFromAtom (ActingRole t _) = Just t
     getTimeFromAtom _ = Nothing
 
@@ -640,6 +665,7 @@ atomToPredicateName = case _ of
   ReminderOn _ _ _       -> { name: "reminder_on", arity: 3 }
   Alive _ _              -> { name: "alive", arity: 2 }
   Dead _ _               -> { name: "dead", arity: 2 }
+  GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }
