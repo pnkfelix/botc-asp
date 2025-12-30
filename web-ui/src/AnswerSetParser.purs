@@ -4,6 +4,7 @@ module AnswerSetParser
   , GameState
   , TimelineEvent(..)
   , ParsedAtom
+  , PredicateCategory(..)
   , parseAnswerSet
   , parseAnswerSetWithOriginals
   , buildGameState
@@ -12,6 +13,7 @@ module AnswerSetParser
   , getStateAtTime
   , compareTimePoints
   , atomToPredicateName
+  , atomCategory
   ) where
 
 import Prelude
@@ -39,6 +41,47 @@ data Atom
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
+
+-- | Categories of predicates based on their semantic meaning
+-- |
+-- | - EventPredicate: Actions/effects that happen at a specific time point
+-- |   These are the "events" in the timeline (st_tells, player_chooses, executed, reminder_on)
+-- |
+-- | - StatePredicate: Ongoing state that holds at a time point but isn't an "event"
+-- |   These describe the current situation (alive, dead, ghost_vote_used)
+-- |
+-- | - StructuralPredicate: Defines game structure, not tied to specific moments
+-- |   Setup info (assigned, received, game_chair), timeline markers (time, acting_role)
+-- |
+-- | - OtherPredicate: Unknown or uncategorized atoms
+data PredicateCategory
+  = EventPredicate      -- Things that happen: st_tells, player_chooses, executed, reminder_on
+  | StatePredicate      -- Ongoing state: alive, dead, ghost_vote_used
+  | StructuralPredicate -- Game structure: assigned, received, game_chair, time, acting_role
+  | OtherPredicate      -- Unknown atoms
+
+derive instance eqPredicateCategory :: Eq PredicateCategory
+
+-- | Categorize an atom by its semantic meaning
+atomCategory :: Atom -> PredicateCategory
+atomCategory = case _ of
+  -- Event predicates: actions that happen at a time point
+  StTells _ _ _ _       -> EventPredicate
+  PlayerChooses _ _ _ _ -> EventPredicate
+  Executed _ _          -> EventPredicate
+  ReminderOn _ _ _      -> EventPredicate
+  -- State predicates: ongoing state, not events
+  Alive _ _             -> StatePredicate
+  Dead _ _              -> StatePredicate
+  GhostVoteUsed _ _     -> StatePredicate
+  -- Structural predicates: game setup and timeline markers
+  Assigned _ _ _        -> StructuralPredicate
+  Received _ _          -> StructuralPredicate
+  Chair _ _             -> StructuralPredicate
+  Time _                -> StructuralPredicate
+  ActingRole _ _        -> StructuralPredicate
+  -- Unknown
+  UnknownAtom _         -> OtherPredicate
 
 -- | A parsed atom with its original string representation
 type ParsedAtom = { atom :: Atom, original :: String }
