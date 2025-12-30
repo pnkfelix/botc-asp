@@ -7,7 +7,7 @@ import Clingo as Clingo
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
-import Data.Array (filter, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
+import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, sort, sortBy)
 import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -80,7 +80,7 @@ answerSetPageSize = 20
 
 -- | List of available file paths derived from embedded files
 availableFiles :: Array String
-availableFiles = map _.path EP.embeddedFileList
+availableFiles = fromFoldable $ Map.keys EP.lpFilesMap
 
 -- | Get list of all unique directories from file paths
 getDirectories :: Array String -> Array String
@@ -116,7 +116,7 @@ isRootFile path = getParentDir path == ""
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
-  { files: foldl (\m f -> Map.insert f.path f.content m) Map.empty EP.embeddedFileList
+  { files: EP.lpFilesMap  -- Use Map for efficient lookups
   , currentFile: "inst.lp"  -- Start with instance file selected
   , showFileDirectory: false
   , expandedDirs: Set.empty  -- All directories collapsed initially

@@ -71,6 +71,45 @@ When the user cannot easily inspect the DOM (e.g., on mobile):
 - Add data attributes to elements for easier identification
 - These can be removed once the issue is resolved
 
+#### CCR Todo List Guidelines
+
+When using the TodoWrite tool in CCR mode, create todos that are **actionable in the CCR environment**:
+
+**✅ Good CCR Todos:**
+- "Update include resolver in Clingo.js to support relative paths"
+- "Refactor EmbeddedPrograms.purs to use Map structure"
+- "Write test file to verify directory traversal"
+- "Commit and push changes for CI testing"
+- "Monitor GitHub Actions status via curl"
+
+**❌ Bad CCR Todos (Cannot Execute):**
+- ~~"Run npm run build to verify changes"~~ → Use: "Push changes and monitor CI build"
+- ~~"Test with clingo locally"~~ → Use: "Push and verify via GitHub Actions"
+- ~~"Run unit tests"~~ → Use: "Write tests and push for CI to run"
+- ~~"Install spago and compile"~~ → Use: "Verify PureScript syntax and push to CI"
+
+**Key Principle:** If a todo requires `spago`, `clingo`, or local builds, rephrase it as:
+1. Write/modify the code
+2. Push to branch
+3. Request user to create/update PR
+4. Monitor CI results
+
+**Example Todo Flow for CCR:**
+```
+1. [pending] Add path normalization function to Clingo.js
+2. [pending] Update embed-lp.js to discover subdirectories
+3. [pending] Update PureScript bindings
+4. [pending] Commit and push changes
+5. [pending] Request user to create PR for CI testing
+```
+
+Instead of:
+```
+❌ 1. [pending] Add path normalization
+❌ 2. [pending] Run tests locally
+❌ 3. [pending] Fix build errors
+```
+
 ## Build Commands
 
 > ⚠️ **CCR Users: These commands are for TERMINAL Claude Code only!**
