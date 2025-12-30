@@ -31,12 +31,11 @@ import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
-import Web.Event.Event (Event, preventDefault)
+import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
-import Web.TouchEvent.TouchEvent (TouchEvent)
-import Web.TouchEvent.TouchEvent as TE
-import Web.TouchEvent.TouchList as TL
-import Web.TouchEvent.Touch as Touch
+import Web.TouchEvent.TouchEvent (TouchEvent, toEvent, touches, changedTouches) as TE
+import Web.TouchEvent.TouchList (item) as TL
+import Web.TouchEvent.Touch (clientX, clientY) as Touch
 
 -- | Output events from the component
 data Output
@@ -87,9 +86,9 @@ data Action
   | EndDrag MouseEvent
   | CancelDrag
   -- Touch events for drag (mobile support)
-  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TouchEvent }
-  | DragMoveTouch TouchEvent
-  | EndDragTouch TouchEvent
+  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TE.TouchEvent }
+  | DragMoveTouch TE.TouchEvent
+  | EndDragTouch TE.TouchEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -905,15 +904,15 @@ findClosestPlayer mouseX mouseY centerX centerY radius playerCount players =
 
 -- | Extract clientX/clientY from a TouchEvent
 -- Uses touches for touchstart/touchmove, changedTouches for touchend
-getTouchCoords :: TouchEvent -> { x :: Number, y :: Number }
+getTouchCoords :: TE.TouchEvent -> { x :: Number, y :: Number }
 getTouchCoords te =
   let
     -- Try touches first, fall back to changedTouches
-    touches = TE.touches te
-    changedTouches = TE.changedTouches te
-    maybeTouch = case TL.item 0 touches of
+    touchList = TE.touches te
+    changedList = TE.changedTouches te
+    maybeTouch = case TL.item 0 touchList of
       Just t -> Just t
-      Nothing -> TL.item 0 changedTouches
+      Nothing -> TL.item 0 changedList
   in case maybeTouch of
     Just touch -> { x: toNumber (Touch.clientX touch), y: toNumber (Touch.clientY touch) }
     Nothing -> { x: 0.0, y: 0.0 }
