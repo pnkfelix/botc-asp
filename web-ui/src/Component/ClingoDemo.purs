@@ -5,6 +5,7 @@ import Prelude
 import AnswerSetParser as AnswerSet
 import AspParser as ASP
 import Clingo as Clingo
+import GitHubApi as GH
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
@@ -50,6 +51,8 @@ type State =
   , selectedPredicate :: Maybe ASP.Predicate
   -- Output filter expression (for filtering displayed atoms)
   , outputFilter :: String          -- Boolean expression to filter atoms
+  -- Latest merged PR from GitHub (for verifying deployment freshness)
+  , latestPR :: Maybe Int           -- Latest merged PR number
   }
 
 -- | How to display results
@@ -77,6 +80,8 @@ data Action
   | ClosePredicateModal
   | JumpToReference String Int  -- sourceFile, lineNumber
   | HandleTimelineEvent TG.Output  -- Handle timeline event clicks
+  | FetchLatestPR               -- Fetch latest merged PR from GitHub
+  | LatestPRFetched (Maybe Int) -- Store fetched PR number
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -134,6 +139,7 @@ initialState =
   , showPredicateList: false
   , selectedPredicate: Nothing
   , outputFilter: ""       -- No filtering by default
+  , latestPR: Nothing      -- Will be fetched on init
   }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
@@ -180,6 +186,20 @@ render state =
     , HH.p
         [ HP.style "color: #666;" ]
         [ HH.text "Blood on the Clocktower ASP Explorer" ]
+    , case state.latestPR of
+        Just prNum ->
+          HH.p
+            [ HP.style "color: #999; font-size: 12px; margin-top: -10px;" ]
+            [ HH.text "Latest merged: "
+            , HH.a
+                [ HP.href $ "https://github.com/pnkfelix/botc-asp/pull/" <> show prNum
+                , HP.target "_blank"
+                , HP.style "color: #4CAF50; text-decoration: none;"
+                ]
+                [ HH.text $ "PR #" <> show prNum ]
+            ]
+        Nothing ->
+          HH.text ""
 
     -- Floating action buttons (bottom right)
     , HH.div
@@ -747,6 +767,8 @@ handleAction = case _ of
     -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
     H.liftAff $ Clingo.init "./clingo.wasm"
     H.modify_ \s -> s { isInitialized = true }
+    -- Fetch latest merged PR from GitHub
+    handleAction FetchLatestPR
 
   SelectFile fileName -> do
     H.modify_ \s -> s { currentFile = fileName, showFileDirectory = false }
@@ -865,6 +887,14 @@ handleAction = case _ of
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
+
+  FetchLatestPR -> do
+    -- Fetch the latest merged PR from GitHub API
+    maybePR <- H.liftAff $ GH.fetchLatestMergedPR "pnkfelix" "botc-asp"
+    handleAction (LatestPRFetched maybePR)
+
+  LatestPRFetched maybePR ->
+    H.modify_ \s -> s { latestPR = maybePR }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
