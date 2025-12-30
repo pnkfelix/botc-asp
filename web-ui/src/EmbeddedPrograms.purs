@@ -18,4 +18,4 @@ foreign import lpFiles :: Object String
 
 -- | Convert to PureScript Map for easier handling
 lpFilesMap :: Map String String
-lpFilesMap = Map.fromFoldable $ map (\(Tuple k v) -> Tuple k v) $ FO.toUnfoldable lpFiles
+lpFilesMap = Map.fromFoldable (FO.toUnfoldable lpFiles :: Array (Tuple String String))
