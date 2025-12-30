@@ -786,7 +786,8 @@ handleAction = case _ of
     H.modify_ \s -> s { outputFilter = filterExpr }
 
   RunClingo -> do
-    H.modify_ \s -> s { isLoading = true, result = Nothing, selectedModelIndex = 0, answerSetPage = 0 }
+    -- Keep previous result visible during loading (preserves TimelineGrimoire state)
+    H.modify_ \s -> s { isLoading = true, selectedModelIndex = 0, answerSetPage = 0 }
     state <- H.get
     -- Parse model limit (empty or invalid = 0 = all models)
     let numModels = fromMaybe 0 $ Int.fromString (trim state.modelLimit)
