@@ -33,6 +33,7 @@ import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
 import Data.Number (cos, sin, pi)
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX, clientY, toEvent)
+import TouchUtils (TouchEvent, touchClientX, touchClientY, touchToEvent)
 
 -- | Output events from the component
 data Output
@@ -77,10 +78,15 @@ data Action
   = ReceiveAtoms (Array String)
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
+  -- Mouse events for drag
   | StartDragReminder { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, mouseEvent :: MouseEvent }
   | DragMove MouseEvent
   | EndDrag MouseEvent
   | CancelDrag
+  -- Touch events for drag (mobile support)
+  | StartDragReminderTouch { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, touchEvent :: TouchEvent }
+  | DragMoveTouch TouchEvent
+  | EndDragTouch TouchEvent
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
@@ -277,6 +283,10 @@ renderGrimoire state =
                   then [ HE.onMouseMove DragMove
                        , HE.onMouseUp EndDrag
                        , HE.onMouseLeave \_ -> CancelDrag
+                       -- Touch events for mobile
+                       , HE.onTouchMove DragMoveTouch
+                       , HE.onTouchEnd EndDragTouch
+                       , HE.onTouchCancel \_ -> CancelDrag
                        ]
                   else [])
           )
@@ -481,10 +491,11 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named (getReminderColor reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
-          , HP.style "cursor: grab;"
+          , HP.style "cursor: grab; touch-action: none;"  -- touch-action: none prevents scroll during drag
           , HE.onMouseDown \evt -> StartDragReminder { reminder, mouseEvent: evt }
+          , HE.onTouchStart \evt -> StartDragReminderTouch { reminder, touchEvent: evt }
           ]
-      -- Reminder abbreviation - also needs drag handler (text overlays circle)
+      -- Reminder abbreviation - let clicks/touches pass through to circle
       , SE.text
           [ SA.x 0.0
           , SA.y 3.0
@@ -492,7 +503,7 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.fill (Named "white")
           , SA.fontWeight FWeightBold
           , SA.fontSize (FontSizeLength (Px 6.0))
-          , HP.style "cursor: grab; pointer-events: none;"  -- Let clicks pass through to circle
+          , HP.style "cursor: grab; pointer-events: none;"
           ]
           [ HH.text $ abbreviateToken reminder.token ]
       ]
@@ -805,6 +816,62 @@ handleAction = case _ of
 
   CancelDrag -> do
     H.modify_ \s -> s { dragging = Nothing }
+
+  -- Touch event handlers (mobile support)
+  StartDragReminderTouch { reminder, touchEvent } -> do
+    liftEffect $ preventDefault (touchToEvent touchEvent)
+    let touchX = toNumber (touchClientX touchEvent)
+    let touchY = toNumber (touchClientY touchEvent)
+    H.modify_ \s -> s
+      { dragging = Just
+          { reminder
+          , startX: touchX
+          , startY: touchY
+          , currentX: touchX
+          , currentY: touchY
+          , targetPlayer: Just reminder.player
+          }
+      }
+
+  DragMoveTouch touchEvent -> do
+    liftEffect $ preventDefault (touchToEvent touchEvent)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        let touchX = toNumber (touchClientX touchEvent)
+        let touchY = toNumber (touchClientY touchEvent)
+        let gameState = case state.selectedTime of
+              Just t -> ASP.buildGameState state.atoms t
+              Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
+        let targetPlayer = findClosestPlayer touchX touchY 250.0 250.0 180.0 (length gameState.players) gameState.players
+        H.modify_ \s -> s
+          { dragging = Just ds
+              { currentX = touchX
+              , currentY = touchY
+              , targetPlayer = targetPlayer
+              }
+          }
+
+  EndDragTouch touchEvent -> do
+    liftEffect $ preventDefault (touchToEvent touchEvent)
+    state <- H.get
+    case state.dragging of
+      Nothing -> pure unit
+      Just ds -> do
+        H.modify_ \s -> s { dragging = Nothing }
+        case ds.targetPlayer of
+          Just toPlayer | toPlayer /= ds.reminder.player -> do
+            case state.selectedTime of
+              Just time ->
+                H.raise $ ReminderMoved
+                  { token: ds.reminder.token
+                  , fromPlayer: ds.reminder.player
+                  , toPlayer
+                  , time
+                  }
+              Nothing -> pure unit
+          _ -> pure unit
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
