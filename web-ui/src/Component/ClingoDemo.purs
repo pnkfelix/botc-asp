@@ -987,13 +987,13 @@ handleAction = case _ of
       let undoEntry = { instLpContent: instContent
                       , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
                       }
-      -- Convert time to an integer for assigned/3 predicate
+      -- Convert time to an integer for received/3 predicate
       -- For Night 1 (setup), use 0; otherwise use night number
       let timeIdx = timePointToAssignedTime time
-      -- Create the new constraint (forces toPlayer to have this role at this time)
-      let newConstraint = ":- not assigned(" <> show timeIdx <> ", " <> toPlayer <> ", " <> role <> ")."
-      -- Create the old constraint pattern to comment out (the previous drag assignment for this role)
-      let oldConstraintPattern = ":- not assigned(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
+      -- Create the new constraint (forces toPlayer to receive this token at this time)
+      let newConstraint = ":- not received(" <> show timeIdx <> ", " <> toPlayer <> ", " <> role <> ")."
+      -- Create the old constraint pattern to comment out (the previous drag for this token)
+      let oldConstraintPattern = ":- not received(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
       -- Modify the content: comment out old constraint if present, add new one
       let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
       -- Update the virtual filesystem, push undo entry, and clear redo stack
