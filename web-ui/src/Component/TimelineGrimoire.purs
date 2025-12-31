@@ -236,7 +236,7 @@ render state =
         ]
     -- Grimoire area: Bag | Grimoire | Script
     , HH.div
-        [ HP.style "flex: 2; min-width: 400px; display: flex; gap: 10px;" ]
+        [ HP.style "flex: 2; min-width: 400px; display: flex; gap: 10px; align-items: stretch;" ]
         [ -- Bag panel (left of grimoire, collapsible)
           renderBagPanel state gameState
         -- Grimoire panel (center)
@@ -291,6 +291,7 @@ renderBagPanel state gameState =
   in
   HH.div
     [ HP.style $ "min-width: " <> (if state.bagCollapsed then "40px" else "150px") <> "; "
+        <> "display: flex; flex-direction: column; "
         <> "transition: min-width 0.2s ease-in-out;"
     ]
     [ -- Header with collapse toggle
@@ -314,7 +315,7 @@ renderBagPanel state gameState =
     , if state.bagCollapsed
         then HH.text ""
         else HH.div
-          [ HP.style $ "max-height: 400px; overflow-y: auto; "
+          [ HP.style $ "flex: 1; min-height: 0; overflow-y: auto; "
               <> "border: 1px solid #ddd; border-radius: 4px; "
               <> "background: white; padding: 8px 20px 8px 8px;"  -- Extra right padding for scroll touch area
           -- Make bag container a drop target
@@ -366,6 +367,7 @@ renderScriptPanel state =
   in
   HH.div
     [ HP.style $ "min-width: " <> (if state.scriptCollapsed then "40px" else "160px") <> "; "
+        <> "display: flex; flex-direction: column; "
         <> "transition: min-width 0.2s ease-in-out;"
     ]
     [ -- Header with collapse toggle
@@ -389,7 +391,7 @@ renderScriptPanel state =
     , if state.scriptCollapsed
         then HH.text ""
         else HH.div
-          [ HP.style $ "max-height: 400px; overflow-y: auto; "
+          [ HP.style $ "flex: 1; min-height: 0; overflow-y: auto; "
               <> "border: 1px solid #ddd; border-radius: 4px; "
               <> "background: white; padding: 8px 8px 8px 20px;"  -- Extra left padding for scroll touch area
           ]
