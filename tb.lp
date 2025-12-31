@@ -625,6 +625,21 @@ other_night_substep(imp, 3, st_places(imp_dead)).
     current_demon(Imp, N),
     alive(Imp, night(N, 0, 0)).
 
+% House rule: Imp cannot target itself if all minions are dead (no one to starpass to)
+% The Imp would never intentionally lose the game by killing itself with no successor.
+% Note: This ignores Poppy Grower which isn't implemented yet.
+:- player_chooses(imp, Imp, point(Imp), night(N, RoleOrd, 2)),
+   other_night_role_order(imp, RoleOrd),
+   night_number(N), N > 1,
+   not any_minion_alive(night(N, 0, 0)).
+
+% Helper: at least one minion is alive at time T
+any_minion_alive(T) :-
+    assigned(0, P, R),
+    minion(R),
+    alive(P, T),
+    time(T).
+
 % Helper: who is the demon at the start of night N
 % By default, it's whoever was assigned at time 0
 current_demon(P, N) :-
