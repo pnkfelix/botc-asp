@@ -25,11 +25,13 @@ import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop
 import Data.Ord (comparing)
 
 -- | A parsed atom from the answer set
+-- | Note: Event predicates use d_ prefix in ASP (d_st_tells, d_player_chooses, d_executed)
+-- | to distinguish them from state predicates. The parser handles both with and without prefix.
 data Atom
   = Assigned Int String String          -- assigned(time, player, role)
   | Received String String              -- received(player, token)
-  | StTells String String String TimePoint  -- st_tells(role, player, message, time)
-  | PlayerChooses String String String TimePoint  -- player_chooses(role, player, choice, time)
+  | StTells String String String TimePoint  -- d_st_tells(role, player, message, time)
+  | PlayerChooses String String String TimePoint  -- d_player_chooses(role, player, choice, time)
   | ReminderOn String String TimePoint  -- reminder_on(token, player, time)
   | Alive String TimePoint              -- alive(player, time)
   | Dead String TimePoint               -- dead(player, time)
@@ -37,7 +39,7 @@ data Atom
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
-  | Executed String Int                 -- executed(player, day)
+  | Executed String Int                 -- d_executed(player, day)
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -45,18 +47,19 @@ derive instance eqAtom :: Eq Atom
 -- | Categories of predicates based on their semantic meaning
 -- |
 -- | - EventPredicate: Actions/effects that happen at a specific time point
--- |   These are the "events" in the timeline (st_tells, player_chooses, executed, reminder_on)
+-- |   These use the d_ prefix in ASP (d_st_tells, d_player_chooses, d_executed)
+-- |   to distinguish them from state. The "d" is for "delta" - a change in state.
 -- |
 -- | - StatePredicate: Ongoing state that holds at a time point but isn't an "event"
--- |   These describe the current situation (alive, dead, ghost_vote_used)
+-- |   These describe the current situation (alive, dead, reminder_on, ghost_vote_used)
 -- |
 -- | - StructuralPredicate: Defines game structure, not tied to specific moments
 -- |   Setup info (assigned, received, game_chair), timeline markers (time, acting_role)
 -- |
 -- | - OtherPredicate: Unknown or uncategorized atoms
 data PredicateCategory
-  = EventPredicate      -- Things that happen: st_tells, player_chooses, executed, reminder_on
-  | StatePredicate      -- Ongoing state: alive, dead, ghost_vote_used
+  = EventPredicate      -- Deltas (d_ prefix): d_st_tells, d_player_chooses, d_executed
+  | StatePredicate      -- Ongoing state: alive, dead, reminder_on, ghost_vote_used
   | StructuralPredicate -- Game structure: assigned, received, game_chair, time, acting_role
   | OtherPredicate      -- Unknown atoms
 
@@ -134,7 +137,7 @@ data TimelineEvent
   = RoleAction
       { time :: TimePoint
       , role :: String
-      , eventType :: String  -- "st_tells" or "player_chooses"
+      , eventType :: String  -- "d_st_tells" or "d_player_chooses"
       , player :: String
       , message :: String
       , sourceAtom :: String  -- Original atom string for navigation
@@ -202,14 +205,18 @@ parseReceived s = do
     [p, t] -> Just $ Received (trim p) (trim t)
     _ -> Nothing
 
--- | Parse st_tells(Role, Player, Message, Time)
+-- | Parse d_st_tells(Role, Player, Message, Time)
+-- | Also accepts st_tells for backward compatibility
 parseStTells :: String -> Maybe Atom
-parseStTells s = do
-  let pattern = "st_tells("
-  _ <- if take (length pattern) s == pattern then Just unit else Nothing
-  let rest = drop (length pattern) (take (length s - 1) s)
-  -- Handle nested parentheses in message and time
-  parseStTellsArgs rest
+parseStTells s =
+  -- Try d_st_tells first (preferred), then st_tells for backward compat
+  let patternD = "d_st_tells("
+      pattern = "st_tells("
+  in if take (length patternD) s == patternD
+     then parseStTellsArgs (drop (length patternD) (take (length s - 1) s))
+     else if take (length pattern) s == pattern
+          then parseStTellsArgs (drop (length pattern) (take (length s - 1) s))
+          else Nothing
 
 parseStTellsArgs :: String -> Maybe Atom
 parseStTellsArgs s =
@@ -228,13 +235,18 @@ parseStTellsArgs s =
         Nothing -> Nothing
     Nothing -> Nothing
 
--- | Parse player_chooses(Role, Player, Choice, Time)
+-- | Parse d_player_chooses(Role, Player, Choice, Time)
+-- | Also accepts player_chooses for backward compatibility
 parsePlayerChooses :: String -> Maybe Atom
-parsePlayerChooses s = do
-  let pattern = "player_chooses("
-  _ <- if take (length pattern) s == pattern then Just unit else Nothing
-  let rest = drop (length pattern) (take (length s - 1) s)
-  parsePlayerChoosesArgs rest
+parsePlayerChooses s =
+  -- Try d_player_chooses first (preferred), then player_chooses for backward compat
+  let patternD = "d_player_chooses("
+      pattern = "player_chooses("
+  in if take (length patternD) s == patternD
+     then parsePlayerChoosesArgs (drop (length patternD) (take (length s - 1) s))
+     else if take (length pattern) s == pattern
+          then parsePlayerChoosesArgs (drop (length pattern) (take (length s - 1) s))
+          else Nothing
 
 parsePlayerChoosesArgs :: String -> Maybe Atom
 parsePlayerChoosesArgs s =
@@ -332,16 +344,23 @@ parseChair s = do
     [p, pos] -> Just $ Chair (trim p) (fromMaybe 0 $ parseInt (trim pos))
     _ -> Nothing
 
--- | Parse executed(Player, Day)
+-- | Parse d_executed(Player, Day)
+-- | Also accepts executed for backward compatibility
 parseExecuted :: String -> Maybe Atom
-parseExecuted s = do
-  let pattern = "executed("
-  _ <- if take (length pattern) s == pattern then Just unit else Nothing
-  let rest = drop (length pattern) (take (length s - 1) s)
-  let parts = split (Pattern ",") rest
-  case parts of
-    [p, d] -> Just $ Executed (trim p) (fromMaybe 0 $ parseInt (trim d))
-    _ -> Nothing
+parseExecuted s =
+  -- Try d_executed first (preferred), then executed for backward compat
+  let patternD = "d_executed("
+      pattern = "executed("
+      parseArgs rest =
+        let parts = split (Pattern ",") rest
+        in case parts of
+          [p, d] -> Just $ Executed (trim p) (fromMaybe 0 $ parseInt (trim d))
+          _ -> Nothing
+  in if take (length patternD) s == patternD
+     then parseArgs (drop (length patternD) (take (length s - 1) s))
+     else if take (length pattern) s == pattern
+          then parseArgs (drop (length pattern) (take (length s - 1) s))
+          else Nothing
 
 -- | Parse a time string like "night(1,2,3)" or "day(1,0)"
 parseTime :: String -> TimePoint
@@ -631,11 +650,11 @@ extractTimelineWithSources parsedAtoms =
     sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
-      Just $ RoleAction { time, role, eventType: "st_tells", player, message, sourceAtom: original }
+      Just $ RoleAction { time, role, eventType: "d_st_tells", player, message, sourceAtom: original }
     toStTellsEvent _ = Nothing
 
     toPlayerChoosesEvent { atom: PlayerChooses role player choice time, original } =
-      Just $ RoleAction { time, role, eventType: "player_chooses", player, message: choice, sourceAtom: original }
+      Just $ RoleAction { time, role, eventType: "d_player_chooses", player, message: choice, sourceAtom: original }
     toPlayerChoosesEvent _ = Nothing
 
     toTokenPlacedEvent { atom: ReminderOn token player time, original } =
@@ -702,12 +721,13 @@ getStateAtTime :: Array Atom -> TimePoint -> GameState
 getStateAtTime = buildGameState
 
 -- | Get the predicate name and arity for an atom (for finding rule definitions)
+-- | Event predicates use d_ prefix to indicate they are deltas
 atomToPredicateName :: Atom -> { name :: String, arity :: Int }
 atomToPredicateName = case _ of
   Assigned _ _ _         -> { name: "assigned", arity: 3 }
   Received _ _           -> { name: "received", arity: 2 }
-  StTells _ _ _ _        -> { name: "st_tells", arity: 4 }
-  PlayerChooses _ _ _ _  -> { name: "player_chooses", arity: 4 }
+  StTells _ _ _ _        -> { name: "d_st_tells", arity: 4 }
+  PlayerChooses _ _ _ _  -> { name: "d_player_chooses", arity: 4 }
   ReminderOn _ _ _       -> { name: "reminder_on", arity: 3 }
   Alive _ _              -> { name: "alive", arity: 2 }
   Dead _ _               -> { name: "dead", arity: 2 }
@@ -715,7 +735,7 @@ atomToPredicateName = case _ of
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }
-  Executed _ _           -> { name: "executed", arity: 2 }
+  Executed _ _           -> { name: "d_executed", arity: 2 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =

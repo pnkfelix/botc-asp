@@ -47,7 +47,7 @@ derive instance eqViewMode :: Eq ViewMode
 data Output
   = TimelineEventClicked
       { sourceAtom :: String      -- Original atom string to highlight in answer set
-      , predicateName :: String   -- Predicate name for finding rules (e.g., "st_tells")
+      , predicateName :: String   -- Predicate name for finding rules (e.g., "d_st_tells")
       , predicateArity :: Int     -- Arity for finding rules
       }
   | ReminderMoved
@@ -165,7 +165,7 @@ getAllTimePoints atoms =
 -- | Find the original source string for an atom matching a given time point
 -- | Preference order:
 -- | 1. time(T) - explicit time marker
--- | 2. Event predicates at time T (st_tells, player_chooses)
+-- | 2. Event predicates at time T (d_st_tells, d_player_chooses)
 -- | 3. acting_role(T, _) - structural but time-specific
 -- | This ensures we never scroll to state predicates like alive/dead/reminder_on
 findTimeAtomSource :: Array ASP.ParsedAtom -> ASP.TimePoint -> Maybe String
@@ -253,7 +253,7 @@ renderTimeline state =
     [ if null state.allTimePoints
         then HH.p
           [ HP.style "padding: 15px; color: #666; font-style: italic;" ]
-          [ HH.text "No timeline data available. Add #show directives for time/1, st_tells/4, player_chooses/4, etc." ]
+          [ HH.text "No timeline data available. Add #show directives for time/1, d_st_tells/4, d_player_chooses/4, etc." ]
         else HH.div_ $ map (renderTimePoint state) state.allTimePoints
     ]
 
@@ -305,11 +305,11 @@ renderEvent event =
         ]
         [ HH.span
             [ HP.style $ "display: inline-block; padding: 2px 6px; border-radius: 3px; "
-                <> "background: " <> (if r.eventType == "st_tells" then "#e8f5e9" else "#fff3e0") <> "; "
+                <> "background: " <> (if r.eventType == "d_st_tells" then "#e8f5e9" else "#fff3e0") <> "; "
                 <> "margin-right: 6px;"
             ]
             [ HH.text $ formatRoleName r.role ]
-        , HH.text $ if r.eventType == "st_tells"
+        , HH.text $ if r.eventType == "d_st_tells"
             then "tells " <> r.player <> ": " <> r.message
             else r.player <> " chooses: " <> r.message
         ]
@@ -1037,7 +1037,7 @@ handleAction = case _ of
     let eventInfo = case event of
           ASP.RoleAction r ->
             { sourceAtom: r.sourceAtom
-            , predicateName: r.eventType  -- "st_tells" or "player_chooses"
+            , predicateName: r.eventType  -- "d_st_tells" or "d_player_chooses"
             , predicateArity: 4
             }
           ASP.TokenPlaced r ->
@@ -1047,7 +1047,7 @@ handleAction = case _ of
             }
           ASP.Execution r ->
             { sourceAtom: r.sourceAtom
-            , predicateName: "executed"
+            , predicateName: "d_executed"
             , predicateArity: 2
             }
     -- Emit the output event

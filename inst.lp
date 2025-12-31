@@ -32,11 +32,13 @@ received(rob, washerwoman).
 #show reminder_on/3.
 %#show impaired/2.
 #show registers_as/3.
-#show executed/2.
 
 % For grimoire/timeline rendering
 #show game_chair/2.
 #show alive/2.
 #show dead/2.
-#show st_tells/4.
-#show player_chooses/4.
+
+% Delta predicates (d_ prefix = events/changes, not ongoing state)
+#show d_st_tells/4.
+#show d_player_chooses/4.
+#show d_executed/2.
