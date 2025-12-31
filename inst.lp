@@ -33,6 +33,11 @@ received(rob, washerwoman).
 % Poisoner should not target evil players (defeats the purpose)
 :- player_chooses(poisoner, _, point(Target), _), actual_category(Target, evil).
 
+% Demon should target living players at night, not already dead ones
+% (Self-targeting for starpass is still allowed)
+% Note: Special cases like Shabbaloth will need separate handling
+:- player_chooses(imp, Imp, point(Target), T), Target != Imp, not alive(Target, T).
+
 % st_tells predicates for player-observed info (unwrapped for convenience):
 %   st_tells(role_or_player, value)           e.g. st_tells(chef, 2)
 %   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
