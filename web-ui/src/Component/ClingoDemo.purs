@@ -979,17 +979,14 @@ handleAction = case _ of
                         }
       -- Re-run Clingo with the new constraints
       handleAction RunClingo
-    TG.RoleMoved { role, fromPlayer, toPlayer, time } -> do
-      -- Modify inst.lp to add a constraint for the new role assignment
+    TG.RoleMoved { role, fromPlayer, toPlayer, time: _ } -> do
+      -- Modify inst.lp to add a constraint for the new token assignment
       state <- H.get
       let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
       -- Push current state onto undo stack (before making changes)
       let undoEntry = { instLpContent: instContent
                       , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
                       }
-      -- Convert time to an integer for received/3 predicate
-      -- For Night 1 (setup), use 0; otherwise use night number
-      let timeIdx = timePointToAssignedTime time
       -- Create the new constraint (forces toPlayer to receive this token)
       let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
       -- Create the old constraint pattern to comment out (the previous drag for this token)
