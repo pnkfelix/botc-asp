@@ -12,7 +12,7 @@ import Component.TimelineGrimoire as TG
 import FilterExpression as FE
 import TokenConstraints as TC
 import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
-import Data.Foldable (foldl, intercalate)
+import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
@@ -1030,36 +1030,57 @@ handleAction = case _ of
             Nothing -> do
               -- Validation passed - proceed with the drop
               let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-              -- Detect if this is a copy operation from script/bag (special sources)
-              let isCopyOperation = String.take 2 fromPlayer == "__"
-              let sourceDescription = case fromPlayer of
-                    "__script__" -> "script"
-                    "__bag__" -> "bag"
-                    _ -> fromPlayer
-              -- Push current state onto undo stack (before making changes)
-              let undoEntry = { instLpContent: instContent
-                              , description: if isCopyOperation
-                                  then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
-                                  else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
-                              }
-              -- Create the new constraint (forces toPlayer to receive this token)
-              let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
-              -- Create the old constraint pattern to comment out (the previous drag for this token)
-              -- For copy operations, we use a dummy pattern that won't match anything
-              let oldConstraintPattern = if isCopyOperation
-                    then "__NOMATCH__"
-                    else "assert_received(" <> fromPlayer <> ", " <> role <> ")."
-              -- Modify the content: comment out old constraint if present, add new one
-              -- For copy operations, use sourceDescription for cleaner comments
-              let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
-              let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
-              -- Update the virtual filesystem, push undo entry, and clear redo stack
-              H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
-                                , undoStack = snoc s.undoStack undoEntry
-                                , redoStack = []  -- Clear redo stack on new action
+              -- Check if dropping onto the bag (special target)
+              if toPlayer == "__bag__" then do
+                -- Dropping onto the bag: add assert_drawn or assert_distrib
+                -- Roles marked never_in_bag (like drunk) should use assert_distrib instead
+                let neverInBagRoles = ["drunk", "marionette"]  -- Roles that can't be physically in the bag
+                let isNeverInBag = elem role neverInBagRoles
+                let newConstraint = if isNeverInBag
+                      then "assert_distrib(" <> role <> ")."
+                      else "assert_drawn(" <> role <> ")."
+                let undoEntry = { instLpContent: instContent
+                                , description: "Add " <> role <> " to bag"
                                 }
-              -- Re-run Clingo with the new constraints
-              handleAction RunClingo
+                -- Add the constraint to inst.lp
+                let modifiedContent = instContent <> "\n" <> newConstraint
+                H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                                  , undoStack = snoc s.undoStack undoEntry
+                                  , redoStack = []
+                                  }
+                handleAction RunClingo
+              else do
+                -- Normal drop onto a player
+                -- Detect if this is a copy operation from script/bag (special sources)
+                let isCopyOperation = String.take 2 fromPlayer == "__"
+                let sourceDescription = case fromPlayer of
+                      "__script__" -> "script"
+                      "__bag__" -> "bag"
+                      _ -> fromPlayer
+                -- Push current state onto undo stack (before making changes)
+                let undoEntry = { instLpContent: instContent
+                                , description: if isCopyOperation
+                                    then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
+                                    else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                                }
+                -- Create the new constraint (forces toPlayer to receive this token)
+                let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
+                -- Create the old constraint pattern to comment out (the previous drag for this token)
+                -- For copy operations, we use a dummy pattern that won't match anything
+                let oldConstraintPattern = if isCopyOperation
+                      then "__NOMATCH__"
+                      else "assert_received(" <> fromPlayer <> ", " <> role <> ")."
+                -- Modify the content: comment out old constraint if present, add new one
+                -- For copy operations, use sourceDescription for cleaner comments
+                let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
+                let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
+                -- Update the virtual filesystem, push undo entry, and clear redo stack
+                H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                                  , undoStack = snoc s.undoStack undoEntry
+                                  , redoStack = []  -- Clear redo stack on new action
+                                  }
+                -- Re-run Clingo with the new constraints
+                handleAction RunClingo
 
   ClearScrollNotification ->
     H.modify_ \s -> s { scrollNotification = Nothing }

@@ -226,56 +226,61 @@ render state =
   in
   HH.div
     [ HP.style "display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap;" ]
-    [ -- Bag panel (leftmost, collapsible)
-      renderBagPanel state gameState
-    -- Timeline panel
-    , HH.div
+    [ -- Timeline panel (leftmost)
+      HH.div
         [ HP.style "flex: 1; min-width: 300px; max-width: 400px;" ]
         [ HH.h3
             [ HP.style "margin: 0 0 10px 0; color: #333;" ]
             [ HH.text "Timeline" ]
         , renderTimeline state
         ]
-    -- Grimoire panel
+    -- Grimoire area: Bag | Grimoire | Script
     , HH.div
-        [ HP.style $ "flex: 2; min-width: 400px;"
-            <> if isJust state.dragging then " cursor: grabbing;" else ""
-        ]
-        [ -- Header with toggle button
-          HH.div
-            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
-            [ HH.h3
-                [ HP.style "margin: 0; color: #333;" ]
-                [ HH.text $ "Grimoire" <> case state.selectedTime of
-                    Just t -> " @ " <> formatTimePoint t
-                    Nothing -> ""
-                ]
-            , HH.button
-                [ HP.style $ "padding: 4px 10px; font-size: 11px; border-radius: 4px; "
-                    <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer;"
-                , HE.onClick \_ -> ToggleViewMode
-                ]
-                [ HH.text $ if state.viewMode == SvgView then "Grid View" else "Circle View" ]
+        [ HP.style "flex: 2; min-width: 400px; display: flex; gap: 10px;" ]
+        [ -- Bag panel (left of grimoire, collapsible)
+          renderBagPanel state gameState
+        -- Grimoire panel (center)
+        , HH.div
+            [ HP.style $ "flex: 1;"
+                <> if isJust state.dragging then " cursor: grabbing;" else ""
             ]
-        , HH.p
-            [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
-            [ HH.text $ "Drag role or reminder tokens to move them between players"
-                <> if state.viewMode == HtmlView then " (touch supported)" else ""
+            [ -- Header with toggle button
+              HH.div
+                [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
+                [ HH.h3
+                    [ HP.style "margin: 0; color: #333;" ]
+                    [ HH.text $ "Grimoire" <> case state.selectedTime of
+                        Just t -> " @ " <> formatTimePoint t
+                        Nothing -> ""
+                    ]
+                , HH.button
+                    [ HP.style $ "padding: 4px 10px; font-size: 11px; border-radius: 4px; "
+                        <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer;"
+                    , HE.onClick \_ -> ToggleViewMode
+                    ]
+                    [ HH.text $ if state.viewMode == SvgView then "Grid View" else "Circle View" ]
+                ]
+            , HH.p
+                [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
+                [ HH.text $ "Drag role or reminder tokens to move them between players"
+                    <> if state.viewMode == HtmlView then " (touch supported)" else ""
+                ]
+            , if state.viewMode == SvgView
+                then renderGrimoire state
+                else renderHtmlGrimoire state
             ]
-        , if state.viewMode == SvgView
-            then renderGrimoire state
-            else renderHtmlGrimoire state
+        -- Script panel (right of grimoire, collapsible)
+        , renderScriptPanel state
         ]
-    -- Script panel (rightmost, collapsible)
-    , renderScriptPanel state
     ]
 
--- | Render the bag panel (collapsible, shows tokens each player received)
+-- | Render the bag panel (collapsible, shows tokens in the physical bag)
 renderBagPanel :: forall cs m.
   State ->
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
+  , bagTokens :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderBagPanel state gameState =
@@ -312,57 +317,44 @@ renderBagPanel state gameState =
           [ HP.style $ "max-height: 400px; overflow-y: auto; "
               <> "border: 1px solid #ddd; border-radius: 4px; "
               <> "background: white; padding: 8px;"
+          -- Make bag container a drop target
+          , HP.attr (HH.AttrName "data-player") "__bag__"
           ]
-          [ if null gameState.players
+          [ if null gameState.bagTokens
               then HH.p
                 [ HP.style "color: #666; font-style: italic; font-size: 12px;" ]
-                [ HH.text "No players" ]
+                [ HH.text "Bag empty" ]
               else HH.div
-                [ HP.style "display: flex; flex-direction: column; gap: 6px;" ]
-                (map (renderBagToken timeStr) gameState.players)
+                [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
+                (map (renderBagToken timeStr) gameState.bagTokens)
           ]
     ]
 
--- | Render a single token in the bag
+-- | Render a single token in the bag (just the role circle, draggable)
 renderBagToken :: forall cs m.
   String ->  -- time string
-  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
+  String ->  -- role name
   H.ComponentHTML Action cs m
-renderBagToken timeStr player =
+renderBagToken timeStr role =
   let
-    roleColor = getRoleColor player.token
+    roleColor = getRoleColor role
   in
   HH.div
-    [ HP.style $ "display: flex; align-items: center; gap: 8px; padding: 4px; "
-        <> "border-radius: 4px; background: #f5f5f5;"
+    [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
+        <> "background: " <> roleColor <> "; "
+        <> "border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "cursor: grab; touch-action: none; user-select: none; "
+        <> "font-size: 8px; font-weight: bold; color: white; text-align: center; padding: 2px;"
+    -- Data attributes for drag - uses __bag__ as source indicator
+    , HP.attr (HH.AttrName "data-role-token") role
+    , HP.attr (HH.AttrName "data-role-player") "__bag__"
+    , HP.attr (HH.AttrName "data-role-time") timeStr
+    , HP.attr (HH.AttrName "data-role-color") roleColor
+    , HP.attr (HH.AttrName "data-role-display") (formatRoleName role)
+    , HP.title (formatRoleName role)
     ]
-    [ -- Token circle (draggable)
-      HH.div
-        [ HP.style $ "width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; "
-            <> "background: " <> roleColor <> "; "
-            <> "border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); "
-            <> "display: flex; align-items: center; justify-content: center; "
-            <> "cursor: grab; touch-action: none; user-select: none;"
-        -- Data attributes for drag - uses __bag__ as source indicator
-        , HP.attr (HH.AttrName "data-role-token") player.token
-        , HP.attr (HH.AttrName "data-role-player") "__bag__"
-        , HP.attr (HH.AttrName "data-role-time") timeStr
-        , HP.attr (HH.AttrName "data-role-color") roleColor
-        , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.token)
-        , HP.attr (HH.AttrName "data-bag-owner") player.name
-        ]
-        []
-    -- Player name and token name
-    , HH.div
-        [ HP.style "font-size: 11px; min-width: 0;" ]
-        [ HH.div
-            [ HP.style "font-weight: bold; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" ]
-            [ HH.text player.name ]
-        , HH.div
-            [ HP.style "color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" ]
-            [ HH.text $ formatRoleName player.token ]
-        ]
-    ]
+    [ HH.text $ formatRoleName role ]
 
 -- | Render the script panel (collapsible, shows all roles in the script)
 renderScriptPanel :: forall cs m. State -> H.ComponentHTML Action cs m

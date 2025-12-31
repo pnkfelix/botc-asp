@@ -377,6 +377,8 @@ distrib(R) :- assigned(0, _, R).
 :- assert_reminder_on(Token, P, T), not reminder_on(Token, P, T).
 % assert_received(P, R) requires that player P received token R
 :- assert_received(P, R), not received(P, R).
+% assert_drawn(R) requires that role R is in the bag (was drawn from script into bag)
+:- assert_drawn(R), not bag(R).
 %{distrib(X) : demon(X)} = 1.
 %{distrib(X) : minion(X)} = 1    :- 7 <= player_count <= 9.
 %{distrib(X) : townsfolk(X)} = 5 - A :- 7 <= player_count <= 9, outsider_adjustment(A).
