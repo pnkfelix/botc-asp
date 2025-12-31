@@ -17,6 +17,9 @@ received(felix, chef).
 received(amanda, poisoner).
 received(rob, washerwoman).
 
+% Town executes exactly one living player at the end of each day
+{ executed(P, N) : alive(P, day(N, 0)) } = 1 :- day_number(N).
+
 % st_tells predicates for player-observed info (unwrapped for convenience):
 %   st_tells(role_or_player, value)           e.g. st_tells(chef, 2)
 %   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
@@ -33,6 +36,7 @@ received(rob, washerwoman).
 % For grimoire/timeline rendering
 #show game_chair/2.
 #show alive/2.
+#show dead/2.
 
 % Delta predicates (d_ prefix = events/changes, not ongoing state)
 #show d_st_tells/4.
