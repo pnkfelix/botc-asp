@@ -275,6 +275,7 @@ renderBagPanel :: forall cs m.
   State ->
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
+  , time :: ASP.TimePoint
   } ->
   H.ComponentHTML Action cs m
 renderBagPanel state gameState =
