@@ -3,10 +3,13 @@ module TextareaUtils
   , focusTextarea
   , scrollToText
   , scrollToTextInChild
+  , getIncludeAtCursor
   ) where
 
 import Prelude
 
+import Data.Maybe (Maybe)
+import Data.Nullable (Nullable, toMaybe)
 import Effect (Effect)
 
 -- | Scroll a textarea to a specific line and select/highlight it
@@ -37,3 +40,10 @@ foreign import scrollToTextInChildImpl :: String -> Int -> String -> Effect Bool
 
 scrollToTextInChild :: String -> Int -> String -> Effect Boolean
 scrollToTextInChild = scrollToTextInChildImpl
+
+-- | Detect if cursor is on an #include directive and return the file path
+-- | Takes the element ID, returns Just filepath if on an include, Nothing otherwise
+foreign import getIncludeAtCursorImpl :: String -> Effect (Nullable String)
+
+getIncludeAtCursor :: String -> Effect (Maybe String)
+getIncludeAtCursor elementId = toMaybe <$> getIncludeAtCursorImpl elementId
