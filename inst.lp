@@ -28,12 +28,7 @@ received(rob, washerwoman).
 
 % Info roles should not see themselves in their pair of players
 % (gives zero new information - a good ST would never do this)
-:- reminder_on(ww_townsfolk, P, _), assigned(0, P, washerwoman).
-:- reminder_on(ww_wrong, P, _), assigned(0, P, washerwoman).
-:- reminder_on(lib_outsider, P, _), assigned(0, P, librarian).
-:- reminder_on(lib_wrong, P, _), assigned(0, P, librarian).
-:- reminder_on(inv_minion, P, _), assigned(0, P, investigator).
-:- reminder_on(inv_wrong, P, _), assigned(0, P, investigator).
+% NOTE: These constraints are now defined generically in tb.lp via never_applied_to/2
 
 % Poisoner should not target evil players (defeats the purpose)
 :- player_chooses(poisoner, _, point(Target), _), actual_category(Target, evil).

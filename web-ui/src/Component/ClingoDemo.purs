@@ -10,6 +10,7 @@ import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
 import FilterExpression as FE
+import TokenConstraints as TC
 import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
 import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
@@ -957,49 +958,95 @@ handleAction = case _ of
             H.modify_ \s -> s { scrollNotification = Nothing }
           pure unit
     TG.ReminderMoved { token, fromPlayer, toPlayer, time } -> do
-      -- Modify inst.lp to add a constraint for the new reminder placement
+      -- Validate the drop using never_applied_to constraints
       state <- H.get
-      let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-      -- Push current state onto undo stack (before making changes)
-      let undoEntry = { instLpContent: instContent
-                      , description: "Move " <> token <> " from " <> fromPlayer <> " to " <> toPlayer
-                      }
-      -- Format the time point for ASP
-      let timeStr = formatTimePointForASP time
-      -- Create the new constraint
-      let newConstraint = "assert_reminder_on(" <> token <> ", " <> toPlayer <> ", " <> timeStr <> ")."
-      -- Create the old constraint pattern to comment out
-      let oldConstraintPattern = "assert_reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
-      -- Modify the content: comment out old constraint if present, add new one
-      let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint token fromPlayer toPlayer
-      -- Update the virtual filesystem, push undo entry, and clear redo stack
-      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
-                        , undoStack = snoc s.undoStack undoEntry
-                        , redoStack = []  -- Clear redo stack on new action
-                        }
-      -- Re-run Clingo with the new constraints
-      handleAction RunClingo
-    TG.RoleMoved { role, fromPlayer, toPlayer, time: _ } -> do
-      -- Modify inst.lp to add a constraint for the new token assignment
+      let constraints = TC.parseNeverAppliedTo state.files
+      -- Get current game state to check player roles
+      let maybeGameState = case state.result of
+            Just (ResultSuccess answerSets) ->
+              case index answerSets state.selectedModelIndex of
+                Just atoms -> Just $ AnswerSet.buildGameState (AnswerSet.parseAnswerSet atoms) time
+                Nothing -> Nothing
+            _ -> Nothing
+      case maybeGameState of
+        Nothing -> pure unit  -- No game state available, skip validation
+        Just gameState -> do
+          -- Validate: check if toPlayer has a role that's in never_applied_to for this token
+          let players = map (\p -> { name: p.name, role: p.role }) gameState.players
+          case TC.validateReminderDrop { token, toPlayer } constraints players of
+            Just errorMsg -> do
+              -- Validation failed - show warning and don't proceed
+              H.modify_ \s -> s { scrollNotification = Just errorMsg }
+              _ <- H.fork do
+                H.liftAff $ Aff.delay (Milliseconds 4000.0)
+                H.modify_ \s -> s { scrollNotification = Nothing }
+              pure unit
+            Nothing -> do
+              -- Validation passed - proceed with the drop
+              let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+              -- Push current state onto undo stack (before making changes)
+              let undoEntry = { instLpContent: instContent
+                              , description: "Move " <> token <> " from " <> fromPlayer <> " to " <> toPlayer
+                              }
+              -- Format the time point for ASP
+              let timeStr = formatTimePointForASP time
+              -- Create the new constraint
+              let newConstraint = "assert_reminder_on(" <> token <> ", " <> toPlayer <> ", " <> timeStr <> ")."
+              -- Create the old constraint pattern to comment out
+              let oldConstraintPattern = "assert_reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
+              -- Modify the content: comment out old constraint if present, add new one
+              let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint token fromPlayer toPlayer
+              -- Update the virtual filesystem, push undo entry, and clear redo stack
+              H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                                , undoStack = snoc s.undoStack undoEntry
+                                , redoStack = []  -- Clear redo stack on new action
+                                }
+              -- Re-run Clingo with the new constraints
+              handleAction RunClingo
+    TG.RoleMoved { role, fromPlayer, toPlayer, time } -> do
+      -- Validate the drop using never_applied_to constraints
       state <- H.get
-      let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-      -- Push current state onto undo stack (before making changes)
-      let undoEntry = { instLpContent: instContent
-                      , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
-                      }
-      -- Create the new constraint (forces toPlayer to receive this token)
-      let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
-      -- Create the old constraint pattern to comment out (the previous drag for this token)
-      let oldConstraintPattern = "assert_received(" <> fromPlayer <> ", " <> role <> ")."
-      -- Modify the content: comment out old constraint if present, add new one
-      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role fromPlayer toPlayer
-      -- Update the virtual filesystem, push undo entry, and clear redo stack
-      H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
-                        , undoStack = snoc s.undoStack undoEntry
-                        , redoStack = []  -- Clear redo stack on new action
-                        }
-      -- Re-run Clingo with the new constraints
-      handleAction RunClingo
+      let constraints = TC.parseNeverAppliedTo state.files
+      -- Get current game state to check reminders on target player
+      let maybeGameState = case state.result of
+            Just (ResultSuccess answerSets) ->
+              case index answerSets state.selectedModelIndex of
+                Just atoms -> Just $ AnswerSet.buildGameState (AnswerSet.parseAnswerSet atoms) time
+                Nothing -> Nothing
+            _ -> Nothing
+      case maybeGameState of
+        Nothing -> pure unit  -- No game state available, skip validation
+        Just gameState -> do
+          -- Validate: check if toPlayer has any reminder tokens that can't be on this role
+          let reminders = map (\r -> { token: r.token, player: r.player }) gameState.reminders
+          case TC.validateRoleDrop { role, toPlayer } constraints reminders of
+            Just errorMsg -> do
+              -- Validation failed - show warning and don't proceed
+              H.modify_ \s -> s { scrollNotification = Just errorMsg }
+              _ <- H.fork do
+                H.liftAff $ Aff.delay (Milliseconds 4000.0)
+                H.modify_ \s -> s { scrollNotification = Nothing }
+              pure unit
+            Nothing -> do
+              -- Validation passed - proceed with the drop
+              let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+              -- Push current state onto undo stack (before making changes)
+              let undoEntry = { instLpContent: instContent
+                              , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                              }
+              -- Create the new constraint (forces toPlayer to receive this token)
+              let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
+              -- Create the old constraint pattern to comment out (the previous drag for this token)
+              let oldConstraintPattern = "assert_received(" <> fromPlayer <> ", " <> role <> ")."
+              -- Modify the content: comment out old constraint if present, add new one
+              let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role fromPlayer toPlayer
+              -- Update the virtual filesystem, push undo entry, and clear redo stack
+              H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                                , undoStack = snoc s.undoStack undoEntry
+                                , redoStack = []  -- Clear redo stack on new action
+                                }
+              -- Re-run Clingo with the new constraints
+              handleAction RunClingo
 
   ClearScrollNotification ->
     H.modify_ \s -> s { scrollNotification = Nothing }

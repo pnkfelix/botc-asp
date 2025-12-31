@@ -804,3 +804,21 @@ reminder_label(sla_no_ability, "No ability").
 reminder_label(monk_protected, "Protected").
 reminder_label(imp_dead, "Dead").
 
+% ===========================================================================
+% Token Placement Constraints (for UI validation and ASP constraint)
+% ===========================================================================
+
+% never_applied_to(Token, Role) - this token should never be placed on the
+% player who has Role. Used for info roles where self-reference provides
+% no useful information.
+never_applied_to(ww_townsfolk, washerwoman).
+never_applied_to(ww_wrong, washerwoman).
+never_applied_to(lib_outsider, librarian).
+never_applied_to(lib_wrong, librarian).
+never_applied_to(inv_minion, investigator).
+never_applied_to(inv_wrong, investigator).
+never_applied_to(but_master, butler).
+
+% Generic constraint: tokens marked never_applied_to cannot be on their owner
+:- never_applied_to(Token, Role), reminder_on(Token, P, _), assigned(0, P, Role).
+
