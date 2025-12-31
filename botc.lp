@@ -371,6 +371,12 @@ distrib(R) :- assigned(0, _, R).
 % Assertion predicates: allow instances to require certain predicates hold
 % assert_distrib(R) requires that role R must be distributed (assigned to some player)
 :- assert_distrib(R), not distrib(R).
+% assert_assigned(T, P, R) requires that player P is assigned role R at time T
+:- assert_assigned(T, P, R), not assigned(T, P, R).
+% assert_reminder_on(Token, P, T) requires that reminder Token is on player P at time T
+:- assert_reminder_on(Token, P, T), not reminder_on(Token, P, T).
+% assert_received(P, R) requires that player P received token R
+:- assert_received(P, R), not received(P, R).
 %{distrib(X) : demon(X)} = 1.
 %{distrib(X) : minion(X)} = 1    :- 7 <= player_count <= 9.
 %{distrib(X) : townsfolk(X)} = 5 - A :- 7 <= player_count <= 9, outsider_adjustment(A).
