@@ -1,6 +1,7 @@
 #include "botc.lp".
 #include "tb.lp".
 #include "players.lp".
+#include "preferences.lp".
 
 #const player_count = 8.
 % We are demoing three nights, so we write needs_night(3).
