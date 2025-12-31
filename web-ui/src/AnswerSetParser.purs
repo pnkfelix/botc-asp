@@ -33,8 +33,7 @@ data Atom
   | StTells String String String TimePoint  -- d_st_tells(role, player, message, time)
   | PlayerChooses String String String TimePoint  -- d_player_chooses(role, player, choice, time)
   | ReminderOn String String TimePoint  -- reminder_on(token, player, time)
-  | Alive String TimePoint              -- alive(player, time)
-  | Dead String TimePoint               -- dead(player, time)
+  | Died String TimePoint               -- d_died(player, time) - player dies at this time
   | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
@@ -47,19 +46,19 @@ derive instance eqAtom :: Eq Atom
 -- | Categories of predicates based on their semantic meaning
 -- |
 -- | - EventPredicate: Actions/effects that happen at a specific time point
--- |   These use the d_ prefix in ASP (d_st_tells, d_player_chooses, d_executed)
+-- |   These use the d_ prefix in ASP (d_st_tells, d_player_chooses, d_executed, d_died)
 -- |   to distinguish them from state. The "d" is for "delta" - a change in state.
 -- |
 -- | - StatePredicate: Ongoing state that holds at a time point but isn't an "event"
--- |   These describe the current situation (alive, dead, reminder_on, ghost_vote_used)
+-- |   These describe the current situation (reminder_on, ghost_vote_used)
 -- |
 -- | - StructuralPredicate: Defines game structure, not tied to specific moments
 -- |   Setup info (assigned, received, game_chair), timeline markers (time, acting_role)
 -- |
 -- | - OtherPredicate: Unknown or uncategorized atoms
 data PredicateCategory
-  = EventPredicate      -- Deltas (d_ prefix): d_st_tells, d_player_chooses, d_executed
-  | StatePredicate      -- Ongoing state: alive, dead, reminder_on, ghost_vote_used
+  = EventPredicate      -- Deltas (d_ prefix): d_st_tells, d_player_chooses, d_executed, d_died
+  | StatePredicate      -- Ongoing state: reminder_on, ghost_vote_used
   | StructuralPredicate -- Game structure: assigned, received, game_chair, time, acting_role
   | OtherPredicate      -- Unknown atoms
 
@@ -72,13 +71,12 @@ atomCategory = case _ of
   StTells _ _ _ _       -> EventPredicate
   PlayerChooses _ _ _ _ -> EventPredicate
   Executed _ _          -> EventPredicate
+  Died _ _              -> EventPredicate
   -- State predicates: ongoing state, not events
   -- Note: reminder_on(token,player,time) represents accumulated state
   -- ("reminder is on player at time"), not the action of placing it.
   -- The timeline display has separate logic to show only first placement.
   ReminderOn _ _ _      -> StatePredicate
-  Alive _ _             -> StatePredicate
-  Dead _ _              -> StatePredicate
   GhostVoteUsed _ _     -> StatePredicate
   -- Structural predicates: game setup and timeline markers
   Assigned _ _ _        -> StructuralPredicate
@@ -153,6 +151,11 @@ data TimelineEvent
       , player :: String
       , sourceAtom :: String
       }
+  | Death
+      { time :: TimePoint
+      , player :: String
+      , sourceAtom :: String
+      }
 
 derive instance eqTimelineEvent :: Eq TimelineEvent
 
@@ -175,8 +178,7 @@ parseAtom atomStr =
       parseStTells trimmed <|>
       parsePlayerChooses trimmed <|>
       parseReminderOn trimmed <|>
-      parseAlive trimmed <|>
-      parseDead trimmed <|>
+      parseDied trimmed <|>
       parseGhostVoteUsed trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
@@ -281,27 +283,22 @@ parseReminderOnArgs s =
         Nothing -> Nothing
     Nothing -> Nothing
 
--- | Parse alive(Player, Time)
-parseAlive :: String -> Maybe Atom
-parseAlive s = do
-  let pattern = "alive("
-  _ <- if take (length pattern) s == pattern then Just unit else Nothing
-  let rest = drop (length pattern) (take (length s - 1) s)
-  case splitAtFirstComma rest of
-    Just { before: player, after: timeStr } ->
-      Just $ Alive (trim player) (parseTime (trim timeStr))
-    Nothing -> Nothing
-
--- | Parse dead(Player, Time)
-parseDead :: String -> Maybe Atom
-parseDead s = do
-  let pattern = "dead("
-  _ <- if take (length pattern) s == pattern then Just unit else Nothing
-  let rest = drop (length pattern) (take (length s - 1) s)
-  case splitAtFirstComma rest of
-    Just { before: player, after: timeStr } ->
-      Just $ Dead (trim player) (parseTime (trim timeStr))
-    Nothing -> Nothing
+-- | Parse d_died(Player, Time)
+-- | Also accepts died for backward compatibility
+parseDied :: String -> Maybe Atom
+parseDied s =
+  let patternD = "d_died("
+      pattern = "died("
+      parseArgs rest =
+        case splitAtFirstComma rest of
+          Just { before: player, after: timeStr } ->
+            Just $ Died (trim player) (parseTime (trim timeStr))
+          Nothing -> Nothing
+  in if take (length patternD) s == patternD
+     then parseArgs (drop (length patternD) (take (length s - 1) s))
+     else if take (length pattern) s == pattern
+          then parseArgs (drop (length pattern) (take (length s - 1) s))
+          else Nothing
 
 -- | Parse ghost_vote_used(Player, Time)
 parseGhostVoteUsed :: String -> Maybe Atom
@@ -514,13 +511,10 @@ buildGameState atoms targetTime =
     -- Get received tokens
     tokens = mapMaybe getReceived atoms
 
-    -- Get alive status at target time (or latest before it)
-    aliveAtoms = filter (isAliveAt targetTime) atoms
-    alivePlayers = mapMaybe getAliveName aliveAtoms
-
-    -- Get dead status at target time
-    deadAtoms = filter (isDeadAt targetTime) atoms
-    deadPlayers = mapMaybe getDeadName deadAtoms
+    -- Get all death events (d_died atoms)
+    -- A player is dead at time T if any d_died(player, T') exists where T' <= T
+    allDeaths = mapMaybe getDeath atoms
+    deadPlayersAtTime = nub $ map _.player $ filter (diedBeforeOrAt targetTime) allDeaths
 
     -- Get ghost vote used status at target time
     ghostVoteAtoms = filter (isGhostVoteUsedAt targetTime) atoms
@@ -539,11 +533,12 @@ buildGameState atoms targetTime =
       mapMaybe (getReminderWithPlacement allReminders allTimePoints targetTime) atoms
 
     -- Build player list
+    -- All players start alive; they're dead if a d_died event occurred at or before targetTime
     players = chairs # map \c ->
       let
         role = fromMaybe "?" $ lookup c.name assignments
         token = fromMaybe role $ lookup c.name tokens
-        isAlive = elem c.name alivePlayers && not (elem c.name deadPlayers)
+        isAlive = not (elem c.name deadPlayersAtTime)
         hasUsedGhostVote = elem c.name ghostVoteUsedPlayers
       in { name: c.name, chair: c.pos, role, token, alive: isAlive, ghostVoteUsed: hasUsedGhostVote }
   in
@@ -561,17 +556,12 @@ buildGameState atoms targetTime =
     getReceived (Received player token) = Just { key: player, value: token }
     getReceived _ = Nothing
 
-    isAliveAt t (Alive _ aliveTime) = aliveTime == t || compareTimePoints aliveTime t == LT
-    isAliveAt _ _ = false
+    -- Extract death event from Died atom
+    getDeath (Died player time) = Just { player, time }
+    getDeath _ = Nothing
 
-    isDeadAt t (Dead _ deadTime) = deadTime == t || compareTimePoints deadTime t == LT
-    isDeadAt _ _ = false
-
-    getAliveName (Alive name _) = Just name
-    getAliveName _ = Nothing
-
-    getDeadName (Dead name _) = Just name
-    getDeadName _ = Nothing
+    -- Check if death occurred at or before target time
+    diedBeforeOrAt t death = death.time == t || compareTimePoints death.time t == LT
 
     isGhostVoteUsedAt t (GhostVoteUsed _ voteTime) = voteTime == t || compareTimePoints voteTime t == LT
     isGhostVoteUsedAt _ _ = false
@@ -588,8 +578,7 @@ buildGameState atoms targetTime =
     getTimeFromAtom (StTells _ _ _ t) = Just t
     getTimeFromAtom (PlayerChooses _ _ _ t) = Just t
     getTimeFromAtom (ReminderOn _ _ t) = Just t
-    getTimeFromAtom (Alive _ t) = Just t
-    getTimeFromAtom (Dead _ t) = Just t
+    getTimeFromAtom (Died _ t) = Just t
     getTimeFromAtom (GhostVoteUsed _ t) = Just t
     getTimeFromAtom (ActingRole t _) = Just t
     getTimeFromAtom _ = Nothing
@@ -646,8 +635,11 @@ extractTimelineWithSources parsedAtoms =
     -- (reminder_on represents accumulated state, not the action of placing)
     tokenPlacedEvents = filterNewTokenPlacements $ mapMaybe toTokenPlacedEvent parsedAtoms
     executionEvents = mapMaybe toExecutionEvent parsedAtoms
+    -- Death events for non-execution deaths (imp kills, slayer, etc.)
+    -- Execution deaths are already shown as Execution events, so filter those out
+    deathEvents = mapMaybe toDeathEvent parsedAtoms
   in
-    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents)
+    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
       Just $ RoleAction { time, role, eventType: "d_st_tells", player, message, sourceAtom: original }
@@ -664,6 +656,14 @@ extractTimelineWithSources parsedAtoms =
     toExecutionEvent { atom: Executed player day, original } =
       Just $ Execution { day, player, sourceAtom: original }
     toExecutionEvent _ = Nothing
+
+    -- Convert Died to Death event, but only for non-execution deaths
+    -- (execution deaths occur at day(N, exec) phase)
+    toDeathEvent { atom: Died player time, original } =
+      case time of
+        Day _ "exec" -> Nothing  -- Skip execution deaths, already shown as Execution
+        _ -> Just $ Death { time, player, sourceAtom: original }
+    toDeathEvent _ = Nothing
 
     -- Filter TokenPlaced events to only keep the earliest occurrence of each token+player
     filterNewTokenPlacements :: Array TimelineEvent -> Array TimelineEvent
@@ -694,13 +694,20 @@ extractTimelineWithSources parsedAtoms =
     compareEvents e1 e2 = case e1, e2 of
       RoleAction r1, RoleAction r2 -> compareTimePoints r1.time r2.time
       TokenPlaced r1, TokenPlaced r2 -> compareTimePoints r1.time r2.time
+      Death d1, Death d2 -> compareTimePoints d1.time d2.time
       RoleAction r1, TokenPlaced r2 -> compareTimePoints r1.time r2.time
       TokenPlaced r1, RoleAction r2 -> compareTimePoints r1.time r2.time
+      RoleAction r, Death d -> compareTimePoints r.time d.time
+      Death d, RoleAction r -> compareTimePoints d.time r.time
+      TokenPlaced t, Death d -> compareTimePoints t.time d.time
+      Death d, TokenPlaced t -> compareTimePoints d.time t.time
       Execution _, Execution _ -> EQ
       Execution e, RoleAction r -> compare (Day e.day "exec") r.time
       RoleAction r, Execution e -> compare r.time (Day e.day "exec")
       Execution e, TokenPlaced t -> compare (Day e.day "exec") t.time
       TokenPlaced t, Execution e -> compare t.time (Day e.day "exec")
+      Execution e, Death d -> compare (Day e.day "exec") d.time
+      Death d, Execution e -> compare d.time (Day e.day "exec")
 
 -- | Get list of all unique time points
 getAllTimePoints :: Array Atom -> Array TimePoint
@@ -711,8 +718,7 @@ getAllTimePoints atoms =
     getTimeFromAtom (StTells _ _ _ t) = Just t
     getTimeFromAtom (PlayerChooses _ _ _ t) = Just t
     getTimeFromAtom (ReminderOn _ _ t) = Just t
-    getTimeFromAtom (Alive _ t) = Just t
-    getTimeFromAtom (Dead _ t) = Just t
+    getTimeFromAtom (Died _ t) = Just t
     getTimeFromAtom (ActingRole t _) = Just t
     getTimeFromAtom _ = Nothing
 
@@ -729,8 +735,7 @@ atomToPredicateName = case _ of
   StTells _ _ _ _        -> { name: "d_st_tells", arity: 4 }
   PlayerChooses _ _ _ _  -> { name: "d_player_chooses", arity: 4 }
   ReminderOn _ _ _       -> { name: "reminder_on", arity: 3 }
-  Alive _ _              -> { name: "alive", arity: 2 }
-  Dead _ _               -> { name: "dead", arity: 2 }
+  Died _ _               -> { name: "d_died", arity: 2 }
   GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
