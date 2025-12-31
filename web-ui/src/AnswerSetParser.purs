@@ -38,6 +38,7 @@ data Atom
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
   | Executed String Int                 -- d_executed(player, day)
+  | Bag String                          -- bag(role) - role is in the physical bag
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -83,6 +84,7 @@ atomCategory = case _ of
   Chair _ _             -> StructuralPredicate
   Time _                -> StructuralPredicate
   ActingRole _ _        -> StructuralPredicate
+  Bag _                 -> StructuralPredicate
   -- Unknown
   UnknownAtom _         -> OtherPredicate
 
@@ -163,6 +165,7 @@ type GameState =
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
   , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
+  , bagTokens :: Array String  -- roles in the physical bag
   }
 
 -- | Parse a single atom string into structured data
@@ -182,7 +185,8 @@ parseAtom atomStr =
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
       parseChair trimmed <|>
-      parseExecuted trimmed
+      parseExecuted trimmed <|>
+      parseBag trimmed
 
 -- | Parse assigned(T, Player, Role)
 parseAssigned :: String -> Maybe Atom
@@ -358,6 +362,14 @@ parseExecuted s =
           then parseArgs (drop (length pattern) (take (length s - 1) s))
           else Nothing
 
+-- | Parse bag(Role)
+parseBag :: String -> Maybe Atom
+parseBag s = do
+  let pattern = "bag("
+  _ <- if take (length pattern) s == pattern then Just unit else Nothing
+  let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bag(" and ")"
+  Just $ Bag (trim rest)
+
 -- | Parse a time string like "night(1,2,3)" or "day(1,0)"
 parseTime :: String -> TimePoint
 parseTime s =
@@ -501,6 +513,9 @@ parseAnswerSetWithOriginals = map \s -> { atom: parseAtom s, original: s }
 buildGameState :: Array Atom -> TimePoint -> GameState
 buildGameState atoms targetTime =
   let
+    -- Get bag tokens (roles in the physical bag)
+    bagTokens = mapMaybe getBagToken atoms
+
     -- Get chairs
     chairs = mapMaybe getChair atoms
 
@@ -544,8 +559,12 @@ buildGameState atoms targetTime =
     { players: sortBy (comparing _.chair) players
     , reminders: remindersAtTime
     , time: targetTime
+    , bagTokens
     }
   where
+    getBagToken (Bag role) = Just role
+    getBagToken _ = Nothing
+
     getChair (Chair name pos) = Just { name, pos }
     getChair _ = Nothing
 
@@ -727,6 +746,7 @@ atomToPredicateName = case _ of
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }
   Executed _ _           -> { name: "d_executed", arity: 2 }
+  Bag _                  -> { name: "bag", arity: 1 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =

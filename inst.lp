@@ -38,6 +38,7 @@ received(rob, washerwoman).
 %   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
 
 #show distrib/1.
+#show bag/1.
 %#show time/1.
 %#show next/2.
 %#show impaired/2.
