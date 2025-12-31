@@ -771,6 +771,49 @@ sw_becomes_demon(SW, N) :-
 assigned(N, SW, imp) :- sw_becomes_demon(SW, N).
 
 % ===========================================================================
+% Imp Starpass: When Imp kills itself, a living minion becomes the new Imp
+% ===========================================================================
+
+% Detect when Imp successfully kills itself at night N
+imp_starpass_triggered(Imp, N) :-
+    night_number(N), N > 1,
+    current_demon(Imp, N),
+    other_night_role_order(imp, RoleOrd),
+    player_chooses(imp, Imp, point(Imp), night(N, RoleOrd, 2)),
+    imp_kill_succeeds(Imp, night(N, RoleOrd, 3)).
+
+% A minion is eligible to become the new Imp if:
+% 1. They were assigned a minion role at setup
+% 2. They are alive when the starpass happens
+eligible_for_starpass(Minion, N) :-
+    imp_starpass_triggered(_, N),
+    assigned(0, Minion, R),
+    minion(R),
+    other_night_role_order(imp, RoleOrd),
+    alive(Minion, night(N, RoleOrd, 3)).
+
+% Exactly one eligible minion is chosen to become the new Imp
+% (Non-deterministic choice - the ST/game decides which minion)
+{ starpass_target(Minion, N) : eligible_for_starpass(Minion, N) } = 1 :-
+    imp_starpass_triggered(_, N),
+    eligible_for_starpass(_, N).
+
+% The chosen minion is assigned the Imp role at time N
+assigned(N, Minion, imp) :- starpass_target(Minion, N).
+
+% The original demon is replaced starting from the night after starpass
+replaced_as_demon(P, NextN) :-
+    imp_starpass_triggered(P, TriggerNight),
+    night_number(NextN),
+    NextN > TriggerNight.
+
+% The new Imp becomes current_demon starting from the night after starpass
+current_demon(Minion, NextN) :-
+    starpass_target(Minion, TriggerNight),
+    night_number(NextN),
+    NextN > TriggerNight.
+
+% ===========================================================================
 % Reminder Token Metadata (for grimoire rendering)
 % ===========================================================================
 
