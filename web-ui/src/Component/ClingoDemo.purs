@@ -15,8 +15,8 @@ import Data.Foldable (foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
-import Data.String (Pattern(..), split, trim, take, contains) as String
-import Data.String (Pattern(..), split, trim, contains)
+import Data.String (Pattern(..), split, trim, take, contains, indexOf) as String
+import Data.String (Pattern(..), split, trim, contains, indexOf)
 import Effect.Class (liftEffect)
 import Effect.Aff (Milliseconds(..))
 import Effect.Aff as Aff
@@ -1084,12 +1084,13 @@ isAssertReceivedForRole role line =
     trimmedLine = trim line
     prefix = "assert_received("
     suffix = ", " <> role <> ")."
-    firstChar = String.take 1 trimmedLine
-    startsCorrectly = String.take 16 trimmedLine == prefix  -- "assert_received(" is 16 chars
-    endsCorrectly = contains (Pattern suffix) trimmedLine
+    -- Check if line starts with the prefix (not commented out)
+    startsWithPrefix = indexOf (Pattern prefix) trimmedLine == Just 0
+    -- Check if line contains the role suffix
+    endsWithSuffix = contains (Pattern suffix) trimmedLine
   in
-    -- Must not already be commented out, must start with assert_received(, and end with role
-    firstChar /= "%" && startsCorrectly && endsCorrectly
+    -- Must start with assert_received( (not commented) and contain the role suffix
+    startsWithPrefix && endsWithSuffix
 
 -- | Comment out a line if it matches an assert_received constraint for the given role
 -- | Takes the role to match and context to describe what was moved and where
