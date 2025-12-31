@@ -522,3 +522,8 @@ d_player_chooses(R, P, C, T) :- player_chooses(R, P, C, T).
 % d_executed/2 - Player is executed
 % This is the event of execution happening on a specific day.
 d_executed(P, D) :- executed(P, D).
+
+% d_died/2 - Player dies at a specific time
+% This captures all death events (execution, imp kill, slayer, etc.)
+% The parser computes alive/dead state from this, avoiding O(players × time) output.
+d_died(P, T) :- died(P, T).

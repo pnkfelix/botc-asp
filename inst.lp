@@ -33,12 +33,12 @@ received(rob, washerwoman).
 %#show impaired/2.
 #show registers_as/3.
 
-% For grimoire/timeline rendering
+% For grimoire rendering (seating positions)
 #show game_chair/2.
-#show alive/2.
-#show dead/2.
 
 % Delta predicates (d_ prefix = events/changes, not ongoing state)
+% Parser derives alive/dead state from d_died events
 #show d_st_tells/4.
 #show d_player_chooses/4.
 #show d_executed/2.
+#show d_died/2.

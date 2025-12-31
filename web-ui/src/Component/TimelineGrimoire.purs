@@ -289,6 +289,7 @@ renderTimePoint state timePoint =
 eventAtTime :: ASP.TimePoint -> ASP.TimelineEvent -> Boolean
 eventAtTime t (ASP.RoleAction r) = r.time == t
 eventAtTime t (ASP.TokenPlaced r) = r.time == t
+eventAtTime t (ASP.Death d) = d.time == t
 eventAtTime (ASP.Day d _) (ASP.Execution e) = e.day == d  -- Executions appear under their day
 eventAtTime _ (ASP.Execution _) = false
 
@@ -329,6 +330,14 @@ renderEvent event =
         , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.text $ r.player <> " executed" ]
+    ASP.Death r ->
+      HH.div
+        [ HP.style $ "font-size: 12px; color: #7b1fa2; margin: 4px 0; font-weight: bold; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to highlight this atom in the answer set"
+        ]
+        [ HH.text $ r.player <> " died" ]
 
 -- | Render the grimoire (players in a circle)
 renderGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
@@ -1048,6 +1057,11 @@ handleAction = case _ of
           ASP.Execution r ->
             { sourceAtom: r.sourceAtom
             , predicateName: "d_executed"
+            , predicateArity: 2
+            }
+          ASP.Death r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "d_died"
             , predicateArity: 2
             }
     -- Emit the output event
