@@ -190,3 +190,36 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Detect if the cursor is on an #include directive and return the file path
+// Returns null if not on an include, or the file path string if found
+export const getIncludeAtCursorImpl = (elementId) => () => {
+  const textarea = document.getElementById(elementId);
+  if (!textarea) return null;
+
+  const text = textarea.value;
+  const cursorPos = textarea.selectionStart;
+
+  // Find the line containing the cursor
+  const lines = text.split('\n');
+  let charCount = 0;
+  let currentLine = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineEnd = charCount + lines[i].length;
+    if (cursorPos >= charCount && cursorPos <= lineEnd) {
+      currentLine = lines[i];
+      break;
+    }
+    charCount += lines[i].length + 1; // +1 for newline
+  }
+
+  // Check if the line is an #include directive
+  // Pattern: #include "filename".
+  const includeMatch = currentLine.match(/#include\s+"([^"]+)"\s*\./);
+  if (includeMatch) {
+    return includeMatch[1]; // Return the filename
+  }
+
+  return null;
+};

@@ -66,6 +66,8 @@ type State =
   -- Undo/redo stacks for token drag operations
   , undoStack :: Array UndoEntry
   , redoStack :: Array UndoEntry
+  -- Navigate to included file dialog
+  , navigateIncludeTarget :: Maybe String  -- File path user clicked on in #include
   }
 
 -- | How to display results
@@ -96,6 +98,9 @@ data Action
   | ClearScrollNotification     -- Clear the scroll notification message
   | Undo                        -- Undo the last token drag operation
   | Redo                        -- Redo the last undone token drag operation
+  | TextareaClicked             -- Check if clicked on #include directive
+  | ConfirmNavigateToInclude String  -- Navigate to the included file
+  | CancelNavigateToInclude     -- Cancel the navigation dialog
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -137,6 +142,24 @@ isInDirectory dir path =
 isRootFile :: String -> Boolean
 isRootFile path = getParentDir path == ""
 
+-- | Join a directory and filename into a path
+joinPath :: String -> String -> String
+joinPath "" filename = filename
+joinPath dir filename = dir <> "/" <> filename
+
+-- | Resolve an include path: try as-is first, then relative to current directory
+resolveIncludePath :: String -> String -> Map.Map String String -> String
+resolveIncludePath currentDir includePath files =
+  -- Try the path as-is first (relative to root)
+  if Map.member includePath files
+    then includePath
+    -- Try relative to current directory
+    else
+      let relativePath = joinPath currentDir includePath
+      in if Map.member relativePath files
+           then relativePath
+           else includePath  -- Return original path even if not found
+
 -- | Initial state with embedded .lp file contents
 initialState :: State
 initialState =
@@ -156,6 +179,7 @@ initialState =
   , scrollNotification: Nothing  -- No notification initially
   , undoStack: []          -- Empty undo stack
   , redoStack: []          -- Empty redo stack
+  , navigateIncludeTarget: Nothing  -- No navigation dialog initially
   }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
@@ -267,6 +291,7 @@ render state =
             , HP.id "editor-textarea"
             , HP.value currentContent
             , HE.onValueInput SetFileContent
+            , HE.onClick \_ -> TextareaClicked
             , HP.disabled state.isLoading
             ]
         ]
@@ -322,6 +347,9 @@ render state =
 
     -- Modal for predicate references
     , renderPredicateModal state.selectedPredicate sources parsed.references
+
+    -- Dialog for navigating to included files
+    , renderNavigateIncludeDialog state.navigateIncludeTarget state.files
     ]
 
 -- | Render a file tab button
@@ -826,6 +854,68 @@ renderPredicateModal (Just pred) _ findRefs =
             [ HH.text ref.lineContent ]
         ]
 
+-- | Render the dialog for navigating to an included file
+renderNavigateIncludeDialog :: forall m. Maybe String -> Map.Map String String -> H.ComponentHTML Action Slots m
+renderNavigateIncludeDialog Nothing _ = HH.text ""
+renderNavigateIncludeDialog (Just targetPath) files =
+  let
+    fileExists = Map.member targetPath files
+  in
+  HH.div
+    [ HP.style $ "position: fixed; top: 0; left: 0; right: 0; bottom: 0; "
+        <> "background: rgba(0,0,0,0.5); z-index: 300; "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "padding: 20px;"
+    , HE.onClick \_ -> CancelNavigateToInclude
+    ]
+    [ HH.div
+        [ HP.style $ "background: white; border-radius: 8px; "
+            <> "max-width: 450px; width: 100%; "
+            <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
+        , HE.onClick \_ -> NoOp  -- Prevent clicks inside dialog from closing it
+        ]
+        [ -- Dialog header
+          HH.div
+            [ HP.style "padding: 15px 20px; background: #FF9800; color: white; border-radius: 8px 8px 0 0;" ]
+            [ HH.strong_ [ HH.text "Navigate to Included File" ] ]
+        -- Dialog body
+        , HH.div
+            [ HP.style "padding: 20px;" ]
+            [ HH.p
+                [ HP.style "margin: 0 0 15px 0; color: #333;" ]
+                [ HH.text "Do you want to open the included file?" ]
+            , HH.div
+                [ HP.style $ "padding: 12px; background: #f5f5f5; border-radius: 4px; "
+                    <> "font-family: monospace; font-size: 14px; "
+                    <> "border: 1px solid " <> (if fileExists then "#4CAF50" else "#f44336") <> ";"
+                ]
+                [ HH.text targetPath ]
+            , if not fileExists
+                then HH.p
+                  [ HP.style "margin: 15px 0 0 0; color: #f44336; font-size: 13px;" ]
+                  [ HH.text "⚠ This file does not exist in the virtual filesystem." ]
+                else HH.text ""
+            ]
+        -- Dialog footer
+        , HH.div
+            [ HP.style "padding: 15px 20px; background: #f5f5f5; border-radius: 0 0 8px 8px; display: flex; justify-content: flex-end; gap: 10px;" ]
+            [ HH.button
+                [ HP.style "padding: 8px 16px; font-size: 14px; cursor: pointer; background: #ccc; color: #333; border: none; border-radius: 4px;"
+                , HE.onClick \_ -> CancelNavigateToInclude
+                ]
+                [ HH.text "Cancel" ]
+            , HH.button
+                [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
+                    <> "background: " <> (if fileExists then "#4CAF50" else "#ccc") <> "; "
+                    <> "color: white; border: none; border-radius: 4px;"
+                , HE.onClick \_ -> ConfirmNavigateToInclude targetPath
+                , HP.disabled (not fileExists)
+                ]
+                [ HH.text "Open File" ]
+            ]
+        ]
+    ]
+
 -- | Handle component actions
 handleAction :: forall cs o m. MonadAff m => Action -> H.HalogenM State Action cs o m Unit
 handleAction = case _ of
@@ -1120,6 +1210,26 @@ handleAction = case _ of
                           }
         -- Re-run Clingo to update the grimoire
         handleAction RunClingo
+
+  TextareaClicked -> do
+    -- Check if the cursor is on an #include directive
+    maybeIncludePath <- liftEffect $ TU.getIncludeAtCursor "editor-textarea"
+    case maybeIncludePath of
+      Just includePath -> do
+        -- Resolve the include path relative to current file
+        state <- H.get
+        let currentDir = getParentDir state.currentFile
+        let resolvedPath = resolveIncludePath currentDir includePath state.files
+        H.modify_ \s -> s { navigateIncludeTarget = Just resolvedPath }
+      Nothing ->
+        pure unit  -- Not on an include, do nothing
+
+  ConfirmNavigateToInclude targetPath -> do
+    -- Navigate to the included file
+    H.modify_ \s -> s { currentFile = targetPath, navigateIncludeTarget = Nothing }
+
+  CancelNavigateToInclude ->
+    H.modify_ \s -> s { navigateIncludeTarget = Nothing }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
