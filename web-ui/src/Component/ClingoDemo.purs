@@ -1076,27 +1076,27 @@ modifyInstLpForReminder content oldPattern newConstraint token fromPlayer toPlay
   in
     intercalate "\n" finalLines
 
--- | Check if a line is an assert_received constraint for a specific role (any player)
--- | Returns true if the trimmed line matches pattern: assert_received(<any_player>, <role>).
-isAssertReceivedForRole :: String -> String -> Boolean
-isAssertReceivedForRole role line =
+-- | Check if a line is an assert_received constraint for a specific player (any role)
+-- | Returns true if the trimmed line matches pattern: assert_received(<player>, <any_role>).
+isAssertReceivedForPlayer :: String -> String -> Boolean
+isAssertReceivedForPlayer player line =
   let
     trimmedLine = trim line
-    prefix = "assert_received("
-    suffix = ", " <> role <> ")."
+    -- Pattern: assert_received(<player>,
+    prefix = "assert_received(" <> player <> ", "
     -- Check if line starts with the prefix (not commented out)
     startsWithPrefix = indexOf (Pattern prefix) trimmedLine == Just 0
-    -- Check if line contains the role suffix
-    endsWithSuffix = contains (Pattern suffix) trimmedLine
+    -- Check if line ends with ). to confirm it's a complete constraint
+    endsCorrectly = contains (Pattern ").") trimmedLine
   in
-    -- Must start with assert_received( (not commented) and contain the role suffix
-    startsWithPrefix && endsWithSuffix
+    -- Must start with assert_received(<player>, and end with ).
+    startsWithPrefix && endsCorrectly
 
--- | Comment out a line if it matches an assert_received constraint for the given role
--- | Takes the role to match and context to describe what was moved and where
-commentOutIfRoleConstraint :: String -> String -> String -> String
-commentOutIfRoleConstraint role contextSuffix line =
-  if isAssertReceivedForRole role line
+-- | Comment out a line if it matches an assert_received constraint for the given player
+-- | Takes the player to match and context to describe what was moved and where
+commentOutIfPlayerConstraint :: String -> String -> String -> String
+commentOutIfPlayerConstraint player contextSuffix line =
+  if isAssertReceivedForPlayer player line
     then "% " <> line <> "  % commented out by drag: " <> contextSuffix
     else line
 
@@ -1124,7 +1124,8 @@ timePointToAssignedTime (AnswerSet.Day n _) = n
 timePointToAssignedTime (AnswerSet.UnknownTime _) = 0
 
 -- | Modify inst.lp to add a new role assignment constraint and comment out conflicting ones
--- | Comments out ALL assert_received constraints for this role (any player), not just fromPlayer
+-- | Comments out ALL assert_received constraints for the target player (any role)
+-- | Because a player can only have one role, assigning a new role invalidates previous ones
 -- | Takes role, fromPlayer, toPlayer for descriptive comments
 modifyInstLpForRole :: String -> String -> String -> String -> String -> String -> String
 modifyInstLpForRole content _oldPattern newConstraint role fromPlayer toPlayer =
@@ -1132,9 +1133,10 @@ modifyInstLpForRole content _oldPattern newConstraint role fromPlayer toPlayer =
     -- Split content into lines
     contentLines = String.split (String.Pattern "\n") content
     -- Context for commented-out line: what was moved and where
-    commentOutContext = "moved " <> role <> " to " <> toPlayer
-    -- Comment out ALL existing assert_received constraints for this role (any player)
-    modifiedLines = map (commentOutIfRoleConstraint role commentOutContext) contentLines
+    commentOutContext = "assigned " <> role <> " to " <> toPlayer
+    -- Comment out ALL existing assert_received constraints for this PLAYER (any role)
+    -- Because a player can only have one role token
+    modifiedLines = map (commentOutIfPlayerConstraint toPlayer commentOutContext) contentLines
     -- Check if the new constraint already exists
     hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
     -- Create descriptive comment for the new line
