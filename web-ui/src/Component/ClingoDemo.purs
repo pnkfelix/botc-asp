@@ -967,9 +967,9 @@ handleAction = case _ of
       -- Format the time point for ASP
       let timeStr = formatTimePointForASP time
       -- Create the new constraint
-      let newConstraint = ":- not reminder_on(" <> token <> ", " <> toPlayer <> ", " <> timeStr <> ")."
+      let newConstraint = "assert_reminder_on(" <> token <> ", " <> toPlayer <> ", " <> timeStr <> ")."
       -- Create the old constraint pattern to comment out
-      let oldConstraintPattern = ":- not reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
+      let oldConstraintPattern = "assert_reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
       -- Modify the content: comment out old constraint if present, add new one
       let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint
       -- Update the virtual filesystem, push undo entry, and clear redo stack
@@ -990,10 +990,10 @@ handleAction = case _ of
       -- Convert time to an integer for received/3 predicate
       -- For Night 1 (setup), use 0; otherwise use night number
       let timeIdx = timePointToAssignedTime time
-      -- Create the new constraint (forces toPlayer to receive this token at this time)
-      let newConstraint = ":- not received(" <> show timeIdx <> ", " <> toPlayer <> ", " <> role <> ")."
+      -- Create the new constraint (forces toPlayer to receive this token)
+      let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
       -- Create the old constraint pattern to comment out (the previous drag for this token)
-      let oldConstraintPattern = ":- not received(" <> show timeIdx <> ", " <> fromPlayer <> ", " <> role <> ")."
+      let oldConstraintPattern = "assert_received(" <> fromPlayer <> ", " <> role <> ")."
       -- Modify the content: comment out old constraint if present, add new one
       let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
       -- Update the virtual filesystem, push undo entry, and clear redo stack
