@@ -1,7 +1,30 @@
+% ===========================================================================
+% Night Order Derivation
+% Derive first_night_role_order/2 and other_night_role_order/2 from the
+% global night_order/3 defined in night_order.lp
+%
+% night_order(Role, FirstNightPos, OtherNightPos) is the canonical source.
+% Roles with position 0 do not wake during that phase.
+% ===========================================================================
+
+% Derive first night role order from global night_order/3
+% Only include roles that actually wake on first night (position > 0)
+first_night_role_order(Role, Pos) :-
+    night_order(Role, Pos, _),
+    Pos > 0.
+
+% Derive other nights role order from global night_order/3
+% Only include roles that actually wake on other nights (position > 0)
+other_night_role_order(Role, Pos) :-
+    night_order(Role, _, Pos),
+    Pos > 0.
+
+% ===========================================================================
 % Time points for the game
 % We use structured time: night(N, RoleOrder, Substep)
 % night(1, 0, 0) is the setup state before any role acts
 % night(1, R, S) is substep S of the role at position R in the night order
+% ===========================================================================
 
 time(night(1, 0, 0)).  % setup state before any actions on night 1
 
