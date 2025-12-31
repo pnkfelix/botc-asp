@@ -1030,16 +1030,29 @@ handleAction = case _ of
             Nothing -> do
               -- Validation passed - proceed with the drop
               let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+              -- Detect if this is a copy operation from script/bag (special sources)
+              let isCopyOperation = String.take 2 fromPlayer == "__"
+              let sourceDescription = case fromPlayer of
+                    "__script__" -> "script"
+                    "__bag__" -> "bag"
+                    _ -> fromPlayer
               -- Push current state onto undo stack (before making changes)
               let undoEntry = { instLpContent: instContent
-                              , description: "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                              , description: if isCopyOperation
+                                  then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
+                                  else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
                               }
               -- Create the new constraint (forces toPlayer to receive this token)
               let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
               -- Create the old constraint pattern to comment out (the previous drag for this token)
-              let oldConstraintPattern = "assert_received(" <> fromPlayer <> ", " <> role <> ")."
+              -- For copy operations, we use a dummy pattern that won't match anything
+              let oldConstraintPattern = if isCopyOperation
+                    then "__NOMATCH__"
+                    else "assert_received(" <> fromPlayer <> ", " <> role <> ")."
               -- Modify the content: comment out old constraint if present, add new one
-              let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role fromPlayer toPlayer
+              -- For copy operations, use sourceDescription for cleaner comments
+              let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
+              let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
               -- Update the virtual filesystem, push undo entry, and clear redo stack
               H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
                                 , undoStack = snoc s.undoStack undoEntry

@@ -82,7 +82,22 @@ type State =
   , dragging :: Maybe DragState          -- Current drag operation
   , svgBounds :: Maybe { left :: Number, top :: Number, width :: Number, height :: Number }
   , viewMode :: ViewMode                 -- SVG (circular) or HTML (grid) view
+  , bagCollapsed :: Boolean              -- Whether the bag panel is collapsed
+  , scriptCollapsed :: Boolean           -- Whether the script panel is collapsed
   }
+
+-- | Trouble Brewing script roles by category
+tbTownsfolk :: Array String
+tbTownsfolk = ["washerwoman", "librarian", "investigator", "chef", "empath", "fortune_teller", "undertaker", "monk", "ravenkeeper", "virgin", "slayer", "soldier", "mayor"]
+
+tbOutsiders :: Array String
+tbOutsiders = ["butler", "drunk", "recluse", "saint"]
+
+tbMinions :: Array String
+tbMinions = ["poisoner", "spy", "scarlet_woman", "baron"]
+
+tbDemons :: Array String
+tbDemons = ["imp"]
 
 -- | Component query type (empty - no queries supported)
 data Query :: forall k. k -> Type
@@ -95,6 +110,8 @@ data Action
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
+  | ToggleBagPanel                        -- Toggle bag panel collapsed state
+  | ToggleScriptPanel                     -- Toggle script panel collapsed state
   -- Mouse events for SVG view (HTML view uses JS pointer events)
   | StartDragReminderMouse { reminder :: { token :: String, player :: String, placedAt :: ASP.TimePoint }, event :: MouseEvent }
   | DragMoveMouse MouseEvent
@@ -136,6 +153,8 @@ initialState atomStrings =
     , dragging: Nothing
     , svgBounds: Nothing
     , viewMode: HtmlView  -- Default to HTML view for better mobile support
+    , bagCollapsed: false    -- Bag panel starts expanded
+    , scriptCollapsed: false -- Script panel starts expanded
     }
 
 -- | Get all unique time points from atoms
@@ -200,17 +219,24 @@ findTimeAtomSource parsedAtoms targetTime =
 -- | Main render function
 render :: forall cs m. State -> H.ComponentHTML Action cs m
 render state =
+  let
+    gameState = case state.selectedTime of
+      Just t -> ASP.buildGameState state.atoms t
+      Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
+  in
   HH.div
     [ HP.style "display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap;" ]
-    [ -- Timeline panel (left)
-      HH.div
+    [ -- Bag panel (leftmost, collapsible)
+      renderBagPanel state gameState
+    -- Timeline panel
+    , HH.div
         [ HP.style "flex: 1; min-width: 300px; max-width: 400px;" ]
         [ HH.h3
             [ HP.style "margin: 0 0 10px 0; color: #333;" ]
             [ HH.text "Timeline" ]
         , renderTimeline state
         ]
-    -- Grimoire panel (right)
+    -- Grimoire panel
     , HH.div
         [ HP.style $ "flex: 2; min-width: 400px;"
             <> if isJust state.dragging then " cursor: grabbing;" else ""
@@ -240,6 +266,193 @@ render state =
             then renderGrimoire state
             else renderHtmlGrimoire state
         ]
+    -- Script panel (rightmost, collapsible)
+    , renderScriptPanel state
+    ]
+
+-- | Render the bag panel (collapsible, shows tokens each player received)
+renderBagPanel :: forall cs m.
+  State ->
+  { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
+  , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
+  , time :: ASP.TimePoint
+  } ->
+  H.ComponentHTML Action cs m
+renderBagPanel state gameState =
+  let
+    timeStr = case state.selectedTime of
+      Just t -> formatTimePoint t
+      Nothing -> ""
+  in
+  HH.div
+    [ HP.style $ "min-width: " <> (if state.bagCollapsed then "40px" else "150px") <> "; "
+        <> "transition: min-width 0.2s ease-in-out;"
+    ]
+    [ -- Header with collapse toggle
+      HH.div
+        [ HP.style "display: flex; align-items: center; gap: 8px; margin-bottom: 10px;" ]
+        [ HH.button
+            [ HP.style $ "padding: 4px 8px; font-size: 11px; border-radius: 4px; "
+                <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; "
+                <> "min-width: 24px;"
+            , HE.onClick \_ -> ToggleBagPanel
+            , HP.title $ if state.bagCollapsed then "Expand bag" else "Collapse bag"
+            ]
+            [ HH.text $ if state.bagCollapsed then ">" else "<" ]
+        , if state.bagCollapsed
+            then HH.text ""
+            else HH.h3
+              [ HP.style "margin: 0; color: #333; font-size: 14px;" ]
+              [ HH.text "Bag" ]
+        ]
+    -- Bag content (hidden when collapsed)
+    , if state.bagCollapsed
+        then HH.text ""
+        else HH.div
+          [ HP.style $ "max-height: 400px; overflow-y: auto; "
+              <> "border: 1px solid #ddd; border-radius: 4px; "
+              <> "background: white; padding: 8px;"
+          ]
+          [ if null gameState.players
+              then HH.p
+                [ HP.style "color: #666; font-style: italic; font-size: 12px;" ]
+                [ HH.text "No players" ]
+              else HH.div
+                [ HP.style "display: flex; flex-direction: column; gap: 6px;" ]
+                (map (renderBagToken timeStr) gameState.players)
+          ]
+    ]
+
+-- | Render a single token in the bag
+renderBagToken :: forall cs m.
+  String ->  -- time string
+  { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
+  H.ComponentHTML Action cs m
+renderBagToken timeStr player =
+  let
+    roleColor = getRoleColor player.token
+  in
+  HH.div
+    [ HP.style $ "display: flex; align-items: center; gap: 8px; padding: 4px; "
+        <> "border-radius: 4px; background: #f5f5f5;"
+    ]
+    [ -- Token circle (draggable)
+      HH.div
+        [ HP.style $ "width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; "
+            <> "background: " <> roleColor <> "; "
+            <> "border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); "
+            <> "display: flex; align-items: center; justify-content: center; "
+            <> "cursor: grab; touch-action: none; user-select: none;"
+        -- Data attributes for drag - uses __bag__ as source indicator
+        , HP.attr (HH.AttrName "data-role-token") player.token
+        , HP.attr (HH.AttrName "data-role-player") "__bag__"
+        , HP.attr (HH.AttrName "data-role-time") timeStr
+        , HP.attr (HH.AttrName "data-role-color") roleColor
+        , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.token)
+        , HP.attr (HH.AttrName "data-bag-owner") player.name
+        ]
+        []
+    -- Player name and token name
+    , HH.div
+        [ HP.style "font-size: 11px; min-width: 0;" ]
+        [ HH.div
+            [ HP.style "font-weight: bold; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" ]
+            [ HH.text player.name ]
+        , HH.div
+            [ HP.style "color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" ]
+            [ HH.text $ formatRoleName player.token ]
+        ]
+    ]
+
+-- | Render the script panel (collapsible, shows all roles in the script)
+renderScriptPanel :: forall cs m. State -> H.ComponentHTML Action cs m
+renderScriptPanel state =
+  let
+    timeStr = case state.selectedTime of
+      Just t -> formatTimePoint t
+      Nothing -> ""
+  in
+  HH.div
+    [ HP.style $ "min-width: " <> (if state.scriptCollapsed then "40px" else "160px") <> "; "
+        <> "transition: min-width 0.2s ease-in-out;"
+    ]
+    [ -- Header with collapse toggle
+      HH.div
+        [ HP.style "display: flex; align-items: center; gap: 8px; margin-bottom: 10px; justify-content: flex-end;" ]
+        [ if state.scriptCollapsed
+            then HH.text ""
+            else HH.h3
+              [ HP.style "margin: 0; color: #333; font-size: 14px;" ]
+              [ HH.text "Script" ]
+        , HH.button
+            [ HP.style $ "padding: 4px 8px; font-size: 11px; border-radius: 4px; "
+                <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; "
+                <> "min-width: 24px;"
+            , HE.onClick \_ -> ToggleScriptPanel
+            , HP.title $ if state.scriptCollapsed then "Expand script" else "Collapse script"
+            ]
+            [ HH.text $ if state.scriptCollapsed then "<" else ">" ]
+        ]
+    -- Script content (hidden when collapsed)
+    , if state.scriptCollapsed
+        then HH.text ""
+        else HH.div
+          [ HP.style $ "max-height: 400px; overflow-y: auto; "
+              <> "border: 1px solid #ddd; border-radius: 4px; "
+              <> "background: white; padding: 8px;"
+          ]
+          [ -- Townsfolk section
+            renderScriptSection "Townsfolk" tbTownsfolk timeStr
+          -- Outsiders section
+          , renderScriptSection "Outsiders" tbOutsiders timeStr
+          -- Minions section
+          , renderScriptSection "Minions" tbMinions timeStr
+          -- Demons section
+          , renderScriptSection "Demons" tbDemons timeStr
+          ]
+    ]
+
+-- | Render a section of the script (category header + role tokens)
+renderScriptSection :: forall cs m. String -> Array String -> String -> H.ComponentHTML Action cs m
+renderScriptSection categoryName roles timeStr =
+  HH.div
+    [ HP.style "margin-bottom: 8px;" ]
+    [ HH.div
+        [ HP.style "font-size: 10px; font-weight: bold; color: #888; text-transform: uppercase; margin-bottom: 4px;" ]
+        [ HH.text categoryName ]
+    , HH.div
+        [ HP.style "display: flex; flex-direction: column; gap: 4px;" ]
+        (map (renderScriptRole timeStr) roles)
+    ]
+
+-- | Render a single role in the script (draggable)
+renderScriptRole :: forall cs m. String -> String -> H.ComponentHTML Action cs m
+renderScriptRole timeStr role =
+  let
+    roleColor = getRoleColor role
+  in
+  HH.div
+    [ HP.style $ "display: flex; align-items: center; gap: 6px; padding: 3px; "
+        <> "border-radius: 4px; background: #f9f9f9; cursor: grab; "
+        <> "touch-action: none; user-select: none;"
+    -- Data attributes for drag - uses __script__ as source indicator
+    , HP.attr (HH.AttrName "data-role-token") role
+    , HP.attr (HH.AttrName "data-role-player") "__script__"
+    , HP.attr (HH.AttrName "data-role-time") timeStr
+    , HP.attr (HH.AttrName "data-role-color") roleColor
+    , HP.attr (HH.AttrName "data-role-display") (formatRoleName role)
+    ]
+    [ -- Small color indicator
+      HH.div
+        [ HP.style $ "width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; "
+            <> "background: " <> roleColor <> "; "
+            <> "border: 1px solid rgba(0,0,0,0.1);"
+        ]
+        []
+    -- Role name
+    , HH.span
+        [ HP.style "font-size: 11px; color: #333;" ]
+        [ HH.text $ formatRoleName role ]
     ]
 
 -- | Render the timeline with events
@@ -1123,6 +1336,12 @@ handleAction = case _ of
 
   ToggleViewMode -> do
     H.modify_ \s -> s { viewMode = if s.viewMode == SvgView then HtmlView else SvgView }
+
+  ToggleBagPanel -> do
+    H.modify_ \s -> s { bagCollapsed = not s.bagCollapsed }
+
+  ToggleScriptPanel -> do
+    H.modify_ \s -> s { scriptCollapsed = not s.scriptCollapsed }
 
   HandleReminderDrop dropEvent -> do
     -- Handle drop event from JS drag handler
