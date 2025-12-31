@@ -20,10 +20,10 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment
+# Allow concurrent builds across different PRs, but cancel redundant runs on the same PR
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
