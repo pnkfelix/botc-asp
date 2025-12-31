@@ -18,7 +18,7 @@ module AnswerSetParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, sortBy, nub, head, findIndex, index)
+import Data.Array (filter, mapMaybe, sortBy, nub, head, last, findIndex, index)
 import Data.Foldable (elem, all, foldl)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
@@ -497,6 +497,15 @@ parseAnswerSet = map parseAtom
 parseAnswerSetWithOriginals :: Array String -> Array ParsedAtom
 parseAnswerSetWithOriginals = map \s -> { atom: parseAtom s, original: s }
 
+-- | Convert a TimePoint to an integer time index for comparing with assigned/3 predicate
+-- Night 1 (any phase) maps to 0 (initial assignment)
+-- Other nights/days map to their number
+timePointToAssignedTime :: TimePoint -> Int
+timePointToAssignedTime (Night 1 _ _) = 0
+timePointToAssignedTime (Night n _ _) = n
+timePointToAssignedTime (Day n _) = n
+timePointToAssignedTime (UnknownTime _) = 0
+
 -- | Build game state from parsed atoms at a specific time
 buildGameState :: Array Atom -> TimePoint -> GameState
 buildGameState atoms targetTime =
@@ -504,8 +513,14 @@ buildGameState atoms targetTime =
     -- Get chairs
     chairs = mapMaybe getChair atoms
 
-    -- Get initial assignments (time 0)
-    assignments = mapMaybe getAssignment atoms
+    -- Get all assignments (initial and mid-game role changes)
+    allAssignments = mapMaybe getAllAssignments atoms
+
+    -- Convert target time to integer for comparison with assigned(N, ...)
+    targetTimeInt = timePointToAssignedTime targetTime
+
+    -- For each player, find the most recent assignment at or before targetTime
+    assignments = getEffectiveAssignments allAssignments targetTimeInt
 
     -- Get received tokens
     tokens = mapMaybe getReceived atoms
@@ -549,8 +564,22 @@ buildGameState atoms targetTime =
     getChair (Chair name pos) = Just { name, pos }
     getChair _ = Nothing
 
-    getAssignment (Assigned 0 player role) = Just { key: player, value: role }
-    getAssignment _ = Nothing
+    -- Get all assignments (not just time 0)
+    getAllAssignments (Assigned t player role) = Just { time: t, player, role }
+    getAllAssignments _ = Nothing
+
+    -- For each player, find the most recent assignment at or before target time
+    getEffectiveAssignments :: Array { time :: Int, player :: String, role :: String } -> Int -> Array { key :: String, value :: String }
+    getEffectiveAssignments allAssigns t =
+      let
+        -- Get unique players
+        players = nub $ map _.player allAssigns
+        -- For each player, find the most recent assignment at or before t
+        effectiveForPlayer p =
+          let validAssigns = filter (\a -> a.player == p && a.time <= t) allAssigns
+              sorted = sortBy (comparing _.time) validAssigns
+          in last sorted # map \a -> { key: p, value: a.role }
+      in mapMaybe effectiveForPlayer players
 
     getReceived (Received player token) = Just { key: player, value: token }
     getReceived _ = Nothing
