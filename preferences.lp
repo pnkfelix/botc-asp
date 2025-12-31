@@ -25,25 +25,16 @@
 % practice - it gives the player zero new information.
 
 % Washerwoman: discourage putting either token on the washerwoman player
-:~ reminder_on(ww_townsfolk, WW, _), assigned(0, WW, washerwoman).
-   [10@1, WW, ww_townsfolk]
-
-:~ reminder_on(ww_wrong, WW, _), assigned(0, WW, washerwoman).
-   [10@1, WW, ww_wrong]
+:~ reminder_on(ww_townsfolk, WW, _), assigned(0, WW, washerwoman). [10@1, WW, ww_townsfolk]
+:~ reminder_on(ww_wrong, WW, _), assigned(0, WW, washerwoman). [10@1, WW, ww_wrong]
 
 % Librarian: discourage putting either token on the librarian player
-:~ reminder_on(lib_outsider, LIB, _), assigned(0, LIB, librarian).
-   [10@1, LIB, lib_outsider]
-
-:~ reminder_on(lib_wrong, LIB, _), assigned(0, LIB, librarian).
-   [10@1, LIB, lib_wrong]
+:~ reminder_on(lib_outsider, LIB, _), assigned(0, LIB, librarian). [10@1, LIB, lib_outsider]
+:~ reminder_on(lib_wrong, LIB, _), assigned(0, LIB, librarian). [10@1, LIB, lib_wrong]
 
 % Investigator: discourage putting either token on the investigator player
-:~ reminder_on(inv_minion, INV, _), assigned(0, INV, investigator).
-   [10@1, INV, inv_minion]
-
-:~ reminder_on(inv_wrong, INV, _), assigned(0, INV, investigator).
-   [10@1, INV, inv_wrong]
+:~ reminder_on(inv_minion, INV, _), assigned(0, INV, investigator). [10@1, INV, inv_minion]
+:~ reminder_on(inv_wrong, INV, _), assigned(0, INV, investigator). [10@1, INV, inv_wrong]
 
 % ---------------------------------------------------------------------------
 % Priority 1: Poisoner targeting evil players
@@ -53,9 +44,7 @@
 % is to make good players receive false information.
 
 % Discourage poisoner targeting any evil player (minion or demon)
-:~ player_chooses(poisoner, _, point(Target), _),
-   actual_category(Target, evil).
-   [10@1, Target]
+:~ player_chooses(poisoner, _, point(Target), _), actual_category(Target, evil). [10@1, Target]
 
 % ---------------------------------------------------------------------------
 % Priority 1: Fortune Teller red herring on self
@@ -64,18 +53,4 @@
 % themselves. Putting it on the FT would mean they always ping themselves
 % as demon, which is odd (though legal).
 
-:~ reminder_on(ft_red_herring, FT, _), assigned(0, FT, fortune_teller).
-   [5@1, FT]
-
-% ---------------------------------------------------------------------------
-% Future considerations (commented out for now):
-% ---------------------------------------------------------------------------
-
-% Spy registering as good to ALL abilities on the same night
-% (A Spy would usually want to cause at least some confusion)
-% :~ [complex condition for "spy registered as good everywhere"]
-
-% Recluse registering as evil to ALL abilities on the same night
-% (Similar - Recluse usually wants some plausible deniability)
-% :~ [complex condition for "recluse registered as evil everywhere"]
-
+:~ reminder_on(ft_red_herring, FT, _), assigned(0, FT, fortune_teller). [5@1, FT]
