@@ -11,6 +11,9 @@ module TokenConstraints
 import Prelude
 
 import Data.Array (filter, mapMaybe, any, head)
+import Data.Array as Array
+import Data.List (List)
+import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -25,12 +28,13 @@ type NeverAppliedTo = { token :: String, role :: String }
 parseNeverAppliedTo :: Map String String -> Array NeverAppliedTo
 parseNeverAppliedTo files =
   let
-    -- Combine all file contents
+    -- Combine all file contents (Map.values returns List)
+    allContent :: List String
     allContent = Map.values files
 
     -- Parse each file
-    parseFile :: String -> Array NeverAppliedTo
-    parseFile content = mapMaybe parseLine (split (Pattern "\n") content)
+    parseFile :: String -> List NeverAppliedTo
+    parseFile content = List.mapMaybe parseLine (List.fromFoldable $ split (Pattern "\n") content)
 
     -- Parse a single line for never_applied_to(token, role).
     parseLine :: String -> Maybe NeverAppliedTo
@@ -43,7 +47,7 @@ parseNeverAppliedTo files =
           Just 0 -> parseNeverAppliedToLine trimmed
           _ -> Nothing
   in
-    allContent >>= parseFile
+    Array.fromFoldable $ allContent >>= parseFile
 
 -- | Parse a never_applied_to line like "never_applied_to(ww_townsfolk, washerwoman)."
 -- | Uses simple string splitting instead of regex
