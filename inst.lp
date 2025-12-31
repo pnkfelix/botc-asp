@@ -6,11 +6,7 @@
 % We are demoing three nights, so we write needs_night(3).
 needs_night(3).
 % These roles must be in play, but the solver chooses which players get them
-:- not distrib(drunk).
-:- not distrib(poisoner).
-:- not distrib(washerwoman).
-:- not distrib(librarian).
-:- not distrib(investigator).
+assert_distrib(drunk; poisoner; washerwoman; librarian; investigator).
 
 % Anchor a few players to specific tokens to reduce solution jumping
 received(felix, chef).
