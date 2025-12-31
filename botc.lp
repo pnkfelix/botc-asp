@@ -367,6 +367,10 @@ base_minion(3) :- 13 <= player_count <= 15.
 base_demon(1).
 
 distrib(R) :- assigned(0, _, R).
+
+% Assertion predicates: allow instances to require certain predicates hold
+% assert_distrib(R) requires that role R must be distributed (assigned to some player)
+:- assert_distrib(R), not distrib(R).
 %{distrib(X) : demon(X)} = 1.
 %{distrib(X) : minion(X)} = 1    :- 7 <= player_count <= 9.
 %{distrib(X) : townsfolk(X)} = 5 - A :- 7 <= player_count <= 9, outsider_adjustment(A).
