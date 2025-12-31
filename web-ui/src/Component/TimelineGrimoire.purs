@@ -226,48 +226,52 @@ render state =
   in
   HH.div
     [ HP.style "display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap;" ]
-    [ -- Bag panel (leftmost, collapsible)
-      renderBagPanel state gameState
-    -- Timeline panel
-    , HH.div
+    [ -- Timeline panel (leftmost)
+      HH.div
         [ HP.style "flex: 1; min-width: 300px; max-width: 400px;" ]
         [ HH.h3
             [ HP.style "margin: 0 0 10px 0; color: #333;" ]
             [ HH.text "Timeline" ]
         , renderTimeline state
         ]
-    -- Grimoire panel
+    -- Grimoire area: Bag | Grimoire | Script
     , HH.div
-        [ HP.style $ "flex: 2; min-width: 400px;"
-            <> if isJust state.dragging then " cursor: grabbing;" else ""
-        ]
-        [ -- Header with toggle button
-          HH.div
-            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
-            [ HH.h3
-                [ HP.style "margin: 0; color: #333;" ]
-                [ HH.text $ "Grimoire" <> case state.selectedTime of
-                    Just t -> " @ " <> formatTimePoint t
-                    Nothing -> ""
-                ]
-            , HH.button
-                [ HP.style $ "padding: 4px 10px; font-size: 11px; border-radius: 4px; "
-                    <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer;"
-                , HE.onClick \_ -> ToggleViewMode
-                ]
-                [ HH.text $ if state.viewMode == SvgView then "Grid View" else "Circle View" ]
+        [ HP.style "flex: 2; min-width: 400px; display: flex; gap: 10px;" ]
+        [ -- Bag panel (left of grimoire, collapsible)
+          renderBagPanel state gameState
+        -- Grimoire panel (center)
+        , HH.div
+            [ HP.style $ "flex: 1;"
+                <> if isJust state.dragging then " cursor: grabbing;" else ""
             ]
-        , HH.p
-            [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
-            [ HH.text $ "Drag role or reminder tokens to move them between players"
-                <> if state.viewMode == HtmlView then " (touch supported)" else ""
+            [ -- Header with toggle button
+              HH.div
+                [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
+                [ HH.h3
+                    [ HP.style "margin: 0; color: #333;" ]
+                    [ HH.text $ "Grimoire" <> case state.selectedTime of
+                        Just t -> " @ " <> formatTimePoint t
+                        Nothing -> ""
+                    ]
+                , HH.button
+                    [ HP.style $ "padding: 4px 10px; font-size: 11px; border-radius: 4px; "
+                        <> "border: 1px solid #ccc; background: #f5f5f5; cursor: pointer;"
+                    , HE.onClick \_ -> ToggleViewMode
+                    ]
+                    [ HH.text $ if state.viewMode == SvgView then "Grid View" else "Circle View" ]
+                ]
+            , HH.p
+                [ HP.style "font-size: 11px; color: #888; margin: 0 0 5px 0; font-style: italic;" ]
+                [ HH.text $ "Drag role or reminder tokens to move them between players"
+                    <> if state.viewMode == HtmlView then " (touch supported)" else ""
+                ]
+            , if state.viewMode == SvgView
+                then renderGrimoire state
+                else renderHtmlGrimoire state
             ]
-        , if state.viewMode == SvgView
-            then renderGrimoire state
-            else renderHtmlGrimoire state
+        -- Script panel (right of grimoire, collapsible)
+        , renderScriptPanel state
         ]
-    -- Script panel (rightmost, collapsible)
-    , renderScriptPanel state
     ]
 
 -- | Render the bag panel (collapsible, shows tokens each player received)
