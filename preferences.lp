@@ -68,27 +68,6 @@
    [5@1, FT]
 
 % ---------------------------------------------------------------------------
-% Priority 1: Monk protecting evil players
-% ---------------------------------------------------------------------------
-% A Monk would rarely choose to protect an evil player (unless they're
-% bluffing or mistaken about alignment). Since we're modeling the game
-% state, not player psychology, we mildly discourage this.
-
-:~ player_chooses(monk, _, point(Target), _),
-   actual_category(Target, evil).
-   [3@1, Target]
-
-% ---------------------------------------------------------------------------
-% Priority 1: Butler choosing evil master
-% ---------------------------------------------------------------------------
-% Similar logic - a Butler would typically choose someone they trust.
-% We mildly discourage choosing an evil master.
-
-:~ player_chooses(butler, _, point(Master), _),
-   actual_category(Master, evil).
-   [2@1, Master]
-
-% ---------------------------------------------------------------------------
 % Future considerations (commented out for now):
 % ---------------------------------------------------------------------------
 
