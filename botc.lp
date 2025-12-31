@@ -493,6 +493,26 @@ dead(P, T2) :- dead(P, T1), next(T1, T2).
 :- executed(P, N), not alive(P, day(N, 0)).
 
 % ===========================================================================
+% Execution Tokens
+% These tokens mark which player was executed on each day, making it easier
+% to visualize and manipulate timeline constraints.
+% ===========================================================================
+
+% Execution tokens for each day (not owned by any role - general game tokens)
+reminder_label(ex_d1, "Ex D1").
+reminder_label(ex_d2, "Ex D2").
+reminder_label(ex_d3, "Ex D3").
+reminder_label(ex_d4, "Ex D4").
+reminder_label(ex_d5, "Ex D5").
+
+% Automatically place execution tokens when a player is executed
+reminder_on(ex_d1, P, day(1, exec)) :- executed(P, 1).
+reminder_on(ex_d2, P, day(2, exec)) :- executed(P, 2).
+reminder_on(ex_d3, P, day(3, exec)) :- executed(P, 3).
+reminder_on(ex_d4, P, day(4, exec)) :- executed(P, 4).
+reminder_on(ex_d5, P, day(5, exec)) :- executed(P, 5).
+
+% ===========================================================================
 % Grimoire State (for rendering)
 % These predicates provide a clean interface for a frontend to render the
 % grimoire at any point in time with minimal deduction.
