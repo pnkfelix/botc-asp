@@ -494,3 +494,25 @@ grimoire_alive(P, T) :- alive(P, T).
 % grimoire_true_role(Player, Role) - the player's actual role (ST view only)
 % This is for the ST's knowledge, not displayed on tokens.
 grimoire_true_role(P, R) :- assigned(0, P, R).
+
+% ===========================================================================
+% Delta predicates (d_ prefix)
+% These are "event" predicates that represent a change/delta in game state.
+% The d_ prefix makes them easy to identify for timeline rendering - only d_
+% predicates should appear as clickable events in the timeline.
+%
+% Contrast with state predicates (alive, dead, reminder_on) which represent
+% ongoing state that persists across time points.
+% ===========================================================================
+
+% d_st_tells/4 - ST communicates info to a player as part of a role's ability
+% This is the event of telling, not the state of having been told.
+d_st_tells(R, P, M, T) :- st_tells_core(R, P, M, T).
+
+% d_player_chooses/4 - Player makes a choice as part of a role's ability
+% This is the event of choosing, not the state of having chosen.
+d_player_chooses(R, P, C, T) :- player_chooses(R, P, C, T).
+
+% d_executed/2 - Player is executed
+% This is the event of execution happening on a specific day.
+d_executed(P, D) :- executed(P, D).
