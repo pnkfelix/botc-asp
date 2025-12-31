@@ -316,7 +316,7 @@ renderBagPanel state gameState =
         else HH.div
           [ HP.style $ "max-height: 400px; overflow-y: auto; "
               <> "border: 1px solid #ddd; border-radius: 4px; "
-              <> "background: white; padding: 8px;"
+              <> "background: white; padding: 8px 20px 8px 8px;"  -- Extra right padding for scroll touch area
           -- Make bag container a drop target
           , HP.attr (HH.AttrName "data-player") "__bag__"
           ]
@@ -391,7 +391,7 @@ renderScriptPanel state =
         else HH.div
           [ HP.style $ "max-height: 400px; overflow-y: auto; "
               <> "border: 1px solid #ddd; border-radius: 4px; "
-              <> "background: white; padding: 8px;"
+              <> "background: white; padding: 8px 8px 8px 20px;"  -- Extra left padding for scroll touch area
           ]
           [ -- Townsfolk section
             renderScriptSection "Townsfolk" tbTownsfolk timeStr
