@@ -800,11 +800,12 @@ renderHtmlPlayer reminders selectedTime player =
               <> "padding: 4px 8px; border-radius: 4px; "
               <> "background: rgba(0,0,0,0.2); display: inline-block;"
           -- Data attributes for JS role drag handler
-          , HP.attr (HH.AttrName "data-role-token") player.role
+          -- Use player.token (received) not player.role (assigned) so Drunk's token is draggable
+          , HP.attr (HH.AttrName "data-role-token") player.token
           , HP.attr (HH.AttrName "data-role-player") player.name
           , HP.attr (HH.AttrName "data-role-time") timeStr
-          , HP.attr (HH.AttrName "data-role-color") roleColor
-          , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.role)
+          , HP.attr (HH.AttrName "data-role-color") (getRoleColor player.token)
+          , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.token)
           ]
           [ HH.text $ formatRoleName player.role ]
       -- Token (if different from role, shows what they think they are)
