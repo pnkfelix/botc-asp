@@ -22,7 +22,6 @@ import Data.Array (filter, mapMaybe, sortBy, nub, head, findIndex, index)
 import Data.Foldable (elem, all, foldl)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
-import Data.Ord (comparing)
 
 -- | A parsed atom from the answer set
 -- | Note: Event predicates use d_ prefix in ASP (d_st_tells, d_player_chooses, d_executed)
@@ -708,19 +707,6 @@ extractTimelineWithSources parsedAtoms =
       TokenPlaced t, Execution e -> compare t.time (Day e.day "exec")
       Execution e, Death d -> compare (Day e.day "exec") d.time
       Death d, Execution e -> compare d.time (Day e.day "exec")
-
--- | Get list of all unique time points
-getAllTimePoints :: Array Atom -> Array TimePoint
-getAllTimePoints atoms =
-  nub $ sortBy compareTimePoints $ mapMaybe getTimeFromAtom atoms
-  where
-    getTimeFromAtom (Time t) = Just t
-    getTimeFromAtom (StTells _ _ _ t) = Just t
-    getTimeFromAtom (PlayerChooses _ _ _ t) = Just t
-    getTimeFromAtom (ReminderOn _ _ t) = Just t
-    getTimeFromAtom (Died _ t) = Just t
-    getTimeFromAtom (ActingRole t _) = Just t
-    getTimeFromAtom _ = Nothing
 
 -- | Get state at a specific time point
 getStateAtTime :: Array Atom -> TimePoint -> GameState

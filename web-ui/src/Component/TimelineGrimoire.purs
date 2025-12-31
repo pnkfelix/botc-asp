@@ -13,11 +13,10 @@ import Data.Char (toCharCode)
 import Data.Foldable (fold, intercalate, minimumBy)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Int (toNumber)
-import Data.Ord (comparing)
 import Data.String (Pattern(..))
 import Data.String.CodeUnits (toCharArray)
 import Data.String as S
-import Data.Number (sqrt)
+import Data.Number (sqrt, cos, sin, pi)
 import Effect.Class (class MonadEffect, liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
@@ -30,7 +29,7 @@ import Halogen.Svg.Attributes.CSSLength (CSSLength(..))
 import Halogen.Svg.Attributes.FontSize (FontSize(..))
 import Halogen.Svg.Attributes.FontWeight (FontWeight(..))
 import Halogen.Svg.Attributes.TextAnchor (TextAnchor(..))
-import Data.Number (cos, sin, pi)
+
 import Web.Event.Event (preventDefault)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as ME
@@ -86,6 +85,7 @@ type State =
   }
 
 -- | Component query type (empty - no queries supported)
+data Query :: forall k. k -> Type
 data Query a
 
 -- | Component actions
@@ -353,8 +353,6 @@ renderGrimoire state =
     centerX = width / 2.0
     centerY = height / 2.0
     radius = 180.0
-    -- Calculate player positions for target detection
-    playerPositions = mapWithIndex (calcPlayerPosition centerX centerY radius playerCount) gameState.players
     -- Drag state
     isDragging = isJust state.dragging
   in
@@ -682,7 +680,6 @@ renderHtmlGrimoire state =
       Just t -> ASP.buildGameState state.atoms t
       Nothing -> ASP.buildGameState state.atoms (ASP.Night 1 0 0)
     playerCount = length gameState.players
-    isDragging = isJust state.dragging
     -- Calculate grid dimensions for hollow rectangle
     -- For n players, we want a grid where perimeter = n
     -- Perimeter of a×b grid = 2a + 2b - 4 (corners counted once)
@@ -913,9 +910,6 @@ isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baro
 
 isDemon :: String -> Boolean
 isDemon r = r == "imp"
-
-isOutsider :: String -> Boolean
-isOutsider r = r == "butler" || r == "drunk" || r == "recluse" || r == "saint"
 
 -- | Map token prefix to the role it belongs to
 tokenToRole :: String -> String

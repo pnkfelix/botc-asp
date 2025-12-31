@@ -5,10 +5,9 @@ module EmbeddedPrograms
   , lpFilesMap
   ) where
 
-import Prelude
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple)
 import Foreign.Object (Object)
 import Foreign.Object as FO
 
