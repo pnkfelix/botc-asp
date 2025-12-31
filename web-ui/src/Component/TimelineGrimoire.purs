@@ -339,6 +339,8 @@ renderBagToken timeStr player =
   HH.div
     [ HP.style $ "display: flex; align-items: center; gap: 8px; padding: 4px; "
         <> "border-radius: 4px; background: #f5f5f5;"
+    -- Make this row a drop target (same as grimoire player cards)
+    , HP.attr (HH.AttrName "data-player") player.name
     ]
     [ -- Token circle (draggable)
       HH.div
