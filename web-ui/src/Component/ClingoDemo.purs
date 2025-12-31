@@ -971,7 +971,7 @@ handleAction = case _ of
       -- Create the old constraint pattern to comment out
       let oldConstraintPattern = "assert_reminder_on(" <> token <> ", " <> fromPlayer <> ", " <> timeStr <> ")."
       -- Modify the content: comment out old constraint if present, add new one
-      let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint
+      let modifiedContent = modifyInstLpForReminder instContent oldConstraintPattern newConstraint token fromPlayer toPlayer
       -- Update the virtual filesystem, push undo entry, and clear redo stack
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
                         , undoStack = snoc s.undoStack undoEntry
@@ -992,7 +992,7 @@ handleAction = case _ of
       -- Create the old constraint pattern to comment out (the previous drag for this token)
       let oldConstraintPattern = "assert_received(" <> fromPlayer <> ", " <> role <> ")."
       -- Modify the content: comment out old constraint if present, add new one
-      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint
+      let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role fromPlayer toPlayer
       -- Update the virtual filesystem, push undo entry, and clear redo stack
       H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
                         , undoStack = snoc s.undoStack undoEntry
@@ -1055,32 +1055,38 @@ formatTimePointForASP (AnswerSet.Day n phase) = "day(" <> show n <> ", " <> phas
 formatTimePointForASP (AnswerSet.UnknownTime s) = s
 
 -- | Modify inst.lp to add a new reminder constraint and comment out conflicting one
-modifyInstLpForReminder :: String -> String -> String -> String
-modifyInstLpForReminder content oldPattern newConstraint =
+-- | Takes token, fromPlayer, toPlayer for descriptive comments
+modifyInstLpForReminder :: String -> String -> String -> String -> String -> String -> String
+modifyInstLpForReminder content oldPattern newConstraint token fromPlayer toPlayer =
   let
     -- Split content into lines
     contentLines = String.split (String.Pattern "\n") content
+    -- Context for commented-out line: what was moved and where
+    commentOutContext = "moved " <> token <> " to " <> toPlayer
     -- Comment out any existing line matching the old pattern
-    modifiedLines = map (commentOutIfMatches oldPattern) contentLines
+    modifiedLines = map (commentOutIfMatchesWithContext oldPattern commentOutContext) contentLines
     -- Check if the new constraint already exists
     hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
+    -- Create descriptive comment for the new line
+    addedComment = "% Moved " <> token <> " from " <> fromPlayer <> " to " <> toPlayer <> " (added by drag)"
     -- Add the new constraint at the end if not already present
     finalLines = if hasNewConstraint
                    then modifiedLines
-                   else modifiedLines <> ["", "% Reminder token constraint (added by drag)", newConstraint]
+                   else modifiedLines <> ["", addedComment, newConstraint]
   in
     intercalate "\n" finalLines
 
 -- | Comment out a line if it matches the pattern (case-sensitive, trimmed comparison)
-commentOutIfMatches :: String -> String -> String
-commentOutIfMatches patternStr line =
+-- | Takes additional context to describe what was moved and where
+commentOutIfMatchesWithContext :: String -> String -> String -> String
+commentOutIfMatchesWithContext patternStr contextSuffix line =
   let
     trimmedLine = trim line
     trimmedPattern = trim patternStr
     firstChar = String.take 1 trimmedLine
   in
     if trimmedLine == trimmedPattern && firstChar /= "%"
-      then "% " <> line <> "  % commented out by drag"
+      then "% " <> line <> "  % commented out by drag: " <> contextSuffix
       else line
 
 -- | Convert a TimePoint to an integer time index for assigned/3 predicate
@@ -1093,18 +1099,23 @@ timePointToAssignedTime (AnswerSet.Day n _) = n
 timePointToAssignedTime (AnswerSet.UnknownTime _) = 0
 
 -- | Modify inst.lp to add a new role assignment constraint and comment out conflicting one
-modifyInstLpForRole :: String -> String -> String -> String
-modifyInstLpForRole content oldPattern newConstraint =
+-- | Takes role, fromPlayer, toPlayer for descriptive comments
+modifyInstLpForRole :: String -> String -> String -> String -> String -> String -> String
+modifyInstLpForRole content oldPattern newConstraint role fromPlayer toPlayer =
   let
     -- Split content into lines
     contentLines = String.split (String.Pattern "\n") content
+    -- Context for commented-out line: what was moved and where
+    commentOutContext = "moved " <> role <> " to " <> toPlayer
     -- Comment out any existing line matching the old pattern
-    modifiedLines = map (commentOutIfMatches oldPattern) contentLines
+    modifiedLines = map (commentOutIfMatchesWithContext oldPattern commentOutContext) contentLines
     -- Check if the new constraint already exists
     hasNewConstraint = foldl (\acc line -> acc || trim line == trim newConstraint) false modifiedLines
+    -- Create descriptive comment for the new line
+    addedComment = "% Moved " <> role <> " from " <> fromPlayer <> " to " <> toPlayer <> " (added by drag)"
     -- Add the new constraint at the end if not already present
     finalLines = if hasNewConstraint
                    then modifiedLines
-                   else modifiedLines <> ["", "% Role assignment constraint (added by drag)", newConstraint]
+                   else modifiedLines <> ["", addedComment, newConstraint]
   in
     intercalate "\n" finalLines
