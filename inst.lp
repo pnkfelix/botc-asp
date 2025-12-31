@@ -25,16 +25,16 @@ received(rob, washerwoman).
 %   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
 
 #show distrib/1.
-#show assigned/3.
-#show received/2.
 %#show time/1.
 %#show next/2.
-#show reminder_on/3.
 %#show impaired/2.
 #show registers_as/3.
 
-% For grimoire rendering (seating positions)
+% For grimoire rendering (player state and positions)
 #show game_chair/2.
+#show assigned/3.
+#show received/2.
+#show reminder_on/3.
 
 % Delta predicates (d_ prefix = events/changes, not ongoing state)
 % Parser derives alive/dead state from d_died events
