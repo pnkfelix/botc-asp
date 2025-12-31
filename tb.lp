@@ -665,10 +665,12 @@ reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
 % This is defined AFTER protected_from_demon (see Monk section below)
 
 % At dawn (end of night), the death becomes public - player dies
-% But only if not protected from demon
+% But only if not protected from demon AND player was alive at start of night
+% (prevents duplicate deaths from imp_dead tokens that persist from prior nights)
 died(P, T) :-
     final_night_time(N, T),
-    imp_kill_succeeds(P, T).
+    imp_kill_succeeds(P, T),
+    alive(P, night(N, 0, 0)).
 
 % dead(P, T) for imp kills - defined after protected_from_demon
 % (see Monk section below for imp_kill_succeeds definition)
