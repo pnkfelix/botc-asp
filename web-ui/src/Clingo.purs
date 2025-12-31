@@ -16,7 +16,7 @@ import Prelude
 
 import Control.Promise (Promise, toAffE)
 import Data.Function.Uncurried (Fn1, runFn1)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Nullable (Nullable, toNullable)
 import Effect (Effect)
 import Effect.Aff (Aff)
