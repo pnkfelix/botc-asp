@@ -706,7 +706,6 @@ renderResult state = case state.result of
               -- Render only the current page of answer sets (with correct global indices)
               [ HH.div_ $ mapWithIndex (\pageIdx atoms -> renderAnswerSet state.outputFilter selectedIdx (pageStart + pageIdx) atoms) pageItems ]
           ]
-      ]
     where
       renderAnswerSet filterExpr selectedIdx idx atoms =
         let

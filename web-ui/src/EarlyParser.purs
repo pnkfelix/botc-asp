@@ -7,7 +7,8 @@ module EarlyParser
 
 import Prelude
 
-import Data.Array (catMaybes, filter, mapMaybe)
+import Data.Array (filter, mapMaybe)
+import Data.Array.NonEmpty as NEA
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
@@ -63,12 +64,11 @@ parseChairLine :: Regex -> String -> Maybe String
 parseChairLine r line =
   case match r (trim line) of
     Just groups ->
-      case groups of
-        [_, Just player, Just posStr] ->
-          case Int.fromString posStr of
-            Just pos -> Just $ "game_chair(" <> player <> "," <> posStr <> ")"
-            Nothing -> Nothing
-        _ -> Nothing
+      -- groups is NonEmptyArray: [fullMatch, player, posStr]
+      case NEA.index groups 1, NEA.index groups 2 of
+        Just (Just player), Just (Just posStr) ->
+          Just $ "game_chair(" <> player <> "," <> posStr <> ")"
+        _, _ -> Nothing
     Nothing -> Nothing
 
 -- | Parse received/2 facts from inst.lp content
@@ -98,8 +98,9 @@ parseReceivedLine :: Regex -> String -> Maybe String
 parseReceivedLine r line =
   case match r (trim line) of
     Just groups ->
-      case groups of
-        [_, Just player, Just token] ->
+      -- groups is NonEmptyArray: [fullMatch, player, token]
+      case NEA.index groups 1, NEA.index groups 2 of
+        Just (Just player), Just (Just token) ->
           Just $ "received(" <> player <> "," <> token <> ")"
-        _ -> Nothing
+        _, _ -> Nothing
     Nothing -> Nothing
