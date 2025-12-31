@@ -1,7 +1,6 @@
 #include "botc.lp".
 #include "tb.lp".
 #include "players.lp".
-#include "preferences.lp".
 
 #const player_count = 8.
 % We are demoing three nights, so we write needs_night(3).
@@ -20,6 +19,24 @@ received(rob, washerwoman).
 
 % Town executes exactly one living player at the end of each day
 { executed(P, N) : alive(P, day(N, 0)) } = 1 :- day_number(N).
+
+% ===========================================================================
+% House rules: Discourage unrealistic but technically legal states
+% These aren't strictly against the rules, but produce uninteresting models.
+% Comment out if you need to explore these edge cases.
+% ===========================================================================
+
+% Info roles should not see themselves in their pair of players
+% (gives zero new information - a good ST would never do this)
+:- reminder_on(ww_townsfolk, P, _), assigned(0, P, washerwoman).
+:- reminder_on(ww_wrong, P, _), assigned(0, P, washerwoman).
+:- reminder_on(lib_outsider, P, _), assigned(0, P, librarian).
+:- reminder_on(lib_wrong, P, _), assigned(0, P, librarian).
+:- reminder_on(inv_minion, P, _), assigned(0, P, investigator).
+:- reminder_on(inv_wrong, P, _), assigned(0, P, investigator).
+
+% Poisoner should not target evil players (defeats the purpose)
+:- player_chooses(poisoner, _, point(Target), _), actual_category(Target, evil).
 
 % st_tells predicates for player-observed info (unwrapped for convenience):
 %   st_tells(role_or_player, value)           e.g. st_tells(chef, 2)
