@@ -272,6 +272,8 @@ render state =
         -- Script panel (right of grimoire, collapsible)
         , renderScriptPanel state
         ]
+    -- Debug panel for reminder tokens (collapsible)
+    , renderReminderDebugPanel state gameState
     ]
 
 -- | Render the bag panel (collapsible, shows tokens in the physical bag)
@@ -447,6 +449,79 @@ renderScriptRole timeStr role =
     , HH.span
         [ HP.style "font-size: 11px; color: #333;" ]
         [ HH.text $ formatRoleName role ]
+    ]
+
+-- | Render debug panel showing all reminder token data
+renderReminderDebugPanel :: forall cs m.
+  State ->
+  { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
+  , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
+  , time :: ASP.TimePoint
+  , bagTokens :: Array String
+  } ->
+  H.ComponentHTML Action cs m
+renderReminderDebugPanel state gameState =
+  let
+    -- Extract all ReminderOn atoms from parsed atoms
+    allReminderAtoms = Array.mapMaybe getReminderOnAtom state.atoms
+
+    getReminderOnAtom (ASP.ReminderOn token player time) =
+      Just { token, player, time }
+    getReminderOnAtom _ = Nothing
+
+    targetTimeStr = case state.selectedTime of
+      Just t -> formatTimePoint t
+      Nothing -> "None (defaulting to Night 1 (0.0))"
+
+    targetTime = fromMaybe (ASP.Night 1 0 0) state.selectedTime
+
+    -- Group reminders by time for easier viewing
+    remindersByTime = Array.sortBy (comparing _.time) allReminderAtoms
+
+    -- Find reminders at the target time specifically
+    remindersAtTarget = Array.filter (\r -> r.time == targetTime) allReminderAtoms
+  in
+  HH.div
+    [ HP.style "margin-top: 20px; width: 100%;" ]
+    [ HH.details
+        [ HP.style "border: 1px solid #f0ad4e; border-radius: 4px; background: #fcf8e3; padding: 8px;" ]
+        [ HH.summary
+            [ HP.style "cursor: pointer; font-weight: bold; color: #8a6d3b;" ]
+            [ HH.text $ "🔍 Reminder Debug (" <> show (Array.length gameState.reminders) <> " displayed, "
+                <> show (Array.length allReminderAtoms) <> " total atoms)" ]
+        , HH.div
+            [ HP.style "margin-top: 10px; font-size: 12px; font-family: monospace;" ]
+            [ HH.div
+                [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]
+                [ HH.strong_ [ HH.text "Selected Time: " ]
+                , HH.text targetTimeStr
+                ]
+            , HH.div
+                [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]
+                [ HH.strong_ [ HH.text $ "Reminders at target time (" <> show (Array.length remindersAtTarget) <> "):" ]
+                , if Array.null remindersAtTarget
+                    then HH.div [ HP.style "color: #a94442; font-style: italic;" ] [ HH.text "None found - this explains why no tokens are displayed!" ]
+                    else HH.ul [ HP.style "margin: 4px 0; padding-left: 20px;" ]
+                      (map (\r -> HH.li_ [ HH.text $ r.token <> " on " <> r.player ]) remindersAtTarget)
+                ]
+            , HH.div
+                [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]
+                [ HH.strong_ [ HH.text $ "Displayed reminders (from gameState, " <> show (Array.length gameState.reminders) <> "):" ]
+                , if Array.null gameState.reminders
+                    then HH.div [ HP.style "color: #a94442; font-style: italic;" ] [ HH.text "None" ]
+                    else HH.ul [ HP.style "margin: 4px 0; padding-left: 20px;" ]
+                      (map (\r -> HH.li_ [ HH.text $ r.token <> " on " <> r.player <> " (placed @ " <> formatTimePoint r.placedAt <> ")" ]) gameState.reminders)
+                ]
+            , HH.div
+                [ HP.style "padding: 8px; background: #fff; border-radius: 4px; max-height: 200px; overflow-y: auto;" ]
+                [ HH.strong_ [ HH.text $ "All ReminderOn atoms parsed (" <> show (Array.length allReminderAtoms) <> "):" ]
+                , if Array.null allReminderAtoms
+                    then HH.div [ HP.style "color: #a94442; font-style: italic;" ] [ HH.text "No reminder_on atoms found in answer set!" ]
+                    else HH.ul [ HP.style "margin: 4px 0; padding-left: 20px;" ]
+                      (map (\r -> HH.li_ [ HH.text $ r.token <> " on " <> r.player <> " @ " <> formatTimePoint r.time ]) remindersByTime)
+                ]
+            ]
+        ]
     ]
 
 -- | Render the timeline with events
