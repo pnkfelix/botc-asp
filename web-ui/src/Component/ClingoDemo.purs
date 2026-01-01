@@ -239,8 +239,13 @@ renderGrimoireSection state =
   let
     grimoireData = getGrimoireAtoms state
     hasAtoms = not (null grimoireData.atoms)
+    -- Extract player_count from files for pre-solve display
+    playerCount = Early.extractPlayerCount state.files
+    playerCountInfo = case playerCount of
+      Just n -> " (player_count = " <> show n <> ")"
+      Nothing -> ""
     title = if grimoireData.isEarly
-      then "Grimoire (Preview)"
+      then "Grimoire (Preview)" <> playerCountInfo
       else "Timeline & Grimoire View" <> grimoireData.modelInfo
     subtitle = if grimoireData.isEarly
       then "Showing player setup from files. Run Clingo to see full game state."

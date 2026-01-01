@@ -3,11 +3,12 @@
 module EarlyParser
   ( extractEarlyAtoms
   , extractFromFiles
+  , extractPlayerCount
   ) where
 
 import Prelude
 
-import Data.Array (filter, mapMaybe)
+import Data.Array (filter, mapMaybe, fromFoldable)
 import Data.Array.NonEmpty as NEA
 import Data.Int as Int
 import Data.Map (Map)
@@ -137,3 +138,53 @@ parseAssertDrawnLine r line =
           Just $ "bag(" <> role <> ")"
         _ -> Nothing
     Nothing -> Nothing
+
+-- | Extract player_count from #const player_count = N. declarations
+-- | Returns the first player_count found from any file in the Map
+extractPlayerCount :: Map String String -> Maybe Int
+extractPlayerCount files =
+  let
+    -- Check inst.lp first, then try other files
+    instContent = Map.lookup "inst.lp" files
+    allContents = fromFoldable $ Map.values files
+  in case instContent of
+    Just content ->
+      case parsePlayerCount content of
+        Just n -> Just n
+        Nothing -> parsePlayerCountFromAny allContents
+    Nothing -> parsePlayerCountFromAny allContents
+
+-- | Parse #const player_count = N. from content
+parsePlayerCount :: String -> Maybe Int
+parsePlayerCount content =
+  let
+    contentLines = split (Pattern "\n") content
+    playerCountRegex = hush $ regex """#const\s+player_count\s*=\s*(\d+)\s*\.""" noFlags
+  in
+    case playerCountRegex of
+      Just r -> findFirstMatch r contentLines
+      Nothing -> Nothing
+
+-- | Find first matching line and extract the number
+findFirstMatch :: Regex -> Array String -> Maybe Int
+findFirstMatch r lines =
+  case mapMaybe (parsePlayerCountLine r) lines of
+    [] -> Nothing
+    (x : _) -> Just x
+
+-- | Parse a single line for #const player_count = N
+parsePlayerCountLine :: Regex -> String -> Maybe Int
+parsePlayerCountLine r line =
+  case match r (trim line) of
+    Just groups ->
+      case NEA.index groups 1 of
+        Just (Just numStr) -> Int.fromString numStr
+        _ -> Nothing
+    Nothing -> Nothing
+
+-- | Try to find player_count in any of the given contents
+parsePlayerCountFromAny :: Array String -> Maybe Int
+parsePlayerCountFromAny contents =
+  case mapMaybe parsePlayerCount contents of
+    [] -> Nothing
+    (x : _) -> Just x
