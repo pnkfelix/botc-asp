@@ -234,13 +234,11 @@ render state =
             [ HH.text "Timeline" ]
         , renderTimeline state
         ]
-    -- Grimoire area: Bag | Grimoire | Script
+    -- Grimoire area: Grimoire | Bag | Script
     , HH.div
         [ HP.style "flex: 2; min-width: 400px; display: flex; gap: 10px; align-items: stretch;" ]
-        [ -- Bag panel (left of grimoire, collapsible)
-          renderBagPanel state gameState
-        -- Grimoire panel (center)
-        , HH.div
+        [ -- Grimoire panel (left)
+          HH.div
             [ HP.style $ "flex: 1;"
                 <> if isJust state.dragging then " cursor: grabbing;" else ""
             ]
@@ -269,7 +267,9 @@ render state =
                 then renderGrimoire state
                 else renderHtmlGrimoire state
             ]
-        -- Script panel (right of grimoire, collapsible)
+        -- Bag panel (center, collapsible)
+        , renderBagPanel state gameState
+        -- Script panel (right, collapsible)
         , renderScriptPanel state
         ]
     ]
