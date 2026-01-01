@@ -283,6 +283,7 @@ renderBagPanel :: forall cs m.
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
   , bagTokens :: Array String
+  , assignedNotInBag :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderBagPanel state gameState =
@@ -332,7 +333,50 @@ renderBagPanel state gameState =
                 [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
                 (map (renderBagToken timeStr) gameState.bagTokens)
           ]
+    -- Assigned but not in bag section (e.g., Drunk)
+    , if state.bagCollapsed || null gameState.assignedNotInBag
+        then HH.text ""
+        else HH.div
+          [ HP.style "margin-top: 12px;" ]
+          [ HH.h4
+              [ HP.style "margin: 0 0 8px 0; color: #666; font-size: 12px; font-weight: normal;" ]
+              [ HH.text "Assigned (not in bag)" ]
+          , HH.div
+              [ HP.style $ "border: 1px dashed #ccc; border-radius: 4px; "
+                  <> "background: #f9f9f9; padding: 8px;"
+              ]
+              [ HH.div
+                  [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
+                  (map (renderAssignedNotInBagToken timeStr) gameState.assignedNotInBag)
+              ]
+          ]
     ]
+
+-- | Render a token for an assigned-but-not-in-bag role (like Drunk)
+-- | These are displayed with a dashed border to distinguish from bag tokens
+renderAssignedNotInBagToken :: forall cs m.
+  String ->  -- time string
+  String ->  -- role name
+  H.ComponentHTML Action cs m
+renderAssignedNotInBagToken timeStr role =
+  let
+    roleColor = getRoleColor role
+  in
+  HH.div
+    [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
+        <> "background: " <> roleColor <> "; "
+        <> "border: 2px dashed white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "font-size: 8px; font-weight: bold; color: white; text-align: center; padding: 2px; "
+        <> "opacity: 0.85;"  -- Slightly faded to indicate special status
+    , HP.attr (HH.AttrName "data-role-token") role
+    , HP.attr (HH.AttrName "data-role-player") "__assigned__"
+    , HP.attr (HH.AttrName "data-role-time") timeStr
+    , HP.attr (HH.AttrName "data-role-color") roleColor
+    , HP.attr (HH.AttrName "data-role-display") (formatRoleName role)
+    , HP.title $ (formatRoleName role) <> " (assigned, not received)"
+    ]
+    [ HH.text $ formatRoleName role ]
 
 -- | Render a single token in the bag (just the role circle, draggable)
 renderBagToken :: forall cs m.
@@ -460,6 +504,7 @@ renderReminderDebugPanel :: forall cs m.
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
   , bagTokens :: Array String
+  , assignedNotInBag :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderReminderDebugPanel state gameState =
