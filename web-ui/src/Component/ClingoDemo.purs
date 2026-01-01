@@ -17,7 +17,7 @@ import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Tuple (Tuple(..))
-import Data.String (Pattern(..), split, trim, take, contains, indexOf) as String
+import Data.String (Pattern(..), split, trim, take, drop, contains, indexOf, length) as String
 import Data.String (Pattern(..), split, trim, contains, indexOf)
 import Effect.Class (liftEffect)
 import Effect.Aff (Milliseconds(..))
@@ -228,10 +228,51 @@ getGrimoireAtoms state =
           in { atoms, isEarly: false, modelInfo }
         Nothing ->
           -- Selected index out of range, fall back to early parsing
-          { atoms: Early.extractFromFiles state.files, isEarly: true, modelInfo: "" }
+          getEarlyAtomsFiltered state.files
     _ ->
       -- No result or error/unsat, use early parsing
-      { atoms: Early.extractFromFiles state.files, isEarly: true, modelInfo: "" }
+      getEarlyAtomsFiltered state.files
+
+-- | Get early atoms filtered by player_count
+-- | Only includes game_chair atoms where chair position <= player_count
+getEarlyAtomsFiltered :: Map.Map String String -> { atoms :: Array String, isEarly :: Boolean, modelInfo :: String }
+getEarlyAtomsFiltered files =
+  let
+    allAtoms = Early.extractFromFiles files
+    playerCount = Early.extractPlayerCount files
+    filteredAtoms = case playerCount of
+      Just n -> filter (isAtomWithinPlayerCount n) allAtoms
+      Nothing -> allAtoms  -- No player_count found, show all
+  in
+    { atoms: filteredAtoms, isEarly: true, modelInfo: "" }
+
+-- | Check if an atom should be included based on player_count
+-- | For game_chair(player, N), only include if N <= player_count
+-- | All other atoms are included
+isAtomWithinPlayerCount :: Int -> String -> Boolean
+isAtomWithinPlayerCount maxPlayers atom =
+  case parseChairPosition atom of
+    Just pos -> pos <= maxPlayers
+    Nothing -> true  -- Non-chair atoms are always included
+
+-- | Parse the chair position from a game_chair(player, N) atom
+parseChairPosition :: String -> Maybe Int
+parseChairPosition atom =
+  -- Pattern: game_chair(player,N)
+  if String.take 11 atom == "game_chair("
+    then
+      -- Extract the number after the comma
+      let
+        inner = String.drop 11 atom  -- Remove "game_chair("
+        -- Find the comma and extract the number after it
+        parts = String.split (String.Pattern ",") inner
+      in case index parts 1 of
+        Just numPart ->
+          -- Remove trailing ")" and parse
+          let cleaned = String.take (String.length numPart - 1) numPart
+          in Int.fromString (trim cleaned)
+        Nothing -> Nothing
+    else Nothing
 
 -- | Render the grimoire section (always visible, using early or answer set atoms)
 renderGrimoireSection :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
@@ -239,8 +280,13 @@ renderGrimoireSection state =
   let
     grimoireData = getGrimoireAtoms state
     hasAtoms = not (null grimoireData.atoms)
+    -- Extract player_count from files for pre-solve display
+    playerCount = Early.extractPlayerCount state.files
+    playerCountInfo = case playerCount of
+      Just n -> " (player_count = " <> show n <> ")"
+      Nothing -> ""
     title = if grimoireData.isEarly
-      then "Grimoire (Preview)"
+      then "Grimoire (Preview)" <> playerCountInfo
       else "Timeline & Grimoire View" <> grimoireData.modelInfo
     subtitle = if grimoireData.isEarly
       then "Showing player setup from files. Run Clingo to see full game state."
