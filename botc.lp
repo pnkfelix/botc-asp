@@ -82,9 +82,16 @@ between(T1, T2) :-
     (R1, S1) < (R3, S3),
     (R3, S3) < (R2, S2).
 
-% Phase transitions: night -> day -> night
-% The final time of night N transitions to day(N, 0)
-next(T, day(N, 0)) :- final_night_time(N, T), day_number(N).
+% Phase transitions: night -> dawn -> day -> night
+% Dawn is when deaths from the night are announced publicly
+% The final time of night N transitions to dawn(N)
+next(T, dawn(N)) :- final_night_time(N, T), day_number(N).
+
+% dawn(N) is a time point
+time(dawn(N)) :- day_number(N).
+
+% Dawn transitions to day start
+next(dawn(N), day(N, 0)) :- day_number(N), not game_over(dawn(N)).
 
 % Within a day: day(N, 0) -> day(N, exec)
 % Don't transition if evil already won at start of day
@@ -445,9 +452,13 @@ alive(P, night(1, 0, 0)) :- player(P).
 % Alive status persists through night unless killed or dead
 alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1), not dead(P, T2).
 
-% Alive at start of day = alive at end of preceding night (unless they died that night)
+% Alive at dawn = alive at end of preceding night (unless they died that night)
 % Note: dead(P, T) handles imp_dead token deaths during the night
-alive(P, day(N, 0)) :- alive(P, T), final_night_time(N, T), not died(P, T), not dead(P, T).
+% This is when deaths are publicly announced (shroud placed)
+alive(P, dawn(N)) :- alive(P, T), final_night_time(N, T), not died(P, T), not dead(P, T).
+
+% Alive at start of day = alive at dawn (unless something killed them at dawn)
+alive(P, day(N, 0)) :- alive(P, dawn(N)), not died(P, dawn(N)), not dead(P, dawn(N)).
 
 % Helper: find the final time point of a night
 final_night_time(N, T) :-
@@ -562,3 +573,9 @@ d_executed(P, D) :- executed(P, D).
 % This captures all death events (execution, imp kill, slayer, etc.)
 % The parser computes alive/dead state from this, avoiding O(players × time) output.
 d_died(P, T) :- died(P, T).
+
+% d_death_announced/2 - Death is publicly announced
+% Night deaths are announced at dawn, execution deaths are announced at execution time.
+% This is what appears in the timeline as the "public" death event.
+d_death_announced(P, dawn(N)) :- died(P, night(N, _, _)).
+d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
