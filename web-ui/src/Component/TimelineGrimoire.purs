@@ -1180,6 +1180,7 @@ formatRoleName role =
 
 -- | Format time point for display
 formatTimePoint :: ASP.TimePoint -> String
+formatTimePoint ASP.Setup = "Setup"
 formatTimePoint (ASP.Night n 0 0) = "Night " <> show n <> " (Setup)"
 formatTimePoint (ASP.Night n r s) = "Night " <> show n <> " (" <> show r <> "." <> show s <> ")"
 formatTimePoint (ASP.Day n "0") = "Day " <> show n <> " (Start)"
