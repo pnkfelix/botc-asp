@@ -501,6 +501,18 @@ renderReminderDebugPanel state gameState =
 
     -- Check for ww_ tokens specifically
     wwTokens = Array.filter (\r -> S.take 3 r.token == "ww_") allReminderAtoms
+
+    -- Extract all Time atoms to see what time points exist
+    allTimeAtoms = Array.mapMaybe getTimeAtom state.atoms
+
+    getTimeAtom (ASP.Time t) = Just t
+    getTimeAtom _ = Nothing
+
+    -- Check if washerwoman substep times exist (role order 51)
+    wwTimes = Array.filter isWasherwomanTime allTimeAtoms
+
+    isWasherwomanTime (ASP.Night 1 51 _) = true
+    isWasherwomanTime _ = false
   in
   HH.div
     [ HP.style "margin-top: 20px; width: 100%;" ]
@@ -528,6 +540,17 @@ renderReminderDebugPanel state gameState =
                       else HH.span [ HP.style "color: #666;" ] [ HH.text "Not in game" ]
                 , HH.div [ HP.style "margin-top: 4px; font-size: 11px; color: #666;" ]
                     [ HH.text $ "ww_ tokens found: " <> show (Array.length wwTokens) ]
+                , HH.div [ HP.style "margin-top: 4px; font-size: 11px;" ]
+                    [ HH.strong_ [ HH.text "Washerwoman times (night(1,51,*)): " ]
+                    , if Array.null wwTimes
+                        then HH.span [ HP.style "color: #a94442;" ] [ HH.text "NONE! Time points missing - reminder can't be placed!" ]
+                        else HH.span [ HP.style "color: #3c763d;" ]
+                          [ HH.text $ show (Array.length wwTimes) <> " time points: "
+                              <> intercalate ", " (map formatTimePoint wwTimes)
+                          ]
+                    ]
+                , HH.div [ HP.style "margin-top: 4px; font-size: 11px; color: #888;" ]
+                    [ HH.text $ "Total time atoms: " <> show (Array.length allTimeAtoms) ]
                 ]
             , HH.div
                 [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]

@@ -44,7 +44,9 @@ needs_night(3).
 
 #show distrib/1.
 #show bag/1.
-%#show time/1.
+#show time/1.  % Uncommented to debug missing reminder tokens
+#show first_night_role_order/2.  % Debug: which roles have first night order
+#show first_night_substep/3.  % Debug: which substeps are defined
 %#show next/2.
 %#show impaired/2.
 #show registers_as/3.
