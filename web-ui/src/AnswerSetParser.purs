@@ -32,7 +32,8 @@ data Atom
   | StTells String String String TimePoint  -- d_st_tells(role, player, message, time)
   | PlayerChooses String String String TimePoint  -- d_player_chooses(role, player, choice, time)
   | ReminderOn String String TimePoint  -- reminder_on(token, player, time)
-  | Died String TimePoint               -- d_died(player, time) - player dies at this time
+  | Died String TimePoint               -- d_died(player, time) - player dies at this time (mechanical)
+  | DeathAnnounced String TimePoint     -- d_death_announced(player, time) - death publicly announced
   | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
@@ -72,6 +73,7 @@ atomCategory = case _ of
   PlayerChooses _ _ _ _ -> EventPredicate
   Executed _ _          -> EventPredicate
   Died _ _              -> EventPredicate
+  DeathAnnounced _ _    -> EventPredicate
   -- State predicates: ongoing state, not events
   -- Note: reminder_on(token,player,time) represents accumulated state
   -- ("reminder is on player at time"), not the action of placing it.
@@ -95,13 +97,14 @@ type ParsedAtom = { atom :: Atom, original :: String }
 data TimePoint
   = Setup                -- Pre-game setup, before Night 1
   | Night Int Int Int    -- night(nightNum, roleOrder, substep)
+  | Dawn Int             -- dawn(N) - deaths announced publicly after night N
   | Day Int String       -- day(dayNum, phase) where phase is "0" or "exec"
   | UnknownTime String
 
 derive instance eqTimePoint :: Eq TimePoint
 
--- Custom Ord instance to properly interleave nights and days:
--- Setup < Night 1 < Day 1 < Night 2 < Day 2, etc.
+-- Custom Ord instance to properly interleave nights, dawn, and days:
+-- Setup < Night 1 < Dawn 1 < Day 1 < Night 2 < Dawn 2 < Day 2, etc.
 instance ordTimePoint :: Ord TimePoint where
   -- Setup is before everything
   compare Setup Setup = EQ
@@ -114,17 +117,29 @@ instance ordTimePoint :: Ord TimePoint where
         EQ -> compare s1 s2
         other -> other
       other -> other
+  -- Dawn comparisons
+  compare (Dawn d1) (Dawn d2) = compare d1 d2
   -- Day comparisons
   compare (Day d1 p1) (Day d2 p2) =
     case compare d1 d2 of
       EQ -> compare p1 p2
       other -> other
-  -- Night vs Day interleaving
+  -- Night vs Dawn: Night N comes before Dawn N
+  compare (Night n _r _s) (Dawn d) =
+    if n <= d then LT else GT
+  compare (Dawn d) (Night n _r _s) =
+    if d < n then LT else GT
+  -- Dawn vs Day: Dawn N comes before Day N
+  compare (Dawn d) (Day n _p) =
+    if d <= n then LT else GT
+  compare (Day n _p) (Dawn d) =
+    if n <= d then GT else LT
+  -- Night vs Day interleaving (Night N < Dawn N < Day N)
   compare (Night n _r _s) (Day d _p) =
-    -- Night n comes before Day n, but after Day (n-1)
+    -- Night n comes before Day n (and Dawn n), but after Day (n-1)
     if n <= d then LT else GT
   compare (Day d _p) (Night n _r _s) =
-    -- Day d comes after Night d, but before Night (d+1)
+    -- Day d comes after Night d and Dawn d, but before Night (d+1)
     if d < n then LT else GT
   -- UnknownTime is after everything (except Setup which is handled above)
   compare (UnknownTime s1) (UnknownTime s2) = compare s1 s2
@@ -134,6 +149,7 @@ instance ordTimePoint :: Ord TimePoint where
 instance showTimePoint :: Show TimePoint where
   show Setup = "setup"
   show (Night n r s) = "night(" <> show n <> "," <> show r <> "," <> show s <> ")"
+  show (Dawn n) = "dawn(" <> show n <> ")"
   show (Day n p) = "day(" <> show n <> "," <> p <> ")"
   show (UnknownTime s) = s
 
@@ -192,6 +208,7 @@ parseAtom atomStr =
       parsePlayerChooses trimmed <|>
       parseReminderOn trimmed <|>
       parseDied trimmed <|>
+      parseDeathAnnounced trimmed <|>
       parseGhostVoteUsed trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
@@ -314,6 +331,20 @@ parseDied s =
           then parseArgs (drop (length pattern) (take (length s - 1) s))
           else Nothing
 
+-- | Parse d_death_announced(Player, Time)
+-- | Death announced at dawn for night deaths, at exec for execution deaths
+parseDeathAnnounced :: String -> Maybe Atom
+parseDeathAnnounced s =
+  let pattern = "d_death_announced("
+      parseArgs rest =
+        case splitAtFirstComma rest of
+          Just { before: player, after: timeStr } ->
+            Just $ DeathAnnounced (trim player) (parseTime (trim timeStr))
+          Nothing -> Nothing
+  in if take (length pattern) s == pattern
+     then parseArgs (drop (length pattern) (take (length s - 1) s))
+     else Nothing
+
 -- | Parse ghost_vote_used(Player, Time)
 parseGhostVoteUsed :: String -> Maybe Atom
 parseGhostVoteUsed s = do
@@ -381,12 +412,12 @@ parseBag s = do
   let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bag(" and ")"
   Just $ Bag (trim rest)
 
--- | Parse a time string like "night(1,2,3)" or "day(1,0)"
+-- | Parse a time string like "night(1,2,3)", "dawn(1)", or "day(1,0)"
 parseTime :: String -> TimePoint
 parseTime s =
   let trimmed = trim s
   in fromMaybe (UnknownTime trimmed) $
-    parseNightTime trimmed <|> parseDayTime trimmed
+    parseNightTime trimmed <|> parseDawnTime trimmed <|> parseDayTime trimmed
 
 parseNightTime :: String -> Maybe TimePoint
 parseNightTime s = do
@@ -401,6 +432,13 @@ parseNightTime s = do
           substep = fromMaybe 0 $ parseInt (trim sub)
       in Just $ Night night roleOrd substep
     _ -> Nothing
+
+parseDawnTime :: String -> Maybe TimePoint
+parseDawnTime s = do
+  let pattern = "dawn("
+  _ <- if take (length pattern) s == pattern then Just unit else Nothing
+  let rest = drop (length pattern) (take (length s - 1) s)  -- Remove trailing )
+  Just $ Dawn (fromMaybe 1 $ parseInt (trim rest))
 
 parseDayTime :: String -> Maybe TimePoint
 parseDayTime s = do
@@ -522,11 +560,12 @@ parseAnswerSetWithOriginals = map \s -> { atom: parseAtom s, original: s }
 
 -- | Convert a TimePoint to an integer time index for comparing with assigned/3 predicate
 -- Setup and Night 1 (any phase) map to 0 (initial assignment)
--- Other nights/days map to their number
+-- Other nights/days/dawns map to their number
 timePointToAssignedTime :: TimePoint -> Int
 timePointToAssignedTime Setup = 0
 timePointToAssignedTime (Night 1 _ _) = 0
 timePointToAssignedTime (Night n _ _) = n
+timePointToAssignedTime (Dawn n) = n
 timePointToAssignedTime (Day n _) = n
 timePointToAssignedTime (UnknownTime _) = 0
 
@@ -727,9 +766,10 @@ extractTimelineWithSources parsedAtoms =
       Just $ Execution { day, player, sourceAtom: original }
     toExecutionEvent _ = Nothing
 
-    -- Convert Died to Death event, but only for non-execution deaths
-    -- (execution deaths occur at day(N, exec) phase)
-    toDeathEvent { atom: Died player time, original } =
+    -- Convert DeathAnnounced to Death event, but only for non-execution deaths
+    -- (execution deaths occur at day(N, exec) phase and are already shown as Execution)
+    -- Night deaths are announced at dawn via d_death_announced(P, dawn(N))
+    toDeathEvent { atom: DeathAnnounced player time, original } =
       case time of
         Day _ "exec" -> Nothing  -- Skip execution deaths, already shown as Execution
         _ -> Just $ Death { time, player, sourceAtom: original }
@@ -793,6 +833,7 @@ atomToPredicateName = case _ of
   PlayerChooses _ _ _ _  -> { name: "d_player_chooses", arity: 4 }
   ReminderOn _ _ _       -> { name: "reminder_on", arity: 3 }
   Died _ _               -> { name: "d_died", arity: 2 }
+  DeathAnnounced _ _     -> { name: "d_death_announced", arity: 2 }
   GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }

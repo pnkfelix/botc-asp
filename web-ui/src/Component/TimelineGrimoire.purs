@@ -1334,6 +1334,7 @@ formatTimePoint :: ASP.TimePoint -> String
 formatTimePoint ASP.Setup = "Setup"
 formatTimePoint (ASP.Night n 0 0) = "Night " <> show n <> " (Setup)"
 formatTimePoint (ASP.Night n r s) = "Night " <> show n <> " (" <> show r <> "." <> show s <> ")"
+formatTimePoint (ASP.Dawn n) = "Dawn " <> show n
 formatTimePoint (ASP.Day n "0") = "Day " <> show n <> " (Start)"
 formatTimePoint (ASP.Day n "exec") = "Day " <> show n <> " (Execution)"
 formatTimePoint (ASP.Day n p) = "Day " <> show n <> " (" <> p <> ")"

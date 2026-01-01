@@ -61,3 +61,7 @@ needs_night(3).
 #show d_player_chooses/4.
 #show d_executed/2.
 #show d_died/2.
+#show d_death_announced/2.
+
+% Show dawn time points so they appear in the timeline
+#show time(dawn(N)) : day_number(N).
