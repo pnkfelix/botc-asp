@@ -44,14 +44,22 @@ type UndoEntry =
   , description :: String     -- Human-readable description of the change
   }
 
+-- | A single file's diff (comment-stripped comparison)
+type FileDiff =
+  { fileName :: String         -- Name of the file that changed
+  , originalLines :: Array String  -- Original lines (comments stripped)
+  , currentLines :: Array String   -- Current lines (comments stripped)
+  }
+
 -- | An entry in the timing history table
 -- Tracks clingo run times along with what changed and the model limit
 type TimingEntry =
-  { diff :: String             -- Description of what changed vs original files
-  , modelLimit :: Int          -- Number of models requested
-  , totalTime :: Number        -- Total solve time in seconds
-  , solveTime :: Number        -- Just the solve time in seconds
-  , runIndex :: Int            -- Sequential index of this run (for uniqueness)
+  { diffSummary :: String        -- Brief description of what changed
+  , fileDiffs :: Array FileDiff  -- Detailed per-file diffs for modal
+  , modelLimit :: Int            -- Number of models requested
+  , totalTime :: Number          -- Total solve time in seconds
+  , solveTime :: Number          -- Just the solve time in seconds
+  , runIndex :: Int              -- Sequential index of this run (for uniqueness)
   }
 
 -- | Component state
@@ -82,6 +90,8 @@ type State =
   -- Timing history table
   , timingHistory :: Array TimingEntry     -- History of clingo run times
   , nextRunIndex :: Int                    -- Counter for unique run indices
+  -- Diff modal (shows detailed diff when clicking a timing table row)
+  , selectedTimingEntry :: Maybe TimingEntry  -- Entry to show in diff modal
   }
 
 -- | How to display results
@@ -115,6 +125,8 @@ data Action
   | TextareaClicked             -- Check if clicked on #include directive
   | ConfirmNavigateToInclude String  -- Navigate to the included file
   | CancelNavigateToInclude     -- Cancel the navigation dialog
+  | ShowTimingDiff TimingEntry  -- Show diff modal for a timing entry
+  | CloseDiffModal              -- Close the diff modal
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -196,34 +208,51 @@ initialState =
   , navigateIncludeTarget: Nothing  -- No navigation dialog initially
   , timingHistory: []      -- No timing history initially
   , nextRunIndex: 1        -- Start run indexing at 1
+  , selectedTimingEntry: Nothing  -- No diff modal initially
   }
 
--- | Compute a human-readable diff description comparing current files to original embedded files
--- | Returns a description like "inst.lp: +5/-2 lines" or "No changes" if identical
-computeFileDiff :: Map.Map String String -> String
+-- | Strip ASP comments from a string (lines starting with %)
+-- | Also strips empty lines and trims whitespace
+stripComments :: String -> Array String
+stripComments content =
+  let
+    allLines = split (Pattern "\n") content
+    -- Filter out comment lines and empty lines, trim whitespace
+    nonCommentLines = filter isNonComment allLines
+  in
+    map trim nonCommentLines
+  where
+    isNonComment line =
+      let trimmed = trim line
+      in trimmed /= "" && String.take 1 trimmed /= "%"
+
+-- | Compute file diffs comparing current files to original embedded files (comments stripped)
+-- | Returns both a summary string and detailed per-file diffs for the modal
+computeFileDiff :: Map.Map String String -> { summary :: String, fileDiffs :: Array FileDiff }
 computeFileDiff currentFiles =
   let
     -- Get all file paths to compare
     allPaths = fromFoldable $ Map.keys currentFiles
-    -- Compare each file and collect descriptions
-    diffs = allPaths >>= \path ->
+    -- Compare each file and collect diffs (with comments stripped)
+    fileDiffsAndDescs = allPaths >>= \path ->
       let
         current = fromMaybe "" $ Map.lookup path currentFiles
         original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
+        -- Strip comments before comparing
+        currentStripped = stripComments current
+        originalStripped = stripComments original
       in
-        if current == original
+        if currentStripped == originalStripped
           then []
           else
             let
-              currentLines = filter (_ /= "") $ split (Pattern "\n") current
-              originalLines = filter (_ /= "") $ split (Pattern "\n") original
-              currentLen = length currentLines
-              originalLen = length originalLines
-              -- Simple line count difference (not a true diff, but gives a sense of changes)
+              currentLen = length currentStripped
+              originalLen = length originalStripped
+              -- Simple line count difference
               added = if currentLen > originalLen then currentLen - originalLen else 0
               removed = if originalLen > currentLen then originalLen - currentLen else 0
-              -- Count lines that differ (approximate)
-              changedCount = countDifferentLines currentLines originalLines
+              -- Count lines that differ
+              changedCount = countDifferentLines currentStripped originalStripped
               diffDesc = if added > 0 && removed > 0
                 then "+" <> show added <> "/-" <> show removed
                 else if added > 0
@@ -231,12 +260,19 @@ computeFileDiff currentFiles =
                   else if removed > 0
                     then "-" <> show removed
                     else show changedCount <> " changed"
+              fileDiff = { fileName: getFileName path
+                         , originalLines: originalStripped
+                         , currentLines: currentStripped
+                         }
             in
-              [getFileName path <> ": " <> diffDesc]
+              [{ desc: getFileName path <> ": " <> diffDesc, diff: fileDiff }]
+    -- Extract summaries and diffs
+    summaries = map _.desc fileDiffsAndDescs
+    diffs = map _.diff fileDiffsAndDescs
   in
-    if null diffs
-      then "No changes"
-      else intercalate ", " diffs
+    { summary: if null summaries then "No changes" else intercalate ", " summaries
+    , fileDiffs: diffs
+    }
   where
     -- Count how many lines are different (simple comparison)
     countDifferentLines :: Array String -> Array String -> Int
@@ -561,6 +597,9 @@ render state =
 
     -- Dialog for navigating to included files
     , renderNavigateIncludeDialog state.navigateIncludeTarget state.files
+
+    -- Diff modal for timing table entries
+    , renderDiffModal state.selectedTimingEntry
     ]
 
 -- | Render a file tab button
@@ -899,6 +938,9 @@ renderTimingTable entries =
         [ HH.h3
             [ HP.style "margin: 0 0 10px 0; color: #333; font-size: 14px;" ]
             [ HH.text $ "Clingo Timing History (" <> show (length entries) <> " runs)" ]
+        , HH.p
+            [ HP.style "margin: 0 0 10px 0; color: #666; font-size: 11px; font-style: italic;" ]
+            [ HH.text "Click a row to see the detailed diff (comments stripped)" ]
         , HH.div
             [ HP.style "overflow-x: auto;" ]
             [ HH.table
@@ -920,15 +962,17 @@ renderTimingTable entries =
   where
     renderTimingRow entry =
       HH.tr
-        [ HP.style "border-bottom: 1px solid #e0e0e0;" ]
+        [ HP.style $ "border-bottom: 1px solid #e0e0e0; cursor: pointer; transition: background 0.2s;"
+        , HE.onClick \_ -> ShowTimingDiff entry
+        ]
         [ HH.td
             [ HP.style "padding: 6px 8px; color: #666;" ]
             [ HH.text $ show entry.runIndex ]
         , HH.td
-            [ HP.style "padding: 6px 8px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
-            , HP.title entry.diff  -- Full diff on hover
+            [ HP.style "padding: 6px 8px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2196F3; text-decoration: underline;"
+            , HP.title $ entry.diffSummary <> " (click for details)"
             ]
-            [ HH.text entry.diff ]
+            [ HH.text entry.diffSummary ]
         , HH.td
             [ HP.style "padding: 6px 8px; text-align: right;" ]
             [ HH.text $ if entry.modelLimit == 0 then "all" else show entry.modelLimit ]
@@ -953,6 +997,96 @@ renderTimingTable entries =
       where
         floorTo3 n = Int.toNumber (Int.floor (n * 1000.0)) / 1000.0
         floorTo2 n = Int.toNumber (Int.floor (n * 100.0)) / 100.0
+
+-- | Render the diff modal showing detailed file changes
+renderDiffModal :: forall m. Maybe TimingEntry -> H.ComponentHTML Action Slots m
+renderDiffModal Nothing = HH.text ""
+renderDiffModal (Just entry) =
+  HH.div
+    [ HP.style $ "position: fixed; top: 0; left: 0; right: 0; bottom: 0; "
+        <> "background: rgba(0,0,0,0.5); z-index: 200; "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "padding: 20px;"
+    , HE.onClick \_ -> CloseDiffModal
+    ]
+    [ HH.div
+        [ HP.style $ "background: white; border-radius: 8px; "
+            <> "max-width: 900px; width: 100%; max-height: 80vh; "
+            <> "display: flex; flex-direction: column; "
+            <> "box-shadow: 0 4px 20px rgba(0,0,0,0.3);"
+        , HE.onClick \_ -> NoOp  -- Prevent clicks inside modal from closing it
+        ]
+        [ -- Modal header
+          HH.div
+            [ HP.style "padding: 15px 20px; background: #2196F3; color: white; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;" ]
+            [ HH.div_
+                [ HH.strong_ [ HH.text $ "Run #" <> show entry.runIndex <> " - Diff Details" ]
+                , HH.div
+                    [ HP.style "font-size: 12px; opacity: 0.9; margin-top: 4px;" ]
+                    [ HH.text $ entry.diffSummary <> " | Models: " <> (if entry.modelLimit == 0 then "all" else show entry.modelLimit)
+                        <> " | Time: " <> show entry.totalTime <> "s"
+                    ]
+                ]
+            , HH.button
+                [ HP.style "background: transparent; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0 5px;"
+                , HE.onClick \_ -> CloseDiffModal
+                ]
+                [ HH.text "×" ]
+            ]
+        -- Modal body with diffs
+        , HH.div
+            [ HP.style "flex: 1; overflow-y: auto; padding: 15px;" ]
+            [ if null entry.fileDiffs
+              then HH.p
+                [ HP.style "color: #666; font-style: italic; text-align: center; padding: 20px;" ]
+                [ HH.text "No differences from original files (comments excluded)" ]
+              else HH.div_ $ map renderFileDiff entry.fileDiffs
+            ]
+        -- Modal footer
+        , HH.div
+            [ HP.style "padding: 10px 20px; background: #f5f5f5; border-radius: 0 0 8px 8px; text-align: right; font-size: 12px; color: #666;" ]
+            [ HH.text $ show (length entry.fileDiffs) <> " file(s) with changes (comments stripped)" ]
+        ]
+    ]
+  where
+    renderFileDiff diff =
+      HH.div
+        [ HP.style "margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;" ]
+        [ -- File header
+          HH.div
+            [ HP.style "padding: 8px 12px; background: #f0f0f0; font-weight: bold; font-family: monospace; font-size: 13px; border-bottom: 1px solid #ddd;" ]
+            [ HH.text diff.fileName ]
+        -- Two-column diff view
+        , HH.div
+            [ HP.style "display: flex; font-family: monospace; font-size: 11px;" ]
+            [ -- Original column
+              HH.div
+                [ HP.style "flex: 1; border-right: 1px solid #ddd;" ]
+                [ HH.div
+                    [ HP.style "padding: 4px 8px; background: #ffebee; font-weight: bold; font-size: 10px; color: #c62828;" ]
+                    [ HH.text "Original" ]
+                , HH.div
+                    [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #fff5f5;" ]
+                    [ HH.pre
+                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
+                        [ HH.text $ intercalate "\n" diff.originalLines ]
+                    ]
+                ]
+            -- Current column
+            , HH.div
+                [ HP.style "flex: 1;" ]
+                [ HH.div
+                    [ HP.style "padding: 4px 8px; background: #e8f5e9; font-weight: bold; font-size: 10px; color: #2e7d32;" ]
+                    [ HH.text "Current" ]
+                , HH.div
+                    [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #f5fff5;" ]
+                    [ HH.pre
+                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
+                        [ HH.text $ intercalate "\n" diff.currentLines ]
+                    ]
+                ]
+            ]
+        ]
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
@@ -1176,7 +1310,7 @@ handleAction = case _ of
           "" -> 5  -- Default to 5 models when field is empty
           s -> fromMaybe 5 $ Int.fromString s
     -- Compute the diff description before running (for timing table)
-    let diffDesc = computeFileDiff state.files
+    let diffResult = computeFileDiff state.files
     -- Build file resolver for #include directives using the virtual filesystem
     let resolver filename = Map.lookup filename state.files
     -- Get the current file's content (the entry point that #includes other files)
@@ -1211,7 +1345,8 @@ handleAction = case _ of
     -- Create timing entry if we have timing data
     let newEntry = case timing of
           Just t -> Just
-            { diff: diffDesc
+            { diffSummary: diffResult.summary
+            , fileDiffs: diffResult.fileDiffs
             , modelLimit: numModels
             , totalTime: t."Total"
             , solveTime: t."Solve"
@@ -1486,6 +1621,12 @@ handleAction = case _ of
 
   CancelNavigateToInclude ->
     H.modify_ \s -> s { navigateIncludeTarget = Nothing }
+
+  ShowTimingDiff entry ->
+    H.modify_ \s -> s { selectedTimingEntry = Just entry }
+
+  CloseDiffModal ->
+    H.modify_ \s -> s { selectedTimingEntry = Nothing }
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
