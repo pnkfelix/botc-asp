@@ -1410,11 +1410,12 @@ commentOutIfMatchesWithContext patternStr contextSuffix line =
 
 -- | Convert a TimePoint to an integer time index for assigned/3 predicate
 -- Setup and Night 1 (any phase) map to 0 (initial assignment)
--- Other nights map to their night number
+-- Other nights/dawns/days map to their number
 timePointToAssignedTime :: AnswerSet.TimePoint -> Int
 timePointToAssignedTime AnswerSet.Setup = 0
 timePointToAssignedTime (AnswerSet.Night 1 _ _) = 0
 timePointToAssignedTime (AnswerSet.Night n _ _) = n
+timePointToAssignedTime (AnswerSet.Dawn n) = n
 timePointToAssignedTime (AnswerSet.Day n _) = n
 timePointToAssignedTime (AnswerSet.UnknownTime _) = 0
 
