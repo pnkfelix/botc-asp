@@ -1353,15 +1353,15 @@ handleAction = case _ of
   HandleRoleDrop dropEvent -> do
     -- Handle role drop event from JS drag handler
     state <- H.get
-    case state.selectedTime of
-      Just time ->
-        H.raise $ RoleMoved
-          { role: dropEvent.role
-          , fromPlayer: dropEvent.fromPlayer
-          , toPlayer: dropEvent.toPlayer
-          , time
-          }
-      Nothing -> pure unit
+    -- Use selected time if available, otherwise use a default (Night 1 0 0)
+    -- In pre-solve mode there's no timeline, so we use a placeholder time
+    let time = fromMaybe (ASP.Night 1 0 0) state.selectedTime
+    H.raise $ RoleMoved
+      { role: dropEvent.role
+      , fromPlayer: dropEvent.fromPlayer
+      , toPlayer: dropEvent.toPlayer
+      , time
+      }
 
 -- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
 -- For n players, perimeter = 2*cols + 2*rows - 4 = n
