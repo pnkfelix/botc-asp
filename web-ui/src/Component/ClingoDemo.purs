@@ -1328,6 +1328,7 @@ extractWitnesses res =
 formatTimePointForASP :: AnswerSet.TimePoint -> String
 formatTimePointForASP AnswerSet.Setup = "setup"
 formatTimePointForASP (AnswerSet.Night n r s) = "night(" <> show n <> ", " <> show r <> ", " <> show s <> ")"
+formatTimePointForASP (AnswerSet.Dawn n) = "dawn(" <> show n <> ")"
 formatTimePointForASP (AnswerSet.Day n phase) = "day(" <> show n <> ", " <> phase <> ")"
 formatTimePointForASP (AnswerSet.UnknownTime s) = s
 
