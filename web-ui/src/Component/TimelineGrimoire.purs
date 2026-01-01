@@ -1353,9 +1353,9 @@ handleAction = case _ of
   HandleRoleDrop dropEvent -> do
     -- Handle role drop event from JS drag handler
     state <- H.get
-    -- Use selected time if available, otherwise use a default (Night 1 0 0)
-    -- In pre-solve mode there's no timeline, so we use a placeholder time
-    let time = fromMaybe (ASP.Night 1 0 0) state.selectedTime
+    -- Use selected time if available, otherwise use Setup (pre-game)
+    -- In pre-solve mode there's no timeline, so we use Setup
+    let time = fromMaybe ASP.Setup state.selectedTime
     H.raise $ RoleMoved
       { role: dropEvent.role
       , fromPlayer: dropEvent.fromPlayer
