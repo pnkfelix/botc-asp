@@ -294,6 +294,7 @@ renderBagPanel state gameState =
   HH.div
     [ HP.style $ "min-width: " <> (if state.bagCollapsed then "40px" else "150px") <> "; "
         <> "display: flex; flex-direction: column; "
+        <> "overflow: hidden; "  -- Prevent content from pushing height beyond grimoire
         <> "transition: min-width 0.2s ease-in-out;"
     ]
     [ -- Header with collapse toggle
@@ -370,6 +371,7 @@ renderScriptPanel state =
   HH.div
     [ HP.style $ "min-width: " <> (if state.scriptCollapsed then "40px" else "160px") <> "; "
         <> "display: flex; flex-direction: column; "
+        <> "overflow: hidden; "  -- Prevent content from pushing height beyond grimoire
         <> "transition: min-width 0.2s ease-in-out;"
     ]
     [ -- Header with collapse toggle
