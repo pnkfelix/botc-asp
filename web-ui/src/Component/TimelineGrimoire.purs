@@ -1236,6 +1236,12 @@ abbreviateToken t = case t of
   "but_master" -> "BUT"
   "sla_no_ability" -> "SLA"
   "drunk_is_drunk" -> "DRUNK"
+  -- Execution day tokens
+  "ex_d1" -> "EX1"
+  "ex_d2" -> "EX2"
+  "ex_d3" -> "EX3"
+  "ex_d4" -> "EX4"
+  "ex_d5" -> "EX5"
   _ -> takeChars 3 t
   where
     takeChars n s = if S.length s <= n then s else fold (take n (S.split (Pattern "") s))
