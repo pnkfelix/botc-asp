@@ -1,4 +1,10 @@
 % ===========================================================================
+% Core Blood on the Clocktower logic
+% ===========================================================================
+
+#include "night_order.lp".
+
+% ===========================================================================
 % Night Order Derivation
 % Derive first_night_role_order/2 and other_night_role_order/2 from the
 % global night_order/3 defined in night_order.lp
