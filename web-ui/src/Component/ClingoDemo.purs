@@ -1280,6 +1280,7 @@ extractWitnesses res =
 
 -- | Format a TimePoint for ASP syntax
 formatTimePointForASP :: AnswerSet.TimePoint -> String
+formatTimePointForASP AnswerSet.Setup = "setup"
 formatTimePointForASP (AnswerSet.Night n r s) = "night(" <> show n <> ", " <> show r <> ", " <> show s <> ")"
 formatTimePointForASP (AnswerSet.Day n phase) = "day(" <> show n <> ", " <> phase <> ")"
 formatTimePointForASP (AnswerSet.UnknownTime s) = s
@@ -1362,9 +1363,10 @@ commentOutIfMatchesWithContext patternStr contextSuffix line =
       else line
 
 -- | Convert a TimePoint to an integer time index for assigned/3 predicate
--- Night 1 (any phase) maps to 0 (initial assignment)
+-- Setup and Night 1 (any phase) map to 0 (initial assignment)
 -- Other nights map to their night number
 timePointToAssignedTime :: AnswerSet.TimePoint -> Int
+timePointToAssignedTime AnswerSet.Setup = 0
 timePointToAssignedTime (AnswerSet.Night 1 _ _) = 0
 timePointToAssignedTime (AnswerSet.Night n _ _) = n
 timePointToAssignedTime (AnswerSet.Day n _) = n
