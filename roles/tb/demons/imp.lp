@@ -47,6 +47,19 @@ reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
     player_chooses(imp, Imp, point(Target), night(N, RoleOrd, 2)),
     functioning(Imp, night(N, RoleOrd, 3)).
 
+% When Imp moves the DIE token to a new target, remove it from any previous target.
+% The Imp has only ONE DIE token that moves from victim to victim.
+token_removed(imp_dead, OldTarget, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(imp, RoleOrd),
+    player_chooses(imp, Imp, point(NewTarget), night(N, RoleOrd, 2)),
+    functioning(Imp, night(N, RoleOrd, 3)),
+    reminder_on(imp_dead, OldTarget, night(N, 0, 0)),  % Token was on OldTarget at start of night
+    OldTarget != NewTarget.  % Only remove if moving to different target
+
+% Constraint: imp_dead token cannot be on a player at the same time it's being removed
+:- reminder_on(imp_dead, P, T), token_removed(imp_dead, P, T).
+
 imp_kill_succeeds(P, T) :-
     reminder_on(imp_dead, P, T),
     not protected_from_demon(P, T).

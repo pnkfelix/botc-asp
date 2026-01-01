@@ -5,13 +5,13 @@ on:
     branches: [main, master]
     paths:
       - 'web-ui/**'
-      - '*.lp'  # Rebuild if .lp files change
+      - '**/*.lp'  # Rebuild if any .lp files change (including subdirectories)
       - '.github/workflows/deploy.yml'
   pull_request:
     branches: [main, master]
     paths:
       - 'web-ui/**'
-      - '*.lp'
+      - '**/*.lp'
   workflow_dispatch:  # Allow manual trigger
 
 # Sets permissions for GitHub Pages deployment
