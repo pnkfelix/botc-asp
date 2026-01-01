@@ -8,7 +8,7 @@ module EarlyParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, fromFoldable)
+import Data.Array (filter, mapMaybe, fromFoldable, head)
 import Data.Array.NonEmpty as NEA
 import Data.Int as Int
 import Data.Map (Map)
@@ -168,9 +168,7 @@ parsePlayerCount content =
 -- | Find first matching line and extract the number
 findFirstMatch :: Regex -> Array String -> Maybe Int
 findFirstMatch r lines =
-  case mapMaybe (parsePlayerCountLine r) lines of
-    [] -> Nothing
-    (x : _) -> Just x
+  head $ mapMaybe (parsePlayerCountLine r) lines
 
 -- | Parse a single line for #const player_count = N
 parsePlayerCountLine :: Regex -> String -> Maybe Int
@@ -185,6 +183,4 @@ parsePlayerCountLine r line =
 -- | Try to find player_count in any of the given contents
 parsePlayerCountFromAny :: Array String -> Maybe Int
 parsePlayerCountFromAny contents =
-  case mapMaybe parsePlayerCount contents of
-    [] -> Nothing
-    (x : _) -> Just x
+  head $ mapMaybe parsePlayerCount contents
