@@ -110,10 +110,12 @@ between(T1, T2) :-
 next(T, day(N, 0)) :- final_night_time(N, T), day_number(N).
 
 % Within a day: day(N, 0) -> day(N, exec)
-next(day(N, 0), day(N, exec)) :- day_number(N).
+% Don't transition if evil already won at start of day
+next(day(N, 0), day(N, exec)) :- day_number(N), not game_over(day(N, 0)).
 
 % Day N ends, night N+1 begins
-next(day(N, exec), night(N+1, 0, 0)) :- day_number(N), night_number(N+1).
+% Don't transition to next night if game ended (good wins from execution, or evil wins)
+next(day(N, exec), night(N+1, 0, 0)) :- day_number(N), night_number(N+1), not game_over(day(N, exec)).
 
 player(P) :- name(P), chair(P,C), C < player_count.
 
@@ -476,7 +478,8 @@ final_night_time(N, T) :-
     not next(T, T2) : time(T2), T2 = night(N, _, _).
 
 % Alive at start of night N+1 = alive at end of day N
-alive(P, night(N+1, 0, 0)) :- alive(P, day(N, exec)), night_number(N+1).
+% Don't propagate if game ended on day N
+alive(P, night(N+1, 0, 0)) :- alive(P, day(N, exec)), night_number(N+1), not game_over(day(N, exec)).
 
 % ===========================================================================
 % Day Time Structure (simplified)
