@@ -15,7 +15,7 @@ import TokenConstraints as TC
 import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
 import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Tuple (Tuple(..))
 import Data.String (Pattern(..), split, trim, take, contains, indexOf) as String
 import Data.String (Pattern(..), split, trim, contains, indexOf)
@@ -1133,79 +1133,83 @@ handleAction = case _ of
       state <- H.get
       let constraints = TC.parseNeverAppliedTo state.files
       -- Get current game state to check reminders on target player
+      -- In pre-solve mode (no answer sets), we skip validation but still update inst.lp
       let maybeGameState = case state.result of
             Just (ResultSuccess answerSets) ->
               case index answerSets state.selectedModelIndex of
                 Just atoms -> Just $ AnswerSet.buildGameState (AnswerSet.parseAnswerSet atoms) time
                 Nothing -> Nothing
             _ -> Nothing
-      case maybeGameState of
-        Nothing -> pure unit  -- No game state available, skip validation
-        Just gameState -> do
-          -- Validate: check if toPlayer has any reminder tokens that can't be on this role
-          let reminders = map (\r -> { token: r.token, player: r.player }) gameState.reminders
-          case TC.validateRoleDrop { role, toPlayer } constraints reminders of
-            Just errorMsg -> do
-              -- Validation failed - show warning and don't proceed
-              H.modify_ \s -> s { scrollNotification = Just errorMsg }
-              _ <- H.fork do
-                H.liftAff $ Aff.delay (Milliseconds 4000.0)
-                H.modify_ \s -> s { scrollNotification = Nothing }
-              pure unit
-            Nothing -> do
-              -- Validation passed - proceed with the drop
-              let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-              -- Check if dropping onto the bag (special target)
-              if toPlayer == "__bag__" then do
-                -- Dropping onto the bag: add assert_drawn or assert_distrib
-                -- Roles marked never_in_bag (like drunk) should use assert_distrib instead
-                let neverInBagRoles = ["drunk", "marionette"]  -- Roles that can't be physically in the bag
-                let isNeverInBag = elem role neverInBagRoles
-                let newConstraint = if isNeverInBag
-                      then "assert_distrib(" <> role <> ")."
-                      else "assert_drawn(" <> role <> ")."
-                let undoEntry = { instLpContent: instContent
-                                , description: "Add " <> role <> " to bag"
-                                }
-                -- Add the constraint to inst.lp
-                let modifiedContent = instContent <> "\n" <> newConstraint
-                H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
-                                  , undoStack = snoc s.undoStack undoEntry
-                                  , redoStack = []
-                                  }
-                handleAction RunClingo
-              else do
-                -- Normal drop onto a player
-                -- Detect if this is a copy operation from script/bag (special sources)
-                let isCopyOperation = String.take 2 fromPlayer == "__"
-                let sourceDescription = case fromPlayer of
-                      "__script__" -> "script"
-                      "__bag__" -> "bag"
-                      _ -> fromPlayer
-                -- Push current state onto undo stack (before making changes)
-                let undoEntry = { instLpContent: instContent
-                                , description: if isCopyOperation
-                                    then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
-                                    else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
-                                }
-                -- Create the new constraint (forces toPlayer to receive this token)
-                let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
-                -- Create the old constraint pattern to comment out (the previous drag for this token)
-                -- For copy operations, we use a dummy pattern that won't match anything
-                let oldConstraintPattern = if isCopyOperation
-                      then "__NOMATCH__"
-                      else "assert_received(" <> fromPlayer <> ", " <> role <> ")."
-                -- Modify the content: comment out old constraint if present, add new one
-                -- For copy operations, use sourceDescription for cleaner comments
-                let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
-                let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
-                -- Update the virtual filesystem, push undo entry, and clear redo stack
-                H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
-                                  , undoStack = snoc s.undoStack undoEntry
-                                  , redoStack = []  -- Clear redo stack on new action
-                                  }
-                -- Re-run Clingo with the new constraints
-                handleAction RunClingo
+      -- Track whether we're in post-solve mode (have a valid answer set)
+      let isPostSolve = isJust maybeGameState
+      -- Get reminders for validation (empty if no game state - validation always passes)
+      let reminders = case maybeGameState of
+            Just gameState -> map (\r -> { token: r.token, player: r.player }) gameState.reminders
+            Nothing -> []  -- No reminders to validate against in pre-solve mode
+      -- Validate: check if toPlayer has any reminder tokens that can't be on this role
+      case TC.validateRoleDrop { role, toPlayer } constraints reminders of
+        Just errorMsg -> do
+          -- Validation failed - show warning and don't proceed
+          H.modify_ \s -> s { scrollNotification = Just errorMsg }
+          _ <- H.fork do
+            H.liftAff $ Aff.delay (Milliseconds 4000.0)
+            H.modify_ \s -> s { scrollNotification = Nothing }
+          pure unit
+        Nothing -> do
+          -- Validation passed (or skipped in pre-solve mode) - proceed with the drop
+          let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+          -- Check if dropping onto the bag (special target)
+          if toPlayer == "__bag__" then do
+            -- Dropping onto the bag: add assert_drawn or assert_distrib
+            -- Roles marked never_in_bag (like drunk) should use assert_distrib instead
+            let neverInBagRoles = ["drunk", "marionette"]  -- Roles that can't be physically in the bag
+            let isNeverInBag = elem role neverInBagRoles
+            let newConstraint = if isNeverInBag
+                  then "assert_distrib(" <> role <> ")."
+                  else "assert_drawn(" <> role <> ")."
+            let undoEntry = { instLpContent: instContent
+                            , description: "Add " <> role <> " to bag"
+                            }
+            -- Add the constraint to inst.lp
+            let modifiedContent = instContent <> "\n" <> newConstraint
+            H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                              , undoStack = snoc s.undoStack undoEntry
+                              , redoStack = []
+                              }
+            -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
+            if isPostSolve then handleAction RunClingo else pure unit
+          else do
+            -- Normal drop onto a player
+            -- Detect if this is a copy operation from script/bag (special sources)
+            let isCopyOperation = String.take 2 fromPlayer == "__"
+            let sourceDescription = case fromPlayer of
+                  "__script__" -> "script"
+                  "__bag__" -> "bag"
+                  _ -> fromPlayer
+            -- Push current state onto undo stack (before making changes)
+            let undoEntry = { instLpContent: instContent
+                            , description: if isCopyOperation
+                                then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
+                                else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                            }
+            -- Create the new constraint (forces toPlayer to receive this token)
+            let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
+            -- Create the old constraint pattern to comment out (the previous drag for this token)
+            -- For copy operations, we use a dummy pattern that won't match anything
+            let oldConstraintPattern = if isCopyOperation
+                  then "__NOMATCH__"
+                  else "assert_received(" <> fromPlayer <> ", " <> role <> ")."
+            -- Modify the content: comment out old constraint if present, add new one
+            -- For copy operations, use sourceDescription for cleaner comments
+            let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
+            let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
+            -- Update the virtual filesystem, push undo entry, and clear redo stack
+            H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                              , undoStack = snoc s.undoStack undoEntry
+                              , redoStack = []  -- Clear redo stack on new action
+                              }
+            -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
+            if isPostSolve then handleAction RunClingo else pure unit
 
   ClearScrollNotification ->
     H.modify_ \s -> s { scrollNotification = Nothing }
