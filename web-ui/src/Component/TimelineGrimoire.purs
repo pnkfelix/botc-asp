@@ -1180,6 +1180,7 @@ formatRoleName role =
 
 -- | Format time point for display
 formatTimePoint :: ASP.TimePoint -> String
+formatTimePoint ASP.Setup = "Setup"
 formatTimePoint (ASP.Night n 0 0) = "Night " <> show n <> " (Setup)"
 formatTimePoint (ASP.Night n r s) = "Night " <> show n <> " (" <> show r <> "." <> show s <> ")"
 formatTimePoint (ASP.Day n "0") = "Day " <> show n <> " (Start)"
@@ -1353,15 +1354,15 @@ handleAction = case _ of
   HandleRoleDrop dropEvent -> do
     -- Handle role drop event from JS drag handler
     state <- H.get
-    case state.selectedTime of
-      Just time ->
-        H.raise $ RoleMoved
-          { role: dropEvent.role
-          , fromPlayer: dropEvent.fromPlayer
-          , toPlayer: dropEvent.toPlayer
-          , time
-          }
-      Nothing -> pure unit
+    -- Use selected time if available, otherwise use Setup (pre-game)
+    -- In pre-solve mode there's no timeline, so we use Setup
+    let time = fromMaybe ASP.Setup state.selectedTime
+    H.raise $ RoleMoved
+      { role: dropEvent.role
+      , fromPlayer: dropEvent.fromPlayer
+      , toPlayer: dropEvent.toPlayer
+      , time
+      }
 
 -- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
 -- For n players, perimeter = 2*cols + 2*rows - 4 = n

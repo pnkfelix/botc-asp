@@ -93,36 +93,46 @@ type ParsedAtom = { atom :: Atom, original :: String }
 
 -- | Time points in the game
 data TimePoint
-  = Night Int Int Int    -- night(nightNum, roleOrder, substep)
+  = Setup                -- Pre-game setup, before Night 1
+  | Night Int Int Int    -- night(nightNum, roleOrder, substep)
   | Day Int String       -- day(dayNum, phase) where phase is "0" or "exec"
   | UnknownTime String
 
 derive instance eqTimePoint :: Eq TimePoint
 
 -- Custom Ord instance to properly interleave nights and days:
--- Night 1 < Day 1 < Night 2 < Day 2, etc.
+-- Setup < Night 1 < Day 1 < Night 2 < Day 2, etc.
 instance ordTimePoint :: Ord TimePoint where
+  -- Setup is before everything
+  compare Setup Setup = EQ
+  compare Setup _ = LT
+  compare _ Setup = GT
+  -- Night comparisons
   compare (Night n1 r1 s1) (Night n2 r2 s2) =
     case compare n1 n2 of
       EQ -> case compare r1 r2 of
         EQ -> compare s1 s2
         other -> other
       other -> other
+  -- Day comparisons
   compare (Day d1 p1) (Day d2 p2) =
     case compare d1 d2 of
       EQ -> compare p1 p2
       other -> other
+  -- Night vs Day interleaving
   compare (Night n _r _s) (Day d _p) =
     -- Night n comes before Day n, but after Day (n-1)
     if n <= d then LT else GT
   compare (Day d _p) (Night n _r _s) =
     -- Day d comes after Night d, but before Night (d+1)
     if d < n then LT else GT
+  -- UnknownTime is after everything (except Setup which is handled above)
   compare (UnknownTime s1) (UnknownTime s2) = compare s1 s2
   compare (UnknownTime _) _ = GT
   compare _ (UnknownTime _) = LT
 
 instance showTimePoint :: Show TimePoint where
+  show Setup = "setup"
   show (Night n r s) = "night(" <> show n <> "," <> show r <> "," <> show s <> ")"
   show (Day n p) = "day(" <> show n <> "," <> p <> ")"
   show (UnknownTime s) = s
@@ -510,9 +520,10 @@ parseAnswerSetWithOriginals :: Array String -> Array ParsedAtom
 parseAnswerSetWithOriginals = map \s -> { atom: parseAtom s, original: s }
 
 -- | Convert a TimePoint to an integer time index for comparing with assigned/3 predicate
--- Night 1 (any phase) maps to 0 (initial assignment)
+-- Setup and Night 1 (any phase) map to 0 (initial assignment)
 -- Other nights/days map to their number
 timePointToAssignedTime :: TimePoint -> Int
+timePointToAssignedTime Setup = 0
 timePointToAssignedTime (Night 1 _ _) = 0
 timePointToAssignedTime (Night n _ _) = n
 timePointToAssignedTime (Day n _) = n
