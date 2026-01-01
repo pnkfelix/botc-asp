@@ -33,3 +33,6 @@
 
 % Demon
 #include "roles/tb/demons/imp.lp".
+
+% Game end conditions (depends on demon/minion logic above)
+#include "game_end.lp".
