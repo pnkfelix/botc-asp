@@ -176,6 +176,7 @@ type GameState =
   , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
   , bagTokens :: Array String  -- roles in the physical bag
+  , assignedNotInBag :: Array String  -- roles assigned to players but not received (e.g., Drunk)
   }
 
 -- | Parse a single atom string into structured data
@@ -581,11 +582,22 @@ buildGameState atoms targetTime =
         isAlive = not (elem c.name deadPlayersAtTime)
         hasUsedGhostVote = elem c.name ghostVoteUsedPlayers
       in { name: c.name, chair: c.pos, role, token, alive: isAlive, ghostVoteUsed: hasUsedGhostVote }
+
+    -- Find roles that are assigned but not in the bag (e.g., Drunk)
+    -- These are roles where a player's actual role differs from their received token
+    -- and the role is not in the bag
+    sortedPlayers = sortBy (comparing _.chair) players
+    assignedNotInBag = nub $ mapMaybe (\p ->
+      if not (elem p.role bagTokens) && p.role /= "?"
+        then Just p.role
+        else Nothing
+    ) sortedPlayers
   in
-    { players: sortBy (comparing _.chair) players
+    { players: sortedPlayers
     , reminders: remindersAtTime
     , time: targetTime
     , bagTokens
+    , assignedNotInBag
     }
   where
     getBagToken (Bag role) = Just role
