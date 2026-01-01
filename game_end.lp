@@ -19,10 +19,11 @@
 
 % The demon dies unreplaced when executed and no one becomes the new demon
 % Note: starpass only triggers from self-kill at night, not from execution
+% Must check current_demon, not original assignment, to handle SW becoming demon
 demon_dies_unreplaced(N) :-
     day_number(N),
     executed(P, N),
-    assigned(0, P, R), demon(R),
+    current_demon(P, N),
     not sw_becomes_demon(_, N).
 
 % Good wins at the moment the demon is executed without replacement
