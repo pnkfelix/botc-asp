@@ -504,6 +504,7 @@ renderReminderDebugPanel :: forall cs m.
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
   , bagTokens :: Array String
+  , assignedNotInBag :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderReminderDebugPanel state gameState =
