@@ -432,7 +432,7 @@ render state =
     , renderResult state
 
     -- File directory popup with tree view
-    , renderFileDirectory state.showFileDirectory state.currentFile state.expandedDirs
+    , renderFileDirectory state.showFileDirectory state.currentFile state.expandedDirs state.files
 
     -- Predicate list panel (slide-in from right)
     , renderPredicatePanel state.showPredicateList parsed.predicates
@@ -471,13 +471,20 @@ renderFileTab currentFile filePath =
     ]
 
 -- | Render the file directory popup with tree view
-renderFileDirectory :: forall m. Boolean -> String -> Set.Set String -> H.ComponentHTML Action Slots m
-renderFileDirectory isVisible currentFile expandedDirs =
+renderFileDirectory :: forall m. Boolean -> String -> Set.Set String -> Map.Map String String -> H.ComponentHTML Action Slots m
+renderFileDirectory isVisible currentFile expandedDirs files =
   let
     -- Get all unique directories sorted
     allDirs = sort $ getDirectories availableFiles
     -- Get root-level files
     rootFiles = sort $ filter isRootFile availableFiles
+
+    -- Compute which files are transitively included from inst.lp
+    fileResolver filename = Map.lookup filename files
+    instContent = fromMaybe "" $ Map.lookup "inst.lp" files
+    includedFiles = Set.fromFoldable $ Clingo.getIncludedFiles instContent "inst.lp" fileResolver
+    includedCount = Set.size includedFiles
+    totalCount = length availableFiles
   in
   HH.div_
     [ -- Backdrop (click to close)
@@ -505,9 +512,20 @@ renderFileDirectory isVisible currentFile expandedDirs =
         [ -- Header
           HH.div
             [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0;" ]
-            [ HH.h3
-                [ HP.style "margin: 0; color: #333;" ]
-                [ HH.text $ "Files (" <> show (length availableFiles) <> ")" ]
+            [ HH.div_
+                [ HH.h3
+                    [ HP.style "margin: 0; color: #333;" ]
+                    [ HH.text $ "Files (" <> show totalCount <> ")" ]
+                , HH.div
+                    [ HP.style "font-size: 11px; color: #666; margin-top: 2px;" ]
+                    [ HH.text $ show includedCount <> " included from inst.lp"
+                    , if includedCount < totalCount
+                        then HH.span
+                          [ HP.style "color: #888; font-style: italic; margin-left: 6px;" ]
+                          [ HH.text "(italicized = not included)" ]
+                        else HH.text ""
+                    ]
+                ]
             , HH.button
                 [ HP.style "background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 0 5px;"
                 , HE.onClick \_ -> ToggleFileDirectory
@@ -520,17 +538,17 @@ renderFileDirectory isVisible currentFile expandedDirs =
             [ HH.div
                 [ HP.style "display: flex; flex-direction: column; gap: 2px;" ]
                 ( -- Root files first
-                  map (renderFileItem currentFile 0) rootFiles
+                  map (renderFileItem currentFile includedFiles 0) rootFiles
                   -- Then directories with their contents
-                  <> (allDirs >>= \dir -> renderDirectoryNode currentFile expandedDirs dir 0)
+                  <> (allDirs >>= \dir -> renderDirectoryNode currentFile expandedDirs includedFiles dir 0)
                 )
             ]
         ]
     ]
 
 -- | Render a directory node with its contents
-renderDirectoryNode :: forall m. String -> Set.Set String -> String -> Int -> Array (H.ComponentHTML Action Slots m)
-renderDirectoryNode currentFile expandedDirs dir depth =
+renderDirectoryNode :: forall m. String -> Set.Set String -> Set.Set String -> String -> Int -> Array (H.ComponentHTML Action Slots m)
+renderDirectoryNode currentFile expandedDirs includedFiles dir depth =
   let
     isExpanded = Set.member dir expandedDirs
     dirFiles = sort $ filter (isInDirectory dir) availableFiles
@@ -567,14 +585,15 @@ renderDirectoryNode currentFile expandedDirs dir depth =
   ] <>
   -- Contents (only if expanded)
   if isExpanded
-    then map (renderFileItem currentFile (depth + 1)) dirFiles
+    then map (renderFileItem currentFile includedFiles (depth + 1)) dirFiles
     else []
 
 -- | Render a file item in the directory tree
-renderFileItem :: forall m. String -> Int -> String -> H.ComponentHTML Action Slots m
-renderFileItem currentFile depth filePath =
+renderFileItem :: forall m. String -> Set.Set String -> Int -> String -> H.ComponentHTML Action Slots m
+renderFileItem currentFile includedFiles depth filePath =
   let
     isSelected = filePath == currentFile
+    isIncluded = Set.member filePath includedFiles
     displayName = getFileName filePath
     indent = depth * 16
     description = getFileDescription filePath
@@ -585,8 +604,9 @@ renderFileItem currentFile depth filePath =
         <> "background: " <> (if isSelected then "#e8f5e9" else "white") <> "; "
         <> "border: " <> (if isSelected then "2px solid #4CAF50" else "1px solid #eee") <> "; "
         <> "border-radius: 4px; cursor: pointer;"
+        <> (if not isIncluded then " opacity: 0.6;" else "")
     , HE.onClick \_ -> SelectFile filePath
-    , HP.title filePath  -- Full path as tooltip
+    , HP.title $ filePath <> (if not isIncluded then " (not included in clingo run)" else "")
     ]
     [ -- File icon
       HH.span
@@ -599,6 +619,7 @@ renderFileItem currentFile depth filePath =
             [ HP.style $ "font-weight: " <> (if isSelected then "bold" else "normal") <> "; "
                 <> "font-family: monospace; font-size: 13px; "
                 <> "white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                <> (if not isIncluded then " font-style: italic; color: #888;" else "")
             ]
             [ HH.text displayName ]
         , if description /= ""

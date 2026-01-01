@@ -99,3 +99,40 @@ export const resolveIncludesWithPathImpl = (program) => (currentFilePath) => (fi
 export const resolveIncludesImpl = (program) => (fileResolver) => {
   return resolveIncludesWithPathImpl(program)("")(fileResolver);
 };
+
+// Get the set of files transitively included from a starting file
+// Returns an array of file paths that are included (directly or indirectly)
+export const getIncludedFilesImpl = (startContent) => (startFilePath) => (fileResolver) => {
+  const included = new Set();
+  included.add(startFilePath); // Include the starting file itself
+
+  function traverse(content, filePath, depth = 0) {
+    if (depth > 10) return;
+
+    const currentDir = getDirectory(filePath);
+
+    // Match all #include "filename". directives
+    const includeRegex = /#include\s+"([^"]+)"\s*\./g;
+    let match;
+    while ((match = includeRegex.exec(content)) !== null) {
+      const includePath = match[1];
+
+      // Try to resolve the path (same logic as resolveIncludesWithPathImpl)
+      let resolvedPath = includePath;
+      let fileContent = fileResolver(resolvedPath);
+
+      if (fileContent === null && currentDir) {
+        resolvedPath = joinPath(currentDir, includePath);
+        fileContent = fileResolver(resolvedPath);
+      }
+
+      if (fileContent !== null && !included.has(resolvedPath)) {
+        included.add(resolvedPath);
+        traverse(fileContent, resolvedPath, depth + 1);
+      }
+    }
+  }
+
+  traverse(startContent, startFilePath);
+  return Array.from(included);
+};

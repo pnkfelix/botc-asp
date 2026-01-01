@@ -10,6 +10,7 @@ module Clingo
   , restart
   , resolveIncludes
   , resolveIncludesWithPath
+  , getIncludedFiles
   ) where
 
 import Prelude
@@ -72,6 +73,7 @@ foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
 foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
 foreign import resolveIncludesWithPathImpl :: String -> String -> Fn1 String (Nullable String) -> String
+foreign import getIncludedFilesImpl :: String -> String -> Fn1 String (Nullable String) -> Array String
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
@@ -127,3 +129,10 @@ resolveIncludes program resolver =
 resolveIncludesWithPath :: String -> String -> (String -> Maybe String) -> String
 resolveIncludesWithPath program currentFilePath resolver =
   resolveIncludesWithPathImpl program currentFilePath (runFn1 \filename -> toNullable (resolver filename))
+
+-- | Get the set of files transitively included from a starting file
+-- | Returns an array of file paths that are included (directly or indirectly)
+-- | Useful for determining which files are "live" in a clingo run
+getIncludedFiles :: String -> String -> (String -> Maybe String) -> Array String
+getIncludedFiles startContent startFilePath resolver =
+  getIncludedFilesImpl startContent startFilePath (runFn1 \filename -> toNullable (resolver filename))
