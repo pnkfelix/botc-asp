@@ -469,6 +469,24 @@ renderReminderDebugPanel state gameState =
       Just { token, player, time }
     getReminderOnAtom _ = Nothing
 
+    -- Extract assigned(0, player, role) atoms - true assignments
+    assignedAtoms = Array.mapMaybe getAssignedAtom state.atoms
+
+    getAssignedAtom (ASP.Assigned 0 player role) =
+      Just { player, role }
+    getAssignedAtom _ = Nothing
+
+    -- Extract received(player, role) atoms - what players think they are
+    receivedAtoms = Array.mapMaybe getReceivedAtom state.atoms
+
+    getReceivedAtom (ASP.Received player role) =
+      Just { player, role }
+    getReceivedAtom _ = Nothing
+
+    -- Check if washerwoman is actually assigned vs just received
+    washerwomanAssigned = Array.any (\a -> a.role == "washerwoman") assignedAtoms
+    washerwomanReceived = Array.any (\r -> r.role == "washerwoman") receivedAtoms
+
     targetTimeStr = case state.selectedTime of
       Just t -> formatTimePoint t
       Nothing -> "None (defaulting to Night 1 (0.0))"
@@ -480,6 +498,9 @@ renderReminderDebugPanel state gameState =
 
     -- Find reminders at the target time specifically
     remindersAtTarget = Array.filter (\r -> r.time == targetTime) allReminderAtoms
+
+    -- Check for ww_ tokens specifically
+    wwTokens = Array.filter (\r -> S.take 3 r.token == "ww_") allReminderAtoms
   in
   HH.div
     [ HP.style "margin-top: 20px; width: 100%;" ]
@@ -491,7 +512,24 @@ renderReminderDebugPanel state gameState =
                 <> show (Array.length allReminderAtoms) <> " total atoms)" ]
         , HH.div
             [ HP.style "margin-top: 10px; font-size: 12px; font-family: monospace;" ]
-            [ HH.div
+            [ -- Role assignment diagnostic
+              HH.div
+                [ HP.style $ "margin-bottom: 8px; padding: 8px; border-radius: 4px; "
+                    <> if washerwomanReceived && not washerwomanAssigned
+                       then "background: #f2dede; border: 1px solid #ebccd1;"  -- Red warning
+                       else "background: #fff;"
+                ]
+                [ HH.strong_ [ HH.text "Washerwoman Status: " ]
+                , if washerwomanAssigned
+                    then HH.span [ HP.style "color: #3c763d;" ] [ HH.text "✓ Actually assigned (should have reminder tokens)" ]
+                    else if washerwomanReceived
+                      then HH.span [ HP.style "color: #a94442;" ]
+                        [ HH.text "⚠ Only RECEIVED (not assigned) - likely a Drunk! No real tokens expected." ]
+                      else HH.span [ HP.style "color: #666;" ] [ HH.text "Not in game" ]
+                , HH.div [ HP.style "margin-top: 4px; font-size: 11px; color: #666;" ]
+                    [ HH.text $ "ww_ tokens found: " <> show (Array.length wwTokens) ]
+                ]
+            , HH.div
                 [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]
                 [ HH.strong_ [ HH.text "Selected Time: " ]
                 , HH.text targetTimeStr
@@ -511,6 +549,22 @@ renderReminderDebugPanel state gameState =
                     then HH.div [ HP.style "color: #a94442; font-style: italic;" ] [ HH.text "None" ]
                     else HH.ul [ HP.style "margin: 4px 0; padding-left: 20px;" ]
                       (map (\r -> HH.li_ [ HH.text $ r.token <> " on " <> r.player <> " (placed @ " <> formatTimePoint r.placedAt <> ")" ]) gameState.reminders)
+                ]
+            , HH.div
+                [ HP.style "margin-bottom: 8px; padding: 8px; background: #fff; border-radius: 4px;" ]
+                [ HH.strong_ [ HH.text "Role Assignments (assigned vs received):" ]
+                , HH.div [ HP.style "display: flex; gap: 20px; margin-top: 4px;" ]
+                    [ HH.div_
+                        [ HH.div [ HP.style "font-size: 10px; color: #888; text-transform: uppercase;" ] [ HH.text "Actually Assigned" ]
+                        , HH.ul [ HP.style "margin: 2px 0; padding-left: 16px; font-size: 11px;" ]
+                            (map (\a -> HH.li_ [ HH.text $ a.player <> " → " <> a.role ]) assignedAtoms)
+                        ]
+                    , HH.div_
+                        [ HH.div [ HP.style "font-size: 10px; color: #888; text-transform: uppercase;" ] [ HH.text "Received (thinks they are)" ]
+                        , HH.ul [ HP.style "margin: 2px 0; padding-left: 16px; font-size: 11px;" ]
+                            (map (\r -> HH.li_ [ HH.text $ r.player <> " → " <> r.role ]) receivedAtoms)
+                        ]
+                    ]
                 ]
             , HH.div
                 [ HP.style "padding: 8px; background: #fff; border-radius: 4px; max-height: 200px; overflow-y: auto;" ]
