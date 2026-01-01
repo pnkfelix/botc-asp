@@ -12,7 +12,7 @@ import Component.TimelineGrimoire as TG
 import EarlyParser as Early
 import FilterExpression as FE
 import TokenConstraints as TC
-import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
+import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc, (..))
 import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -44,6 +44,16 @@ type UndoEntry =
   , description :: String     -- Human-readable description of the change
   }
 
+-- | An entry in the timing history table
+-- Tracks clingo run times along with what changed and the model limit
+type TimingEntry =
+  { diff :: String             -- Description of what changed vs original files
+  , modelLimit :: Int          -- Number of models requested
+  , totalTime :: Number        -- Total solve time in seconds
+  , solveTime :: Number        -- Just the solve time in seconds
+  , runIndex :: Int            -- Sequential index of this run (for uniqueness)
+  }
+
 -- | Component state
 type State =
   { files :: Map.Map String String  -- Virtual filesystem: filepath -> content
@@ -69,6 +79,9 @@ type State =
   , redoStack :: Array UndoEntry
   -- Navigate to included file dialog
   , navigateIncludeTarget :: Maybe String  -- File path user clicked on in #include
+  -- Timing history table
+  , timingHistory :: Array TimingEntry     -- History of clingo run times
+  , nextRunIndex :: Int                    -- Counter for unique run indices
   }
 
 -- | How to display results
@@ -181,7 +194,64 @@ initialState =
   , undoStack: []          -- Empty undo stack
   , redoStack: []          -- Empty redo stack
   , navigateIncludeTarget: Nothing  -- No navigation dialog initially
+  , timingHistory: []      -- No timing history initially
+  , nextRunIndex: 1        -- Start run indexing at 1
   }
+
+-- | Compute a human-readable diff description comparing current files to original embedded files
+-- | Returns a description like "inst.lp: +5/-2 lines" or "No changes" if identical
+computeFileDiff :: Map.Map String String -> String
+computeFileDiff currentFiles =
+  let
+    -- Get all file paths to compare
+    allPaths = fromFoldable $ Map.keys currentFiles
+    -- Compare each file and collect descriptions
+    diffs = allPaths >>= \path ->
+      let
+        current = fromMaybe "" $ Map.lookup path currentFiles
+        original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
+      in
+        if current == original
+          then []
+          else
+            let
+              currentLines = filter (_ /= "") $ split (Pattern "\n") current
+              originalLines = filter (_ /= "") $ split (Pattern "\n") original
+              currentLen = length currentLines
+              originalLen = length originalLines
+              -- Simple line count difference (not a true diff, but gives a sense of changes)
+              added = if currentLen > originalLen then currentLen - originalLen else 0
+              removed = if originalLen > currentLen then originalLen - currentLen else 0
+              -- Count lines that differ (approximate)
+              changedCount = countDifferentLines currentLines originalLines
+              diffDesc = if added > 0 && removed > 0
+                then "+" <> show added <> "/-" <> show removed
+                else if added > 0
+                  then "+" <> show added
+                  else if removed > 0
+                    then "-" <> show removed
+                    else show changedCount <> " changed"
+            in
+              [getFileName path <> ": " <> diffDesc]
+  in
+    if null diffs
+      then "No changes"
+      else intercalate ", " diffs
+  where
+    -- Count how many lines are different (simple comparison)
+    countDifferentLines :: Array String -> Array String -> Int
+    countDifferentLines a b =
+      let
+        -- Compare line by line up to the shorter length
+        minLen = min (length a) (length b)
+        changedInCommon = foldl (\acc i ->
+          let
+            lineA = fromMaybe "" $ index a i
+            lineB = fromMaybe "" $ index b i
+          in if lineA /= lineB then acc + 1 else acc
+        ) 0 (0 .. (minLen - 1))
+      in
+        changedInCommon
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
 getVisibleTabs :: String -> Array String
@@ -476,6 +546,9 @@ render state =
 
     -- Results display (status and answer set output)
     , renderResult state
+
+    -- Timing history table (shows after any runs)
+    , renderTimingTable state.timingHistory
 
     -- File directory popup with tree view
     , renderFileDirectory state.showFileDirectory state.currentFile state.expandedDirs
@@ -814,6 +887,73 @@ renderResult state = case state.result of
               [ HH.text $ intercalate " " filteredAtoms ]
           ]
 
+-- | Render the timing history table
+-- | Shows a table with diff description, model limit, and timing for each run
+renderTimingTable :: forall m. Array TimingEntry -> H.ComponentHTML Action Slots m
+renderTimingTable entries =
+  if null entries
+    then HH.text ""  -- Don't render anything if no timing data
+    else
+      HH.div
+        [ HP.style "margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 4px; border: 1px solid #e0e0e0;" ]
+        [ HH.h3
+            [ HP.style "margin: 0 0 10px 0; color: #333; font-size: 14px;" ]
+            [ HH.text $ "Clingo Timing History (" <> show (length entries) <> " runs)" ]
+        , HH.div
+            [ HP.style "overflow-x: auto;" ]
+            [ HH.table
+                [ HP.style "width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace;" ]
+                [ HH.thead_
+                    [ HH.tr
+                        [ HP.style "background: #e8e8e8;" ]
+                        [ HH.th [ HP.style "padding: 8px; text-align: left; border-bottom: 2px solid #ccc;" ] [ HH.text "#" ]
+                        , HH.th [ HP.style "padding: 8px; text-align: left; border-bottom: 2px solid #ccc;" ] [ HH.text "Changes vs Original" ]
+                        , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Models" ]
+                        , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Solve (s)" ]
+                        , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Total (s)" ]
+                        ]
+                    ]
+                , HH.tbody_ $ map renderTimingRow entries
+                ]
+            ]
+        ]
+  where
+    renderTimingRow entry =
+      HH.tr
+        [ HP.style "border-bottom: 1px solid #e0e0e0;" ]
+        [ HH.td
+            [ HP.style "padding: 6px 8px; color: #666;" ]
+            [ HH.text $ show entry.runIndex ]
+        , HH.td
+            [ HP.style "padding: 6px 8px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+            , HP.title entry.diff  -- Full diff on hover
+            ]
+            [ HH.text entry.diff ]
+        , HH.td
+            [ HP.style "padding: 6px 8px; text-align: right;" ]
+            [ HH.text $ if entry.modelLimit == 0 then "all" else show entry.modelLimit ]
+        , HH.td
+            [ HP.style "padding: 6px 8px; text-align: right; color: #2196F3;" ]
+            [ HH.text $ formatTime entry.solveTime ]
+        , HH.td
+            [ HP.style "padding: 6px 8px; text-align: right; color: #4CAF50;" ]
+            [ HH.text $ formatTime entry.totalTime ]
+        ]
+
+    -- Format time in seconds with appropriate precision
+    formatTime :: Number -> String
+    formatTime t =
+      if t < 0.001
+        then "<0.001"
+        else if t < 0.01
+          then show (floorTo3 (t * 1000.0)) <> "ms"
+          else if t < 1.0
+            then show (floorTo3 t)
+            else show (floorTo2 t)
+      where
+        floorTo3 n = Int.toNumber (Int.floor (n * 1000.0)) / 1000.0
+        floorTo2 n = Int.toNumber (Int.floor (n * 100.0)) / 100.0
+
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
 renderPredicatePanel isVisible predicates =
@@ -1035,6 +1175,8 @@ handleAction = case _ of
     let numModels = case trim state.modelLimit of
           "" -> 5  -- Default to 5 models when field is empty
           s -> fromMaybe 5 $ Int.fromString s
+    -- Compute the diff description before running (for timing table)
+    let diffDesc = computeFileDiff state.files
     -- Build file resolver for #include directives using the virtual filesystem
     let resolver filename = Map.lookup filename state.files
     -- Get the current file's content (the entry point that #includes other files)
@@ -1044,18 +1186,47 @@ handleAction = case _ of
     -- This follows Clingo's behavior: try CWD first, then relative to including file
     let fullProgram = Clingo.resolveIncludesWithPath entryProgram entryFile resolver
     result <- H.liftAff $ Clingo.run fullProgram numModels
-    let display = case result of
+    -- Extract timing and display from result
+    let { display, timing } = case result of
           Clingo.Satisfiable res ->
-            ResultSuccess $ extractWitnesses res
+            { display: ResultSuccess $ extractWitnesses res
+            , timing: Just res."Time"
+            }
           Clingo.OptimumFound res ->
-            ResultSuccess $ extractWitnesses res
-          Clingo.Unsatisfiable _ ->
-            ResultUnsat
-          Clingo.Unknown _ ->
-            ResultError "Result unknown"
+            { display: ResultSuccess $ extractWitnesses res
+            , timing: Just res."Time"
+            }
+          Clingo.Unsatisfiable res ->
+            { display: ResultUnsat
+            , timing: Just res."Time"
+            }
+          Clingo.Unknown res ->
+            { display: ResultError "Result unknown"
+            , timing: Just res."Time"
+            }
           Clingo.Error err ->
-            ResultError err
-    H.modify_ \s -> s { isLoading = false, result = Just display }
+            { display: ResultError err
+            , timing: Nothing
+            }
+    -- Create timing entry if we have timing data
+    let newEntry = case timing of
+          Just t -> Just
+            { diff: diffDesc
+            , modelLimit: numModels
+            , totalTime: t."Total"
+            , solveTime: t."Solve"
+            , runIndex: state.nextRunIndex
+            }
+          Nothing -> Nothing
+    -- Update state with result and timing history
+    H.modify_ \s -> s
+      { isLoading = false
+      , result = Just display
+      , timingHistory = case newEntry of
+          Just entry -> snoc s.timingHistory entry
+          Nothing -> s.timingHistory
+      , nextRunIndex = s.nextRunIndex + 1
+      }
 
   CancelSolve -> do
     -- Restart the worker to cancel the current solve
