@@ -9,6 +9,7 @@ import Clingo as Clingo
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
+import EarlyParser as Early
 import FilterExpression as FE
 import TokenConstraints as TC
 import Data.Array (filter, fromFoldable, index, length, mapWithIndex, nub, null, slice, snoc, sort, sortBy, unsnoc)
@@ -212,6 +213,94 @@ getCurrentFileContent state = fromMaybe "" $ Map.lookup state.currentFile state.
 getSources :: State -> Array { name :: String, content :: String }
 getSources state = map (\path -> { name: path, content: fromMaybe "" $ Map.lookup path state.files }) availableFiles
 
+-- | Get atoms for the grimoire - either from answer set or early parsing
+-- | Returns a tuple of (atoms, isEarly) where isEarly indicates if using early parsing
+getGrimoireAtoms :: State -> { atoms :: Array String, isEarly :: Boolean, modelInfo :: String }
+getGrimoireAtoms state =
+  case state.result of
+    Just (ResultSuccess answerSets) ->
+      case index answerSets state.selectedModelIndex of
+        Just atoms ->
+          let totalCount = length answerSets
+              modelInfo = if totalCount > 1
+                then " (Model " <> show (state.selectedModelIndex + 1) <> " of " <> show totalCount <> ")"
+                else ""
+          in { atoms, isEarly: false, modelInfo }
+        Nothing ->
+          -- Selected index out of range, fall back to early parsing
+          { atoms: Early.extractFromFiles state.files, isEarly: true, modelInfo: "" }
+    _ ->
+      -- No result or error/unsat, use early parsing
+      { atoms: Early.extractFromFiles state.files, isEarly: true, modelInfo: "" }
+
+-- | Render the grimoire section (always visible, using early or answer set atoms)
+renderGrimoireSection :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
+renderGrimoireSection state =
+  let
+    grimoireData = getGrimoireAtoms state
+    hasAtoms = not (null grimoireData.atoms)
+    title = if grimoireData.isEarly
+      then "Grimoire (Preview)"
+      else "Timeline & Grimoire View" <> grimoireData.modelInfo
+    subtitle = if grimoireData.isEarly
+      then "Showing player setup from files. Run Clingo to see full game state."
+      else "Click on timeline events to highlight the corresponding atom in the answer set below."
+  in
+  HH.div
+    [ HP.style "margin-bottom: 20px;" ]
+    [ HH.h2
+        [ HP.style "color: #333; margin-bottom: 10px;" ]
+        [ HH.text title ]
+    , HH.p
+        [ HP.style $ "font-size: 12px; margin-bottom: 10px; font-style: italic; "
+            <> if grimoireData.isEarly then "color: #FF9800;" else "color: #666;"
+        ]
+        [ HH.text subtitle ]
+    -- Undo/Redo buttons (only show when we have answer sets)
+    , if not grimoireData.isEarly
+        then HH.div
+          [ HP.style "display: flex; gap: 10px; margin-bottom: 10px;" ]
+          [ HH.button
+              [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
+                  <> "background: " <> (if null state.undoStack then "#ccc" else "#FF9800") <> "; "
+                  <> "color: white; border: none; border-radius: 4px; "
+                  <> "display: flex; align-items: center; gap: 6px;"
+              , HE.onClick \_ -> Undo
+              , HP.disabled (null state.undoStack)
+              , HP.title $ if null state.undoStack then "Nothing to undo" else "Undo last token drag"
+              ]
+              [ HH.text "↩ Undo"
+              , if not (null state.undoStack)
+                then HH.span
+                  [ HP.style "font-size: 11px; opacity: 0.8;" ]
+                  [ HH.text $ "(" <> show (length state.undoStack) <> ")" ]
+                else HH.text ""
+              ]
+          , HH.button
+              [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
+                  <> "background: " <> (if null state.redoStack then "#ccc" else "#2196F3") <> "; "
+                  <> "color: white; border: none; border-radius: 4px; "
+                  <> "display: flex; align-items: center; gap: 6px;"
+              , HE.onClick \_ -> Redo
+              , HP.disabled (null state.redoStack)
+              , HP.title $ if null state.redoStack then "Nothing to redo" else "Redo last undone action"
+              ]
+              [ HH.text "↪ Redo"
+              , if not (null state.redoStack)
+                then HH.span
+                  [ HP.style "font-size: 11px; opacity: 0.8;" ]
+                  [ HH.text $ "(" <> show (length state.redoStack) <> ")" ]
+                else HH.text ""
+              ]
+          ]
+        else HH.text ""
+    , if hasAtoms
+        then HH.slot _timelineGrimoire unit TG.component grimoireData.atoms HandleTimelineEvent
+        else HH.div
+          [ HP.style "padding: 20px; background: #f5f5f5; border-radius: 4px; color: #666;" ]
+          [ HH.text "No player data found. Add chair/2 facts to players.lp to see the grimoire." ]
+    ]
+
 -- | Render the component
 render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
 render state =
@@ -336,7 +425,10 @@ render state =
             else HH.text ""
         ]
 
-    -- Results display
+    -- Grimoire section (always visible - uses early parsing or answer set)
+    , renderGrimoireSection state
+
+    -- Results display (status and answer set output)
     , renderResult state
 
     -- File directory popup with tree view
@@ -567,7 +659,6 @@ renderResult state = case state.result of
   Just (ResultSuccess answerSets) ->
     let
       selectedIdx = state.selectedModelIndex
-      selectedSet = index answerSets selectedIdx
       -- Pagination: only render a subset of answer sets to prevent browser crash
       totalCount = length answerSets
       pageStart = state.answerSetPage * answerSetPageSize
@@ -578,63 +669,8 @@ renderResult state = case state.result of
       hasPrevPage = state.answerSetPage > 0
       hasNextPage = pageEnd < totalCount
     in
-    HH.div_
-      [ -- Timeline and Grimoire view FIRST (for selected model)
-        case selectedSet of
-          Just atoms ->
-            HH.div
-              [ HP.style "margin-bottom: 20px;" ]
-              [ HH.h2
-                  [ HP.style "color: #333; margin-bottom: 10px;" ]
-                  [ HH.text $ "Timeline & Grimoire View"
-                      <> if totalCount > 1
-                         then " (Model " <> show (selectedIdx + 1) <> " of " <> show totalCount <> ")"
-                         else ""
-                  ]
-              , HH.p
-                  [ HP.style "font-size: 12px; color: #666; margin-bottom: 10px; font-style: italic;" ]
-                  [ HH.text "Click on timeline events to highlight the corresponding atom in the answer set below." ]
-              -- Undo/Redo buttons for token drag operations
-              , HH.div
-                  [ HP.style "display: flex; gap: 10px; margin-bottom: 10px;" ]
-                  [ HH.button
-                      [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
-                          <> "background: " <> (if null state.undoStack then "#ccc" else "#FF9800") <> "; "
-                          <> "color: white; border: none; border-radius: 4px; "
-                          <> "display: flex; align-items: center; gap: 6px;"
-                      , HE.onClick \_ -> Undo
-                      , HP.disabled (null state.undoStack)
-                      , HP.title $ if null state.undoStack then "Nothing to undo" else "Undo last token drag"
-                      ]
-                      [ HH.text "↩ Undo"
-                      , if not (null state.undoStack)
-                        then HH.span
-                          [ HP.style "font-size: 11px; opacity: 0.8;" ]
-                          [ HH.text $ "(" <> show (length state.undoStack) <> ")" ]
-                        else HH.text ""
-                      ]
-                  , HH.button
-                      [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
-                          <> "background: " <> (if null state.redoStack then "#ccc" else "#2196F3") <> "; "
-                          <> "color: white; border: none; border-radius: 4px; "
-                          <> "display: flex; align-items: center; gap: 6px;"
-                      , HE.onClick \_ -> Redo
-                      , HP.disabled (null state.redoStack)
-                      , HP.title $ if null state.redoStack then "Nothing to redo" else "Redo last undone action"
-                      ]
-                      [ HH.text "↪ Redo"
-                      , if not (null state.redoStack)
-                        then HH.span
-                          [ HP.style "font-size: 11px; opacity: 0.8;" ]
-                          [ HH.text $ "(" <> show (length state.redoStack) <> ")" ]
-                        else HH.text ""
-                      ]
-                  ]
-              , HH.slot _timelineGrimoire unit TG.component atoms HandleTimelineEvent
-              ]
-          Nothing -> HH.text ""
-      -- Output section SECOND (compact, scrollable)
-      , HH.div
+    -- Output section (grimoire is now rendered separately in renderGrimoireSection)
+    HH.div
           [ HP.style "padding: 15px; background: #e8f5e9; border-radius: 4px;" ]
           [ HH.strong
               [ HP.style "color: #2e7d32;" ]
@@ -698,7 +734,6 @@ renderResult state = case state.result of
               -- Render only the current page of answer sets (with correct global indices)
               [ HH.div_ $ mapWithIndex (\pageIdx atoms -> renderAnswerSet state.outputFilter selectedIdx (pageStart + pageIdx) atoms) pageItems ]
           ]
-      ]
     where
       renderAnswerSet filterExpr selectedIdx idx atoms =
         let
