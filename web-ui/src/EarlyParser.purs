@@ -33,6 +33,7 @@ extractFromFiles files =
 -- | Returns atoms in the same format as answer set output:
 -- | - game_chair(player, position)
 -- | - received(player, token)
+-- | - bag(role) - from assert_drawn(role) facts
 extractEarlyAtoms :: Maybe String -> Maybe String -> Array String
 extractEarlyAtoms playersContent instContent =
   let
@@ -42,8 +43,11 @@ extractEarlyAtoms playersContent instContent =
     receivedAtoms = case instContent of
       Just content -> parseReceivedFacts content
       Nothing -> []
+    bagAtoms = case instContent of
+      Just content -> parseAssertDrawnFacts content
+      Nothing -> []
   in
-    chairAtoms <> receivedAtoms
+    chairAtoms <> receivedAtoms <> bagAtoms
 
 -- | Parse chair/2 facts from players.lp content
 -- | Format: chair(player, position).
@@ -103,4 +107,33 @@ parseReceivedLine r line =
         Just (Just player), Just (Just token) ->
           Just $ "received(" <> player <> "," <> token <> ")"
         _, _ -> Nothing
+    Nothing -> Nothing
+
+-- | Parse assert_drawn(role) facts from inst.lp content
+-- | Returns bag(role) atoms so they display in pre-solve bag panel
+parseAssertDrawnFacts :: String -> Array String
+parseAssertDrawnFacts content =
+  let
+    -- Split into lines and parse each
+    contentLines = split (Pattern "\n") content
+    -- Filter out commented lines first
+    activeLines = filter (not <<< isCommentLine) contentLines
+    -- Match assert_drawn(role). pattern
+    assertDrawnRegex = hush $ regex """assert_drawn\s*\(\s*(\w+)\s*\)\s*\.""" noFlags
+  in
+    case assertDrawnRegex of
+      Just r -> mapMaybe (parseAssertDrawnLine r) activeLines
+      Nothing -> []
+
+-- | Parse a single line for assert_drawn(role) fact
+parseAssertDrawnLine :: Regex -> String -> Maybe String
+parseAssertDrawnLine r line =
+  case match r (trim line) of
+    Just groups ->
+      -- groups is NonEmptyArray: [fullMatch, role]
+      case NEA.index groups 1 of
+        Just (Just role) ->
+          -- Return as bag(role) so it shows in the bag panel
+          Just $ "bag(" <> role <> ")"
+        _ -> Nothing
     Nothing -> Nothing
