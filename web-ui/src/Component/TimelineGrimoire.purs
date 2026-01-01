@@ -878,11 +878,21 @@ renderReminderToken angleToCenter _total idx reminder =
     dist = baseDistance + (toNumber idx) * spacing
     rx = dist * cos angleToCenter
     ry = dist * sin angleToCenter
-  in
-    SE.g
-      [ SA.transform [ SA.Translate rx ry ] ]
-      [ -- Reminder circle - attach drag handler here (circles have geometry, receive events)
-        SE.circle
+    isPseudo = isPseudoReminder reminder.token
+    -- Shape element: circle for regular reminders, square for pseudo reminders
+    shapeElement = if isPseudo
+      then SE.rect
+          [ SA.x (-10.0)
+          , SA.y (-10.0)
+          , SA.width 20.0
+          , SA.height 20.0
+          , SA.fill (Named (getReminderColor reminder.token))
+          , SA.stroke (Named "#fff")
+          , SA.strokeWidth 1.0
+          , HP.style "cursor: grab;"
+          , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
+          ]
+      else SE.circle
           [ SA.cx 0.0
           , SA.cy 0.0
           , SA.r 12.0
@@ -892,7 +902,12 @@ renderReminderToken angleToCenter _total idx reminder =
           , HP.style "cursor: grab;"
           , HE.onMouseDown \evt -> StartDragReminderMouse { reminder, event: evt }
           ]
-      -- Reminder abbreviation - let clicks/touches pass through to circle
+  in
+    SE.g
+      [ SA.transform [ SA.Translate rx ry ] ]
+      [ -- Reminder shape - attach drag handler here (shapes have geometry, receive events)
+        shapeElement
+      -- Reminder abbreviation - let clicks/touches pass through to shape
       , SE.text
           [ SA.x 0.0
           , SA.y 3.0
@@ -1113,9 +1128,12 @@ renderHtmlReminderToken selectedTime reminder =
     timeStr = case selectedTime of
       Just t -> formatTimePoint t
       Nothing -> ""
+    isPseudo = isPseudoReminder reminder.token
+    -- Square (2px radius) for pseudo reminders, circle (50%) for regular
+    borderRadius = if isPseudo then "2px" else "50%"
   in
     HH.div
-      [ HP.style $ "width: 24px; height: 24px; border-radius: 50%; "
+      [ HP.style $ "width: 24px; height: 24px; border-radius: " <> borderRadius <> "; "
           <> "background: " <> getReminderColor reminder.token <> "; "
           <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
           <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
@@ -1194,6 +1212,11 @@ isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baro
 
 isDemon :: String -> Boolean
 isDemon r = r == "imp"
+
+-- | Check if a reminder token is a pseudo-reminder (not owned by any role)
+-- Pseudo reminders include execution day markers (ex_d1, ex_d2, etc.)
+isPseudoReminder :: String -> Boolean
+isPseudoReminder token = S.take 3 token == "ex_"
 
 -- | Map token prefix to the role it belongs to
 tokenToRole :: String -> String

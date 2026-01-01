@@ -175,15 +175,22 @@ function completeDrag(toPlayer) {
   dragState = null;
 }
 
+// Check if a token is a pseudo reminder (not owned by any role)
+function isPseudoReminder(token) {
+  return token && token.startsWith('ex_');
+}
+
 function createFloatingElement(state) {
   floatingElement = document.createElement('div');
+  // Use square (2px radius) for pseudo reminders, circle (50%) for regular
+  const borderRadius = isPseudoReminder(state.token) ? '2px' : '50%';
   floatingElement.style.cssText = `
     position: fixed;
     left: ${state.currentX - 14}px;
     top: ${state.currentY - 14}px;
     width: 28px;
     height: 28px;
-    border-radius: 50%;
+    border-radius: ${borderRadius};
     background: ${state.color};
     border: 2px solid #FFD700;
     display: flex;
