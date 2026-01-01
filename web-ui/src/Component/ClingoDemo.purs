@@ -247,12 +247,12 @@ getEarlyAtomsFiltered files =
     { atoms: filteredAtoms, isEarly: true, modelInfo: "" }
 
 -- | Check if an atom should be included based on player_count
--- | For game_chair(player, N), only include if N <= player_count
+-- | For game_chair(player, N), only include if N < player_count (0-indexed chairs)
 -- | All other atoms are included
 isAtomWithinPlayerCount :: Int -> String -> Boolean
 isAtomWithinPlayerCount maxPlayers atom =
   case parseChairPosition atom of
-    Just pos -> pos <= maxPlayers
+    Just pos -> pos < maxPlayers
     Nothing -> true  -- Non-chair atoms are always included
 
 -- | Parse the chair position from a game_chair(player, N) atom
