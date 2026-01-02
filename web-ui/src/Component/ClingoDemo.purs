@@ -304,7 +304,7 @@ getGrimoireAtoms state =
       getEarlyAtomsFiltered state.files
 
 -- | Get early atoms filtered by player_count
--- | Only includes game_chair atoms where chair position <= player_count
+-- | Only includes game_chair atoms where chair position < player_count (0-indexed)
 getEarlyAtomsFiltered :: Map.Map String String -> { atoms :: Array String, isEarly :: Boolean, modelInfo :: String }
 getEarlyAtomsFiltered files =
   let

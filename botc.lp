@@ -359,17 +359,21 @@ role(X) :- demon(X).
 reminder(poi_poisoned).
 
 % the legal baseline role distrbutions are:
+% 5 players => 1 demon, 1 minion, 0 outsiders, 3 townsfolk
+% 6 players => 1 demon, 1 minion, 1 outsider, 3 townsfolk
 % 7 players => 1 demon, 1 minion, 0 outsiders, 5 townsfolk
 
+base_townsfolk(3) :- 5 <= player_count <= 6.
 base_townsfolk(5) :- 7 <= player_count <= 9.
 base_townsfolk(7) :- 10 <= player_count <= 12.
 base_townsfolk(9) :- 13 <= player_count <= 15.
 
+base_outsider(player_count - 5) :- 5 <= player_count <= 6.
 base_outsider(player_count - 7) :- 7 <= player_count <= 9.
 base_outsider(player_count - 10) :- 10 <= player_count <= 12.
 base_outsider(player_count - 13) :- 13 <= player_count <= 15.
 
-base_minion(1) :-  7 <= player_count <= 9.
+base_minion(1) :-  5 <= player_count <= 9.
 base_minion(2) :- 10 <= player_count <= 12.
 base_minion(3) :- 13 <= player_count <= 15.
 
