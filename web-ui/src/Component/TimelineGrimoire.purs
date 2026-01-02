@@ -1570,6 +1570,8 @@ renderHollowGrid reminders selectedTime players positions cols rows =
   let
     -- Create a lookup from position to player
     positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
+    -- Debug: show what positions we have
+    positionStrs = map (\p -> "(" <> show p.row <> "," <> show p.col <> ")") positions
     -- Generate all grid cells
     allCells = do
       r <- 0 .. (rows - 1)
@@ -1577,17 +1579,37 @@ renderHollowGrid reminders selectedTime players positions cols rows =
       pure { row: r, col: c }
     -- For each cell, either render a player or empty/center cell
     renderCell cell =
-      case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
-        Just { player } -> renderHtmlPlayer reminders selectedTime player
+      let
+        foundPlayer = Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers
+        cellDebug = "cell(" <> show cell.row <> "," <> show cell.col <> ")"
+      in case foundPlayer of
+        Just { player } ->
+          HH.div
+            [ HP.attr (HH.AttrName "data-cell") cellDebug
+            , HP.attr (HH.AttrName "data-player") player.name
+            ]
+            [ renderHtmlPlayer reminders selectedTime player ]
         Nothing ->
           -- Empty center cell
           if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
             then HH.div
-              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;" ]
+              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;"
+              , HP.attr (HH.AttrName "data-cell") cellDebug
+              , HP.attr (HH.AttrName "data-empty") "center"
+              ]
               []
-            else HH.div [] []  -- Edge position with no player (shouldn't happen normally)
+            else HH.div
+              [ HP.attr (HH.AttrName "data-cell") cellDebug
+              , HP.attr (HH.AttrName "data-empty") "edge"
+              , HP.style "min-height: 20px; background: rgba(255,0,0,0.1);"  -- Debug: highlight empty edge cells
+              ]
+              [ HH.text $ "empty:" <> cellDebug ]  -- Debug: show which cells are empty
   in
-    map renderCell allCells
+    -- Add positions debug before cells
+    [ HH.div
+        [ HP.style "font-size: 9px; color: #999; margin-bottom: 4px;" ]
+        [ HH.text $ "Positions: " <> intercalate " " positionStrs ]
+    ] <> map renderCell allCells
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
