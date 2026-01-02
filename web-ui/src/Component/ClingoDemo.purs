@@ -1035,6 +1035,29 @@ renderDiffModal (Just entry) =
     ]
   where
     renderFileDiff diff =
+      let
+        -- Build content-addressed sets: all unique line contents from each side
+        originalSet = Set.fromFoldable diff.originalLines
+        currentSet = Set.fromFoldable diff.currentLines
+        -- A line is "unique" to its side if it doesn't appear anywhere on the other side
+        isUniqueToOriginal line = not (Set.member line currentSet)
+        isUniqueToCurrent line = not (Set.member line originalSet)
+        -- Render a single line with optional highlighting
+        renderLine isUnique line =
+          HH.div
+            [ HP.style $ if isUnique line
+                then "background: #ffcdd2; padding: 0 4px; margin: 0 -4px;"  -- Red highlight for removed
+                else ""
+            ]
+            [ HH.text line ]
+        renderLineGreen isUnique line =
+          HH.div
+            [ HP.style $ if isUnique line
+                then "background: #c8e6c9; padding: 0 4px; margin: 0 -4px;"  -- Green highlight for added
+                else ""
+            ]
+            [ HH.text line ]
+      in
       HH.div
         [ HP.style "margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;" ]
         [ -- File header
@@ -1052,10 +1075,7 @@ renderDiffModal (Just entry) =
                     [ HH.text "Original" ]
                 , HH.div
                     [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #fff5f5;" ]
-                    [ HH.pre
-                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
-                        [ HH.text $ intercalate "\n" diff.originalLines ]
-                    ]
+                    (map (renderLine isUniqueToOriginal) diff.originalLines)
                 ]
             -- Current column
             , HH.div
@@ -1065,10 +1085,7 @@ renderDiffModal (Just entry) =
                     [ HH.text "Current" ]
                 , HH.div
                     [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #f5fff5;" ]
-                    [ HH.pre
-                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
-                        [ HH.text $ intercalate "\n" diff.currentLines ]
-                    ]
+                    (map (renderLineGreen isUniqueToCurrent) diff.currentLines)
                 ]
             ]
         ]
