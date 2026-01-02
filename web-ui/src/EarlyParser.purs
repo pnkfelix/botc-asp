@@ -4,6 +4,7 @@ module EarlyParser
   ( extractEarlyAtoms
   , extractFromFiles
   , extractPlayerCount
+  , parsePlayerCount
   ) where
 
 import Prelude
