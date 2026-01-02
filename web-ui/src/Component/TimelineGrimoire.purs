@@ -1032,7 +1032,9 @@ renderHtmlGrimoire state =
     cols = gridDims.cols
     rows = gridDims.rows
     -- Assign players to perimeter positions (clockwise from top-left)
-    playerPositions = assignPerimeterPositions playerCount cols rows
+    -- Using debug version to diagnose position generation
+    positionResult = assignPerimeterPositionsDebug playerCount cols rows
+    playerPositions = positionResult.positions
     -- Debug info for diagnosing grid issues
     positionCount = length playerPositions
     playerNames = map _.name gameState.players
@@ -1048,6 +1050,9 @@ renderHtmlGrimoire state =
           [ HH.text debugInfo
           , HH.text $ " | Players: " <> intercalate ", " playerNames
           ]
+      , HH.div
+          [ HP.style "font-size: 9px; color: #333; margin-bottom: 8px; padding: 4px; background: #ffe0e0; border-radius: 4px; word-break: break-all;" ]
+          [ HH.text $ "Position calc: " <> positionResult.debug ]
       , -- Player grid with hollow center
         -- Note: JS handles all drag events via pointer events on document
         HH.div
@@ -1544,18 +1549,58 @@ calculateGridDimensions n
 
 -- | Assign grid positions to players around the perimeter (clockwise from top-left)
 -- Returns array of {row, col} for each player index
+-- DEBUG VERSION: Also returns debug strings for each component
 assignPerimeterPositions :: Int -> Int -> Int -> Array { row :: Int, col :: Int }
 assignPerimeterPositions playerCount cols rows =
   let
     -- Walk around the perimeter: top row (left to right), right column (top to bottom),
     -- bottom row (right to left), left column (bottom to top)
-    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
-    rightCol = map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
-    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
-    leftCol = map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
+    topRowIndices = 0 .. (cols - 1)
+    topRow = map (\c -> { row: 0, col: c }) topRowIndices
+
+    rightColIndices = 1 .. (rows - 2)
+    rightCol = map (\r -> { row: r, col: cols - 1 }) rightColIndices
+
+    bottomRowIndices = Array.reverse (0 .. (cols - 1))
+    bottomRow = map (\c -> { row: rows - 1, col: c }) bottomRowIndices
+
+    leftColIndices = Array.reverse (1 .. (rows - 2))
+    leftCol = map (\r -> { row: r, col: 0 }) leftColIndices
+
     allPositions = topRow <> rightCol <> bottomRow <> leftCol
   in
     take playerCount allPositions
+
+-- | Debug version that returns component info
+assignPerimeterPositionsDebug :: Int -> Int -> Int -> { positions :: Array { row :: Int, col :: Int }, debug :: String }
+assignPerimeterPositionsDebug playerCount cols rows =
+  let
+    topRowIndices = 0 .. (cols - 1)
+    topRow = map (\c -> { row: 0, col: c }) topRowIndices
+
+    rightColIndices = 1 .. (rows - 2)
+    rightCol = map (\r -> { row: r, col: cols - 1 }) rightColIndices
+
+    bottomRowIndices = Array.reverse (0 .. (cols - 1))
+    bottomRow = map (\c -> { row: rows - 1, col: c }) bottomRowIndices
+
+    leftColIndices = Array.reverse (1 .. (rows - 2))
+    leftCol = map (\r -> { row: r, col: 0 }) leftColIndices
+
+    allPositions = topRow <> rightCol <> bottomRow <> leftCol
+
+    showIndices arr = "[" <> intercalate "," (map show arr) <> "]"
+    showPos p = "(" <> show p.row <> "," <> show p.col <> ")"
+    showPosArr arr = "[" <> intercalate "," (map showPos arr) <> "]"
+
+    debugStr = "cols=" <> show cols <> " rows=" <> show rows
+            <> " | topIdx=" <> showIndices topRowIndices
+            <> " | bottomIdx=" <> showIndices bottomRowIndices
+            <> " | topRow=" <> showPosArr topRow
+            <> " | bottomRow=" <> showPosArr bottomRow
+            <> " | all=" <> showPosArr allPositions
+  in
+    { positions: take playerCount allPositions, debug: debugStr }
 
 -- | Render the hollow grid with players on perimeter and empty center
 renderHollowGrid :: forall cs m.
