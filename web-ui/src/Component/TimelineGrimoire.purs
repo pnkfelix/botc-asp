@@ -1032,28 +1032,11 @@ renderHtmlGrimoire state =
     cols = gridDims.cols
     rows = gridDims.rows
     -- Assign players to perimeter positions (clockwise from top-left)
-    -- Using debug version to diagnose position generation
-    positionResult = assignPerimeterPositionsDebug playerCount cols rows
-    playerPositions = positionResult.positions
-    -- Debug info for diagnosing grid issues
-    positionCount = length playerPositions
-    playerNames = map _.name gameState.players
-    debugInfo = "Grid debug: " <> show playerCount <> " players, "
-             <> show cols <> "x" <> show rows <> " grid, "
-             <> show positionCount <> " positions"
+    playerPositions = assignPerimeterPositions playerCount cols rows
   in
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 15px;" ]
-      [ -- Debug panel (temporary - can be removed once issue is fixed)
-        HH.div
-          [ HP.style "font-size: 10px; color: #666; margin-bottom: 8px; padding: 4px; background: #e0e0e0; border-radius: 4px;" ]
-          [ HH.text debugInfo
-          , HH.text $ " | Players: " <> intercalate ", " playerNames
-          ]
-      , HH.div
-          [ HP.style "font-size: 9px; color: #333; margin-bottom: 8px; padding: 4px; background: #ffe0e0; border-radius: 4px; word-break: break-all;" ]
-          [ HH.text $ "Position calc: " <> positionResult.debug ]
-      , -- Player grid with hollow center
+      [ -- Player grid with hollow center
         -- Note: JS handles all drag events via pointer events on document
         HH.div
           [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
@@ -1576,40 +1559,6 @@ assignPerimeterPositions playerCount cols rows =
   in
     take playerCount allPositions
 
--- | Debug version that returns component info
-assignPerimeterPositionsDebug :: Int -> Int -> Int -> { positions :: Array { row :: Int, col :: Int }, debug :: String }
-assignPerimeterPositionsDebug playerCount cols rows =
-  let
-    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
-
-    -- Right column: rows 1 to (rows-2), i.e., middle rows only (excludes corners)
-    -- For a 2-row grid, this should be empty (no middle rows)
-    rightCol = if rows <= 2
-               then []
-               else map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
-
-    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
-
-    -- Left column: rows (rows-2) down to 1, i.e., middle rows only (excludes corners)
-    -- For a 2-row grid, this should be empty (no middle rows)
-    leftCol = if rows <= 2
-              then []
-              else map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
-
-    allPositions = topRow <> rightCol <> bottomRow <> leftCol
-
-    showPos p = "(" <> show p.row <> "," <> show p.col <> ")"
-    showPosArr arr = "[" <> intercalate "," (map showPos arr) <> "]"
-
-    debugStr = "cols=" <> show cols <> " rows=" <> show rows
-            <> " | topRow=" <> showPosArr topRow
-            <> " | rightCol=" <> showPosArr rightCol
-            <> " | bottomRow=" <> showPosArr bottomRow
-            <> " | leftCol=" <> showPosArr leftCol
-            <> " | all=" <> showPosArr allPositions
-  in
-    { positions: take playerCount allPositions, debug: debugStr }
-
 -- | Render the hollow grid with players on perimeter and empty center
 renderHollowGrid :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
@@ -1623,8 +1572,6 @@ renderHollowGrid reminders selectedTime players positions cols rows =
   let
     -- Create a lookup from position to player
     positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
-    -- Debug: show what positions we have
-    positionStrs = map (\p -> "(" <> show p.row <> "," <> show p.col <> ")") positions
     -- Generate all grid cells
     allCells = do
       r <- 0 .. (rows - 1)
@@ -1632,37 +1579,17 @@ renderHollowGrid reminders selectedTime players positions cols rows =
       pure { row: r, col: c }
     -- For each cell, either render a player or empty/center cell
     renderCell cell =
-      let
-        foundPlayer = Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers
-        cellDebug = "cell(" <> show cell.row <> "," <> show cell.col <> ")"
-      in case foundPlayer of
-        Just { player } ->
-          HH.div
-            [ HP.attr (HH.AttrName "data-cell") cellDebug
-            , HP.attr (HH.AttrName "data-player") player.name
-            ]
-            [ renderHtmlPlayer reminders selectedTime player ]
+      case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
+        Just { player } -> renderHtmlPlayer reminders selectedTime player
         Nothing ->
-          -- Empty center cell
+          -- Empty center cell or edge position with no player
           if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
             then HH.div
-              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;"
-              , HP.attr (HH.AttrName "data-cell") cellDebug
-              , HP.attr (HH.AttrName "data-empty") "center"
-              ]
+              [ HP.style "background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 60px;" ]
               []
-            else HH.div
-              [ HP.attr (HH.AttrName "data-cell") cellDebug
-              , HP.attr (HH.AttrName "data-empty") "edge"
-              , HP.style "min-height: 20px; background: rgba(255,0,0,0.1);"  -- Debug: highlight empty edge cells
-              ]
-              [ HH.text $ "empty:" <> cellDebug ]  -- Debug: show which cells are empty
+            else HH.div [] []  -- Edge position with no player
   in
-    -- Add positions debug before cells
-    [ HH.div
-        [ HP.style "font-size: 9px; color: #999; margin-bottom: 4px;" ]
-        [ HH.text $ "Positions: " <> intercalate " " positionStrs ]
-    ] <> map renderCell allCells
+    map renderCell allCells
 
 -- | Find the closest player to a given screen position
 findClosestPlayer :: forall r.
