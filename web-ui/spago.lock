@@ -20,7 +20,9 @@
             "prelude",
             "strings",
             "tuples",
-            "web-html"
+            "web-html",
+            "web-pointerevents",
+            "web-touchevents"
           ],
           "build_plan": [
             "aff",
