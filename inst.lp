@@ -18,8 +18,7 @@ needs_night(3).
 % received(rob, washerwoman).
 
 % Town executes exactly one living player at the end of each day
-% (unless the game has already ended at the start of this day)
-{ executed(P, N) : alive(P, day(N, 0)) } = 1 :- day_number(N), not game_over(day(N, 0)).
+{ executed(P, N) : alive(P, day(N, 0)) } = 1 :- day_number(N).
 
 % ===========================================================================
 % House rules: Discourage unrealistic but technically legal states
