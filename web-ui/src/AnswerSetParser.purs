@@ -35,6 +35,7 @@ data Atom
   | Died String TimePoint               -- d_died(player, time) - player dies at this time (mechanical)
   | DeathAnnounced String TimePoint     -- d_death_announced(player, time) - death publicly announced
   | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
+  | GameOver TimePoint String           -- d_game_over(time, winner) - game ends at time, winner is "good" or "evil"
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
@@ -74,6 +75,7 @@ atomCategory = case _ of
   Executed _ _          -> EventPredicate
   Died _ _              -> EventPredicate
   DeathAnnounced _ _    -> EventPredicate
+  GameOver _ _          -> EventPredicate
   -- State predicates: ongoing state, not events
   -- Note: reminder_on(token,player,time) represents accumulated state
   -- ("reminder is on player at time"), not the action of placing it.
@@ -183,6 +185,11 @@ data TimelineEvent
       , player :: String
       , sourceAtom :: String
       }
+  | GameOverEvent
+      { time :: TimePoint
+      , winner :: String  -- "good" or "evil"
+      , sourceAtom :: String
+      }
 
 derive instance eqTimelineEvent :: Eq TimelineEvent
 
@@ -210,6 +217,7 @@ parseAtom atomStr =
       parseDied trimmed <|>
       parseDeathAnnounced trimmed <|>
       parseGhostVoteUsed trimmed <|>
+      parseGameOver trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
       parseChair trimmed <|>
@@ -355,6 +363,19 @@ parseGhostVoteUsed s = do
     Just { before: player, after: timeStr } ->
       Just $ GhostVoteUsed (trim player) (parseTime (trim timeStr))
     Nothing -> Nothing
+
+-- | Parse d_game_over(Time, Winner)
+parseGameOver :: String -> Maybe Atom
+parseGameOver s =
+  let pattern = "d_game_over("
+  in if take (length pattern) s == pattern
+     then
+       let rest = drop (length pattern) (take (length s - 1) s)
+       in case parseTimeAndRest rest of
+            Just { time, rest: winner } ->
+              Just $ GameOver time (trim winner)
+            Nothing -> Nothing
+     else Nothing
 
 -- | Parse time(TimePoint)
 parseTimeAtom :: String -> Maybe Atom
@@ -747,8 +768,10 @@ extractTimelineWithSources parsedAtoms =
     -- Death events for non-execution deaths (imp kills, slayer, etc.)
     -- Execution deaths are already shown as Execution events, so filter those out
     deathEvents = mapMaybe toDeathEvent parsedAtoms
+    -- Game over events
+    gameOverEvents = mapMaybe toGameOverEvent parsedAtoms
   in
-    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents)
+    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents <> gameOverEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
       Just $ RoleAction { time, role, eventType: "d_st_tells", player, message, sourceAtom: original }
@@ -774,6 +797,11 @@ extractTimelineWithSources parsedAtoms =
         Day _ "exec" -> Nothing  -- Skip execution deaths, already shown as Execution
         _ -> Just $ Death { time, player, sourceAtom: original }
     toDeathEvent _ = Nothing
+
+    -- Convert GameOver to GameOverEvent
+    toGameOverEvent { atom: GameOver time winner, original } =
+      Just $ GameOverEvent { time, winner, sourceAtom: original }
+    toGameOverEvent _ = Nothing
 
     -- Filter TokenPlaced events to only keep the earliest occurrence of each token+player
     filterNewTokenPlacements :: Array TimelineEvent -> Array TimelineEvent
@@ -805,6 +833,7 @@ extractTimelineWithSources parsedAtoms =
       RoleAction r1, RoleAction r2 -> compareTimePoints r1.time r2.time
       TokenPlaced r1, TokenPlaced r2 -> compareTimePoints r1.time r2.time
       Death d1, Death d2 -> compareTimePoints d1.time d2.time
+      GameOverEvent g1, GameOverEvent g2 -> compareTimePoints g1.time g2.time
       RoleAction r1, TokenPlaced r2 -> compareTimePoints r1.time r2.time
       TokenPlaced r1, RoleAction r2 -> compareTimePoints r1.time r2.time
       RoleAction r, Death d -> compareTimePoints r.time d.time
@@ -818,6 +847,15 @@ extractTimelineWithSources parsedAtoms =
       TokenPlaced t, Execution e -> compare t.time (Day e.day "exec")
       Execution e, Death d -> compare (Day e.day "exec") d.time
       Death d, Execution e -> compare d.time (Day e.day "exec")
+      -- GameOverEvent comparisons
+      GameOverEvent g, RoleAction r -> compareTimePoints g.time r.time
+      RoleAction r, GameOverEvent g -> compareTimePoints r.time g.time
+      GameOverEvent g, TokenPlaced t -> compareTimePoints g.time t.time
+      TokenPlaced t, GameOverEvent g -> compareTimePoints t.time g.time
+      GameOverEvent g, Death d -> compareTimePoints g.time d.time
+      Death d, GameOverEvent g -> compareTimePoints d.time g.time
+      GameOverEvent g, Execution e -> compare g.time (Day e.day "exec")
+      Execution e, GameOverEvent g -> compare (Day e.day "exec") g.time
 
 -- | Get state at a specific time point
 getStateAtTime :: Array Atom -> TimePoint -> GameState
@@ -835,6 +873,7 @@ atomToPredicateName = case _ of
   Died _ _               -> { name: "d_died", arity: 2 }
   DeathAnnounced _ _     -> { name: "d_death_announced", arity: 2 }
   GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
+  GameOver _ _           -> { name: "d_game_over", arity: 2 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }

@@ -4,12 +4,15 @@ other_night_substep(imp, 1, st_asks(choose_target)).
 other_night_substep(imp, 2, player_chooses(kill_target)).
 other_night_substep(imp, 3, st_places(imp_dead)).
 
+% Imp chooses a target each night (nights after the first)
+% Only if: game is still active at night start, and Imp is alive
 { player_chooses(imp, Imp, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
     current_demon(Imp, N),
-    alive(Imp, night(N, 0, 0)).
+    alive(Imp, night(N, 0, 0)),
+    game_active(night(N, 0, 0)).
 
 % House rule: Imp cannot target itself if all minions are dead
 :- player_chooses(imp, Imp, point(Imp), night(N, RoleOrd, 2)),

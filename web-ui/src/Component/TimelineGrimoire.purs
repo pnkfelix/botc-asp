@@ -619,8 +619,10 @@ eventAtTime :: ASP.TimePoint -> ASP.TimelineEvent -> Boolean
 eventAtTime t (ASP.RoleAction r) = r.time == t
 eventAtTime t (ASP.TokenPlaced r) = r.time == t
 eventAtTime t (ASP.Death d) = d.time == t
+eventAtTime t (ASP.GameOverEvent g) = g.time == t
 eventAtTime (ASP.Day d _) (ASP.Execution e) = e.day == d  -- Executions appear under their day
 eventAtTime _ (ASP.Execution _) = false
+eventAtTime _ (ASP.GameOverEvent _) = false
 
 -- | Render a single event (clickable for navigation)
 renderEvent :: forall cs m. ASP.TimelineEvent -> H.ComponentHTML Action cs m
@@ -667,6 +669,17 @@ renderEvent event =
         , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.text $ r.player <> " died" ]
+    ASP.GameOverEvent r ->
+      HH.div
+        [ HP.style $ "font-size: 14px; margin: 8px 0; font-weight: bold; cursor: pointer; "
+            <> "padding: 8px 12px; border-radius: 6px; transition: background-color 0.2s; "
+            <> "background: " <> (if r.winner == "good" then "#e8f5e9" else "#ffebee") <> "; "
+            <> "color: " <> (if r.winner == "good" then "#2e7d32" else "#c62828") <> "; "
+            <> "border: 2px solid " <> (if r.winner == "good" then "#4caf50" else "#f44336") <> ";"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to highlight this atom in the answer set"
+        ]
+        [ HH.text $ "🏆 GAME OVER - " <> (if r.winner == "good" then "Good" else "Evil") <> " wins!" ]
 
 -- | Render the grimoire (players in a circle)
 renderGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
@@ -1417,6 +1430,11 @@ handleAction = case _ of
           ASP.Death r ->
             { sourceAtom: r.sourceAtom
             , predicateName: "d_died"
+            , predicateArity: 2
+            }
+          ASP.GameOverEvent r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "d_game_over"
             , predicateArity: 2
             }
     -- Emit the output event
