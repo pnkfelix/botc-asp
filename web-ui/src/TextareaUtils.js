@@ -191,6 +191,146 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// Syntax highlighting for ASP/LP code
+// Returns HTML with span elements for syntax highlighting
+export const highlightLPImpl = (code) => () => {
+  const lines = code.split('\n');
+  const highlightedLines = lines.map(line => highlightLine(line));
+  return highlightedLines.join('\n');
+};
+
+// Highlight a single line of LP code
+function highlightLine(line) {
+  // First, find if there's a comment (% not inside quotes)
+  let commentStart = -1;
+  let inString = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' && (i === 0 || line[i-1] !== '\\')) {
+      inString = !inString;
+    } else if (char === '%' && !inString) {
+      commentStart = i;
+      break;
+    }
+  }
+
+  let codePart = commentStart >= 0 ? line.substring(0, commentStart) : line;
+  let commentPart = commentStart >= 0 ? line.substring(commentStart) : '';
+
+  // Highlight the code part
+  let highlighted = highlightCodePart(codePart);
+
+  // Add comment with highlighting
+  if (commentPart) {
+    highlighted += '<span class="lp-comment">' + escapeHtml(commentPart) + '</span>';
+  }
+
+  return highlighted;
+}
+
+// Highlight non-comment code
+function highlightCodePart(code) {
+  if (!code) return '';
+
+  // Tokenize and highlight
+  // Order matters: we process in a way that avoids double-highlighting
+  let result = '';
+  let i = 0;
+
+  while (i < code.length) {
+    // Check for string literals
+    if (code[i] === '"') {
+      let end = i + 1;
+      while (end < code.length && (code[end] !== '"' || code[end-1] === '\\')) {
+        end++;
+      }
+      if (end < code.length) end++; // include closing quote
+      result += '<span class="lp-string">' + escapeHtml(code.substring(i, end)) + '</span>';
+      i = end;
+      continue;
+    }
+
+    // Check for directives (#include, #const, etc.)
+    if (code[i] === '#') {
+      const match = code.substring(i).match(/^#[a-z_]+/);
+      if (match) {
+        result += '<span class="lp-directive">' + escapeHtml(match[0]) + '</span>';
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    // Check for rule operators
+    if (code.substring(i, i + 2) === ':-') {
+      result += '<span class="lp-keyword">' + ':-' + '</span>';
+      i += 2;
+      continue;
+    }
+    if (code.substring(i, i + 2) === ':~') {
+      result += '<span class="lp-keyword">' + ':~' + '</span>';
+      i += 2;
+      continue;
+    }
+
+    // Check for word-based tokens (keywords and variables)
+    const wordMatch = code.substring(i).match(/^[A-Za-z_][A-Za-z0-9_]*/);
+    if (wordMatch) {
+      const word = wordMatch[0];
+      if (word === 'not') {
+        result += '<span class="lp-keyword">' + escapeHtml(word) + '</span>';
+      } else if (/^[A-Z_]/.test(word)) {
+        // Variable: starts with uppercase or underscore
+        result += '<span class="lp-variable">' + escapeHtml(word) + '</span>';
+      } else {
+        // Regular predicate/atom
+        result += escapeHtml(word);
+      }
+      i += word.length;
+      continue;
+    }
+
+    // Default: escape and add the character
+    result += escapeHtml(code[i]);
+    i++;
+  }
+
+  return result;
+}
+
+// Synchronize scroll position from textarea to highlight overlay
+export const syncScrollImpl = (textareaId) => (overlayId) => () => {
+  const textarea = document.getElementById(textareaId);
+  const overlay = document.getElementById(overlayId);
+  if (textarea && overlay) {
+    overlay.scrollTop = textarea.scrollTop;
+    overlay.scrollLeft = textarea.scrollLeft;
+  }
+};
+
+// Update the syntax highlight overlay with highlighted HTML
+// Also sets up scroll synchronization if not already done
+export const updateHighlightOverlayImpl = (textareaId) => (overlayId) => (code) => () => {
+  const overlay = document.getElementById(overlayId);
+  const textarea = document.getElementById(textareaId);
+  if (!overlay) return;
+
+  // Generate highlighted HTML
+  const lines = code.split('\n');
+  const highlightedLines = lines.map(line => highlightLine(line));
+  // Add an extra newline at the end to match textarea scrolling behavior
+  overlay.innerHTML = highlightedLines.join('\n') + '\n';
+
+  // Set up scroll sync if not already done
+  if (textarea && !textarea.dataset.scrollSyncSetup) {
+    textarea.dataset.scrollSyncSetup = 'true';
+    textarea.addEventListener('scroll', () => {
+      overlay.scrollTop = textarea.scrollTop;
+      overlay.scrollLeft = textarea.scrollLeft;
+    });
+  }
+};
+
 // Detect if the cursor is on an #include directive and return the file path
 // Returns null if not on an include, or the file path string if found
 export const getIncludeAtCursorImpl = (elementId) => () => {

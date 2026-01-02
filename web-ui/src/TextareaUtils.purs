@@ -4,6 +4,9 @@ module TextareaUtils
   , scrollToText
   , scrollToTextInChild
   , getIncludeAtCursor
+  , highlightLP
+  , syncScroll
+  , updateHighlightOverlay
   ) where
 
 import Prelude
@@ -47,3 +50,25 @@ foreign import getIncludeAtCursorImpl :: String -> Effect (Nullable String)
 
 getIncludeAtCursor :: String -> Effect (Maybe String)
 getIncludeAtCursor elementId = toMaybe <$> getIncludeAtCursorImpl elementId
+
+-- | Apply syntax highlighting to LP/ASP code
+-- | Returns HTML string with span elements for different token types
+foreign import highlightLPImpl :: String -> Effect String
+
+highlightLP :: String -> Effect String
+highlightLP = highlightLPImpl
+
+-- | Synchronize scroll position from textarea to overlay element
+-- | Takes textarea ID and overlay ID
+foreign import syncScrollImpl :: String -> String -> Effect Unit
+
+syncScroll :: String -> String -> Effect Unit
+syncScroll = syncScrollImpl
+
+-- | Update the syntax highlight overlay with highlighted code
+-- | Takes textarea ID, overlay ID, and the code content
+-- | Also sets up scroll synchronization
+foreign import updateHighlightOverlayImpl :: String -> String -> String -> Effect Unit
+
+updateHighlightOverlay :: String -> String -> String -> Effect Unit
+updateHighlightOverlay = updateHighlightOverlayImpl

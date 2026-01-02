@@ -529,16 +529,33 @@ render state =
           HH.div
             [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;" ]
             (map (renderFileTab state.currentFile) (getVisibleTabs state.currentFile))
-        , -- Editor textarea
-          HH.textarea
-            [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
-                <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
-                <> "resize: vertical; overflow: auto;"
-            , HP.id "editor-textarea"
-            , HP.value currentContent
-            , HE.onValueInput SetFileContent
-            , HE.onClick \_ -> TextareaClicked
-            , HP.disabled state.isLoading
+        , -- Editor container with syntax highlighting overlay
+          HH.div
+            [ HP.style "position: relative;" ]
+            [ -- Syntax highlight overlay (behind textarea)
+              HH.pre
+                [ HP.id "editor-highlight-overlay"
+                , HP.style $ "position: absolute; top: 0; left: 0; right: 0; bottom: 0; "
+                    <> "margin: 0; padding: 10px; border: 1px solid transparent; "
+                    <> "font-family: monospace; font-size: 12px; line-height: inherit; "
+                    <> "overflow: auto; pointer-events: none; white-space: pre-wrap; "
+                    <> "word-wrap: break-word; color: #333; background: white; "
+                    <> "border-radius: 4px;"
+                ]
+                [ HH.text "" ]  -- Content set via JS
+            , -- Editor textarea (transparent text, on top)
+              HH.textarea
+                [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
+                    <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
+                    <> "resize: vertical; overflow: auto; position: relative; "
+                    <> "background: transparent; color: transparent; caret-color: black; "
+                    <> "-webkit-text-fill-color: transparent;"
+                , HP.id "editor-textarea"
+                , HP.value currentContent
+                , HE.onValueInput SetFileContent
+                , HE.onClick \_ -> TextareaClicked
+                , HP.disabled state.isLoading
+                ]
             ]
         ]
 
@@ -1326,9 +1343,17 @@ handleAction = case _ of
           in s { files = updatedFiles, isInitialized = true }
       Nothing ->
         H.modify_ \s -> s { isInitialized = true }
+    -- Initialize syntax highlighting for the initial file
+    state <- H.get
+    let content = fromMaybe "" $ Map.lookup state.currentFile state.files
+    liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" content
 
   SelectFile fileName -> do
     H.modify_ \s -> s { currentFile = fileName, showFileDirectory = false }
+    -- Update syntax highlighting for the newly selected file
+    state <- H.get
+    let content = fromMaybe "" $ Map.lookup state.currentFile state.files
+    liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" content
 
   SetFileContent content -> do
     state <- H.get
@@ -1338,6 +1363,8 @@ handleAction = case _ of
       case parsePlayerCount content of
         Just n -> liftEffect $ UP.setUrlParam "player_count" (show n)
         Nothing -> pure unit
+    -- Update syntax highlighting as content changes
+    liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" content
 
   ToggleFileDirectory ->
     H.modify_ \s -> s { showFileDirectory = not s.showFileDirectory }
