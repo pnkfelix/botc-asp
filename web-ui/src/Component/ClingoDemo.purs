@@ -538,7 +538,7 @@ render state =
                 , HP.style $ "position: absolute; top: 0; left: 0; right: 0; bottom: 0; "
                     <> "margin: 0; padding: 10px; border: 1px solid transparent; "
                     <> "font-family: monospace; font-size: 12px; line-height: inherit; "
-                    <> "overflow: auto; pointer-events: none; white-space: pre-wrap; "
+                    <> "overflow: hidden; pointer-events: none; white-space: pre-wrap; "
                     <> "word-wrap: break-word; color: #333; background: white; "
                     <> "border-radius: 4px;"
                 ]

@@ -321,6 +321,13 @@ export const updateHighlightOverlayImpl = (textareaId) => (overlayId) => (code) 
   // Add an extra newline at the end to match textarea scrolling behavior
   overlay.innerHTML = highlightedLines.join('\n') + '\n';
 
+  // Sync scroll position immediately after updating content
+  // This is critical because innerHTML update can reset scroll position
+  if (textarea) {
+    overlay.scrollTop = textarea.scrollTop;
+    overlay.scrollLeft = textarea.scrollLeft;
+  }
+
   // Set up scroll sync if not already done
   if (textarea && !textarea.dataset.scrollSyncSetup) {
     textarea.dataset.scrollSyncSetup = 'true';
