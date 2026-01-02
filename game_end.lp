@@ -56,6 +56,28 @@ game_over(T) :- evil_wins(T).
 % Game over propagates forward through next (for any remaining time points)
 game_over(T2) :- game_over(T1), next(T1, T2).
 
+% Game over also propagates based on day number comparison
+% This is needed because 'next' is conditional on game_over, which could break propagation
+% Evil wins at day(N, 0): game ends immediately, affects rest of day N and all later times
+game_over(day(N, exec)) :- evil_wins(day(N, 0)).
+game_over(night(N2, _, _)) :- evil_wins(day(N, 0)), night_number(N2), N2 > N.
+game_over(dawn(N2)) :- evil_wins(day(N, 0)), day_number(N2), N2 > N.
+game_over(day(N2, _)) :- evil_wins(day(N, 0)), day_number(N2), N2 > N.
+
+% Good wins at day(N, exec): game ends at execution, affects all times after day N
+game_over(night(N2, _, _)) :- good_wins(day(N, exec)), night_number(N2), N2 > N.
+game_over(dawn(N2)) :- good_wins(day(N, exec)), day_number(N2), N2 > N.
+game_over(day(N2, _)) :- good_wins(day(N, exec)), day_number(N2), N2 > N.
+
+% ---------------------------------------------------------------------------
+% Game Over Event (delta predicate for timeline rendering)
+% ---------------------------------------------------------------------------
+
+% d_game_over/2 is an explicit event marking when the game ends
+% Format: d_game_over(Time, Winner) where Winner is 'good' or 'evil'
+d_game_over(T, good) :- good_wins(T).
+d_game_over(T, evil) :- evil_wins(T).
+
 % ---------------------------------------------------------------------------
 % Convenience predicates for UI/debugging
 % ---------------------------------------------------------------------------
