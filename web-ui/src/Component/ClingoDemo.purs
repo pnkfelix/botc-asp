@@ -1537,13 +1537,18 @@ handleAction = case _ of
           let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
           -- Check if dropping onto the bag (special target)
           if toPlayer == "__bag__" then do
-            -- Dropping onto the bag: add assert_drawn or assert_distrib
-            -- Roles marked never_in_bag (like drunk) should use assert_distrib instead
+            -- Dropping onto the bag: add bag/1 fact or assert_distrib
+            -- Roles marked never_in_bag (like drunk) must use assert_distrib because
+            -- they can't appear in bag/1 (excluded by choice rule condition).
+            -- For normal roles, we directly state bag(role) as a fact rather than
+            -- using assert_drawn(role) - this is an optimization since the role is
+            -- already in the choice set, so we're selecting from existing possibilities
+            -- rather than introducing new constraints.
             let neverInBagRoles = ["drunk", "marionette"]  -- Roles that can't be physically in the bag
             let isNeverInBag = elem role neverInBagRoles
             let newConstraint = if isNeverInBag
                   then "assert_distrib(" <> role <> ")."
-                  else "assert_drawn(" <> role <> ")."
+                  else "bag(" <> role <> ")."
             let undoEntry = { instLpContent: instContent
                             , description: "Add " <> role <> " to bag"
                             }
