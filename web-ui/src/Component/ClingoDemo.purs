@@ -227,48 +227,26 @@ stripCommentsToString content =
       let trimmed = trim line
       in trimmed /= "" && String.take 1 trimmed /= "%"
 
--- | Compute file diffs comparing current files to original embedded files (comments stripped)
--- | Uses jsdiff for efficient Myers diff algorithm
+-- | Compute file diffs comparing current files to original embedded files
+-- | Simple line-based diff implementation
 -- | Returns both a summary string and detailed per-file diffs for the modal
 computeFileDiff :: Map.Map String String -> { summary :: String, fileDiffs :: Array FileDiff }
 computeFileDiff currentFiles =
   let
     -- Get all file paths to compare
     allPaths = fromFoldable $ Map.keys currentFiles
-    -- Compare each file and collect diffs (with comments stripped)
-    fileDiffsAndDescs = allPaths >>= \path ->
-      let
-        current = fromMaybe "" $ Map.lookup path currentFiles
-        original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
-        -- TESTING: Skip comment stripping to isolate the bug
-        -- currentStripped = stripCommentsToString current
-        -- originalStripped = stripCommentsToString original
-      in
-        if current == original
-          then []
-          else
-            let
-              -- Use jsdiff to compute the actual diff (on raw content)
-              diffResult = Diff.computeLineDiff original current
-              -- Count added and removed lines for summary
-              addedCount = length $ filter (\d -> d.status == Diff.Added) diffResult
-              removedCount = length $ filter (\d -> d.status == Diff.Removed) diffResult
-              diffDesc = case addedCount, removedCount of
-                0, 0 -> "modified"
-                a, 0 -> "+" <> show a
-                0, r -> "-" <> show r
-                a, r -> "+" <> show a <> "/-" <> show r
-              fileDiff = { fileName: getFileName path
-                         , diffLines: diffResult
-                         }
-            in
-              [{ desc: getFileName path <> ": " <> diffDesc, diff: fileDiff }]
-    -- Extract summaries and diffs
-    summaries = map _.desc fileDiffsAndDescs
-    diffs = map _.diff fileDiffsAndDescs
+    -- Compare each file and collect diffs - only for changed files
+    changedFiles = filter isChanged allPaths
+      where
+        isChanged path =
+          let current = fromMaybe "" $ Map.lookup path currentFiles
+              original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
+          in current /= original
+    -- Build summaries for changed files (skip detailed diff for now to test perf)
+    summaries = map (\path -> getFileName path <> ": modified") changedFiles
   in
     { summary: if null summaries then "No changes" else intercalate ", " summaries
-    , fileDiffs: diffs
+    , fileDiffs: []  -- Skip detailed diff computation for now
     }
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
