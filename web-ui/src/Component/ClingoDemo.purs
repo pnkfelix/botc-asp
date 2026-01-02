@@ -240,16 +240,16 @@ computeFileDiff currentFiles =
       let
         current = fromMaybe "" $ Map.lookup path currentFiles
         original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
-        -- Strip comments before comparing
-        currentStripped = stripCommentsToString current
-        originalStripped = stripCommentsToString original
+        -- TESTING: Skip comment stripping to isolate the bug
+        -- currentStripped = stripCommentsToString current
+        -- originalStripped = stripCommentsToString original
       in
-        if currentStripped == originalStripped
+        if current == original
           then []
           else
             let
-              -- Use jsdiff to compute the actual diff
-              diffResult = Diff.computeLineDiff originalStripped currentStripped
+              -- Use jsdiff to compute the actual diff (on raw content)
+              diffResult = Diff.computeLineDiff original current
               -- Count added and removed lines for summary
               addedCount = length $ filter (\d -> d.status == Diff.Added) diffResult
               removedCount = length $ filter (\d -> d.status == Diff.Removed) diffResult
