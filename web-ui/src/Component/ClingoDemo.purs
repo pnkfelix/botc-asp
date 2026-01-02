@@ -6,7 +6,6 @@ import AnswerSetParser as AnswerSet
 import AspParser as ASP
 import BuildInfo as BI
 import Clingo as Clingo
-import Diff as Diff
 import Data.Map as Map
 import Data.Set as Set
 import Component.TimelineGrimoire as TG
@@ -45,10 +44,11 @@ type UndoEntry =
   , description :: String     -- Human-readable description of the change
   }
 
--- | A single file's diff (comment-stripped comparison using jsdiff)
+-- | A single file's diff (comment-stripped comparison)
 type FileDiff =
-  { fileName :: String              -- Name of the file that changed
-  , diffLines :: Array Diff.DiffLine  -- Computed diff lines with status
+  { fileName :: String         -- Name of the file that changed
+  , originalLines :: Array String  -- Original lines (comments stripped)
+  , currentLines :: Array String   -- Current lines (comments stripped)
   }
 
 -- | An entry in the timing history table
@@ -213,22 +213,20 @@ initialState =
 
 -- | Strip ASP comments from a string (lines starting with %)
 -- | Also strips empty lines and trims whitespace
--- | Returns the stripped content as a single string (with newlines)
-stripCommentsToString :: String -> String
-stripCommentsToString content =
+stripComments :: String -> Array String
+stripComments content =
   let
     allLines = split (Pattern "\n") content
     -- Filter out comment lines and empty lines, trim whitespace
     nonCommentLines = filter isNonComment allLines
   in
-    intercalate "\n" (map trim nonCommentLines)
+    map trim nonCommentLines
   where
     isNonComment line =
       let trimmed = trim line
       in trimmed /= "" && String.take 1 trimmed /= "%"
 
 -- | Compute file diffs comparing current files to original embedded files (comments stripped)
--- | Uses jsdiff for efficient Myers diff algorithm
 -- | Returns both a summary string and detailed per-file diffs for the modal
 computeFileDiff :: Map.Map String String -> { summary :: String, fileDiffs :: Array FileDiff }
 computeFileDiff currentFiles =
@@ -241,25 +239,30 @@ computeFileDiff currentFiles =
         current = fromMaybe "" $ Map.lookup path currentFiles
         original = fromMaybe "" $ Map.lookup path EP.lpFilesMap
         -- Strip comments before comparing
-        currentStripped = stripCommentsToString current
-        originalStripped = stripCommentsToString original
+        currentStripped = stripComments current
+        originalStripped = stripComments original
       in
         if currentStripped == originalStripped
           then []
           else
             let
-              -- Use jsdiff to compute the actual diff
-              diffResult = Diff.computeLineDiff originalStripped currentStripped
-              -- Count added and removed lines for summary
-              addedCount = length $ filter (\d -> d.status == Diff.Added) diffResult
-              removedCount = length $ filter (\d -> d.status == Diff.Removed) diffResult
-              diffDesc = case addedCount, removedCount of
-                0, 0 -> "modified"
-                a, 0 -> "+" <> show a
-                0, r -> "-" <> show r
-                a, r -> "+" <> show a <> "/-" <> show r
+              currentLen = length currentStripped
+              originalLen = length originalStripped
+              -- Simple line count difference
+              added = if currentLen > originalLen then currentLen - originalLen else 0
+              removed = if originalLen > currentLen then originalLen - currentLen else 0
+              -- Count lines that differ
+              changedCount = countDifferentLines currentStripped originalStripped
+              diffDesc = if added > 0 && removed > 0
+                then "+" <> show added <> "/-" <> show removed
+                else if added > 0
+                  then "+" <> show added
+                  else if removed > 0
+                    then "-" <> show removed
+                    else show changedCount <> " changed"
               fileDiff = { fileName: getFileName path
-                         , diffLines: diffResult
+                         , originalLines: originalStripped
+                         , currentLines: currentStripped
                          }
             in
               [{ desc: getFileName path <> ": " <> diffDesc, diff: fileDiff }]
@@ -270,6 +273,21 @@ computeFileDiff currentFiles =
     { summary: if null summaries then "No changes" else intercalate ", " summaries
     , fileDiffs: diffs
     }
+  where
+    -- Count how many lines are different (simple comparison)
+    countDifferentLines :: Array String -> Array String -> Int
+    countDifferentLines a b =
+      let
+        -- Compare line by line up to the shorter length
+        minLen = min (length a) (length b)
+        changedInCommon = foldl (\acc i ->
+          let
+            lineA = fromMaybe "" $ index a i
+            lineB = fromMaybe "" $ index b i
+          in if lineA /= lineB then acc + 1 else acc
+        ) 0 (0 .. (minLen - 1))
+      in
+        changedInCommon
 
 -- | Get files to show in tabs: root files + current file if it's in a subdirectory
 getVisibleTabs :: String -> Array String
@@ -1031,37 +1049,44 @@ renderDiffModal (Just entry) =
         ]
     ]
   where
-    renderFileDiff fileDiff =
+    renderFileDiff diff =
       HH.div
         [ HP.style "margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;" ]
         [ -- File header
           HH.div
             [ HP.style "padding: 8px 12px; background: #f0f0f0; font-weight: bold; font-family: monospace; font-size: 13px; border-bottom: 1px solid #ddd;" ]
-            [ HH.text fileDiff.fileName ]
-        -- Unified diff view with colored lines
+            [ HH.text diff.fileName ]
+        -- Two-column diff view
         , HH.div
-            [ HP.style "max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px;" ]
-            [ HH.div_ $ map renderDiffLine fileDiff.diffLines ]
+            [ HP.style "display: flex; font-family: monospace; font-size: 11px;" ]
+            [ -- Original column
+              HH.div
+                [ HP.style "flex: 1; border-right: 1px solid #ddd;" ]
+                [ HH.div
+                    [ HP.style "padding: 4px 8px; background: #ffebee; font-weight: bold; font-size: 10px; color: #c62828;" ]
+                    [ HH.text "Original" ]
+                , HH.div
+                    [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #fff5f5;" ]
+                    [ HH.pre
+                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
+                        [ HH.text $ intercalate "\n" diff.originalLines ]
+                    ]
+                ]
+            -- Current column
+            , HH.div
+                [ HP.style "flex: 1;" ]
+                [ HH.div
+                    [ HP.style "padding: 4px 8px; background: #e8f5e9; font-weight: bold; font-size: 10px; color: #2e7d32;" ]
+                    [ HH.text "Current" ]
+                , HH.div
+                    [ HP.style "padding: 8px; max-height: 300px; overflow-y: auto; background: #f5fff5;" ]
+                    [ HH.pre
+                        [ HP.style "margin: 0; white-space: pre-wrap; word-break: break-all;" ]
+                        [ HH.text $ intercalate "\n" diff.currentLines ]
+                    ]
+                ]
+            ]
         ]
-
-    renderDiffLine :: Diff.DiffLine -> H.ComponentHTML Action Slots m
-    renderDiffLine diffLine =
-      let
-        { prefix, bgColor, textColor } = case diffLine.status of
-          Diff.Added -> { prefix: "+ ", bgColor: "#e6ffec", textColor: "#22863a" }
-          Diff.Removed -> { prefix: "- ", bgColor: "#ffebe9", textColor: "#cb2431" }
-          Diff.Unchanged -> { prefix: "  ", bgColor: "transparent", textColor: "#24292e" }
-      in
-        HH.div
-          [ HP.style $ "padding: 2px 8px; background: " <> bgColor <> "; color: " <> textColor <> "; "
-              <> "white-space: pre-wrap; word-break: break-all; border-left: 3px solid "
-              <> (case diffLine.status of
-                    Diff.Added -> "#28a745"
-                    Diff.Removed -> "#d73a49"
-                    Diff.Unchanged -> "transparent")
-              <> ";"
-          ]
-          [ HH.text $ prefix <> diffLine.line ]
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
