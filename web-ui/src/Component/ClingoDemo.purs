@@ -1284,8 +1284,9 @@ handleAction = case _ of
     let numModels = case trim state.modelLimit of
           "" -> 5  -- Default to 5 models when field is empty
           s -> fromMaybe 5 $ Int.fromString s
-    -- Compute the diff description before running (for timing table)
-    let diffResult = computeFileDiff state.files
+    -- DISABLED: Diff computation was causing hangs
+    -- let diffResult = computeFileDiff state.files
+    let diffResult = { summary: "Diff disabled", fileDiffs: [] }
     -- Build file resolver for #include directives using the virtual filesystem
     let resolver filename = Map.lookup filename state.files
     -- Get the current file's content (the entry point that #includes other files)
