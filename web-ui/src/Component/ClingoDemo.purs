@@ -30,6 +30,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import TextareaUtils as TU
 import Type.Proxy (Proxy(..))
+import UrlParams as UP
 
 -- | Child slots for embedded components
 type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
@@ -187,6 +188,22 @@ resolveIncludePath currentDir includePath files =
       in if Map.member relativePath files
            then relativePath
            else includePath  -- Return original path even if not found
+
+-- | Update player_count in inst.lp content
+-- | Replaces the line "#const player_count = N." with the new value
+updatePlayerCount :: Int -> String -> String
+updatePlayerCount newCount content =
+  let
+    contentLines = split (Pattern "\n") content
+    updatedLines = map updateLine contentLines
+  in
+    intercalate "\n" updatedLines
+  where
+    updateLine line =
+      let trimmed = trim line
+      in if String.take 20 trimmed == "#const player_count "
+           then "#const player_count = " <> show newCount <> "."
+           else line
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -1295,7 +1312,19 @@ handleAction = case _ of
   Initialize -> do
     -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
     H.liftAff $ Clingo.init "./clingo.wasm"
-    H.modify_ \s -> s { isInitialized = true }
+    -- Check for player_count URL parameter and update inst.lp if present
+    maybePlayerCount <- liftEffect $ UP.getUrlParam "player_count"
+    case maybePlayerCount >>= Int.fromString of
+      Just n -> do
+        -- Update inst.lp with the new player_count
+        H.modify_ \s ->
+          let
+            instContent = fromMaybe "" $ Map.lookup "inst.lp" s.files
+            updatedContent = updatePlayerCount n instContent
+            updatedFiles = Map.insert "inst.lp" updatedContent s.files
+          in s { files = updatedFiles, isInitialized = true }
+      Nothing ->
+        H.modify_ \s -> s { isInitialized = true }
 
   SelectFile fileName -> do
     H.modify_ \s -> s { currentFile = fileName, showFileDirectory = false }
