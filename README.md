@@ -138,8 +138,6 @@ npm run dev         # Watch mode with live reload
 
 6. **Modular role definitions**: Each role is defined in its own file under `roles/`, making it easy to understand, test, and extend individual role mechanics.
 
-7. **UI actions select, not create**: Drag-and-drop operations introduce constraints on what states are legal, but never introduce new states that were previously considered impossible. For roles already in the choice set (non-never-in-bag roles), the UI can directly state facts like `bag(role).` as an optimization. For special roles like Drunk that require indirect reasoning, the UI uses assertion predicates that constrain the solver.
-
 ## ASP Concepts
 
 **Answer Set Programming** is a declarative programming paradigm where you:

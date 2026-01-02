@@ -249,34 +249,6 @@ View specific run:
 curl -s "https://api.github.com/repos/pnkfelix/botc-asp/actions/runs/<run_id>/jobs"
 ```
 
-## UI Drag-and-Drop Design Principle
-
-**Core principle**: UI drag-and-drop actions can introduce constraints on what states are legal, but will never introduce new states that were previously considered impossible.
-
-This means the UI selects from existing possibilities in the ASP choice sets, rather than creating arbitrary new facts.
-
-### Optimization: Direct Facts vs Assertions
-
-For roles that are already in a choice set (like most roles in the `bag/1` choice rule), the UI can directly state facts:
-- `bag(chef).` - directly asserts chef is in the bag
-
-For roles with special conditions (like `never_in_bag` roles), the UI must use assertion predicates:
-- `assert_distrib(drunk).` - constrains solver to make `distrib(drunk)` true
-
-The direct fact approach is an optimization because:
-1. It provides the same semantic result (role ends up in bag)
-2. The solver can fix the atom during grounding rather than deriving it via constraint propagation
-3. It's conceptually cleaner—the UI is stating what IS true, not what MUST become true
-
-### Implementation (ClingoDemo.purs)
-
-When dropping a role onto the bag:
-```purescript
-let newConstraint = if isNeverInBag
-      then "assert_distrib(" <> role <> ")."  -- Must use assertion
-      else "bag(" <> role <> ")."              -- Direct fact (optimized)
-```
-
 ## Known Limitations
 
 - Clingo WASM is large (~2MB); initial page load may be slow
