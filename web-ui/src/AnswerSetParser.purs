@@ -133,7 +133,7 @@ instance ordTimePoint :: Ord TimePoint where
   compare (Dawn d) (Day n _p) =
     if d <= n then LT else GT
   compare (Day n _p) (Dawn d) =
-    if n <= d then GT else LT
+    if n < d then LT else GT
   -- Night vs Day interleaving (Night N < Dawn N < Day N)
   compare (Night n _r _s) (Day d _p) =
     -- Night n comes before Day n (and Dawn n), but after Day (n-1)
