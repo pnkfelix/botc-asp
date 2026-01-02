@@ -58,16 +58,18 @@ game_over(T2) :- game_over(T1), next(T1, T2).
 
 % Game over also propagates based on day number comparison
 % This is needed because 'next' is conditional on game_over, which could break propagation
+% We use time(T) to ground T, then extract the day number via unification
+
 % Evil wins at day(N, 0): game ends immediately, affects rest of day N and all later times
 game_over(day(N, exec)) :- evil_wins(day(N, 0)).
-game_over(night(N2, _, _)) :- evil_wins(day(N, 0)), night_number(N2), N2 > N.
-game_over(dawn(N2)) :- evil_wins(day(N, 0)), day_number(N2), N2 > N.
-game_over(day(N2, _)) :- evil_wins(day(N, 0)), day_number(N2), N2 > N.
+game_over(T) :- evil_wins(day(N, 0)), time(T), T = night(N2, R, S), N2 > N.
+game_over(T) :- evil_wins(day(N, 0)), time(T), T = dawn(N2), N2 > N.
+game_over(T) :- evil_wins(day(N, 0)), time(T), T = day(N2, P), N2 > N.
 
 % Good wins at day(N, exec): game ends at execution, affects all times after day N
-game_over(night(N2, _, _)) :- good_wins(day(N, exec)), night_number(N2), N2 > N.
-game_over(dawn(N2)) :- good_wins(day(N, exec)), day_number(N2), N2 > N.
-game_over(day(N2, _)) :- good_wins(day(N, exec)), day_number(N2), N2 > N.
+game_over(T) :- good_wins(day(N, exec)), time(T), T = night(N2, R, S), N2 > N.
+game_over(T) :- good_wins(day(N, exec)), time(T), T = dawn(N2), N2 > N.
+game_over(T) :- good_wins(day(N, exec)), time(T), T = day(N2, P), N2 > N.
 
 % ---------------------------------------------------------------------------
 % Game Over Event (delta predicate for timeline rendering)
