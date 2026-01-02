@@ -10,7 +10,7 @@ export const initImpl = (wasmUrl) => () => {
 };
 
 export const runImpl = (program) => (numModels) => () =>
-  clingo.run(program, numModels, ["--opt-mode=optN"]);
+  clingo.run(program, numModels);
 
 export const restartImpl = (wasmUrl) => () => {
   // Terminate the worker and re-initialize
