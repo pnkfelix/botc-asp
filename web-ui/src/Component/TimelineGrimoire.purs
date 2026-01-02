@@ -179,6 +179,7 @@ getAllTimePoints atoms =
     getTimePointFromAtom (ASP.PlayerChooses _ _ _ t) = Just t
     getTimePointFromAtom (ASP.ActingRole t _) = Just t
     getTimePointFromAtom (ASP.Executed _ d) = Just (ASP.Day d "exec")  -- Executions happen during day
+    getTimePointFromAtom (ASP.GameOver t _) = Just t  -- Game over at start of day (evil) or exec (good)
     getTimePointFromAtom _ = Nothing
 
 -- | Find the original source string for an atom matching a given time point
