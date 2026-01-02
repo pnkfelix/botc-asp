@@ -1043,6 +1043,13 @@ renderDiffModal (Just entry) =
         ]
     ]
   where
+    -- Format model count for modal display: "actual/max" with "+" if more exist
+    formatModalModelCount :: TimingEntry -> String
+    formatModalModelCount e =
+      let actual = show e.actualModelCount <> (if e.moreModels then "+" else "")
+          maxStr = if e.modelLimit == 0 then "all" else show e.modelLimit
+      in actual <> "/" <> maxStr
+
     renderFileDiff diff =
       let
         -- Build content-addressed sets: all unique line contents from each side
@@ -1098,13 +1105,6 @@ renderDiffModal (Just entry) =
                 ]
             ]
         ]
-  where
-    -- Format model count for modal display: "actual/max" with "+" if more exist
-    formatModalModelCount :: TimingEntry -> String
-    formatModalModelCount e =
-      let actual = show e.actualModelCount <> (if e.moreModels then "+" else "")
-          maxStr = if e.modelLimit == 0 then "all" else show e.modelLimit
-      in actual <> "/" <> maxStr
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
