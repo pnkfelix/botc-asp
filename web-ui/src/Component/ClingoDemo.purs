@@ -52,11 +52,13 @@ type FileDiff =
   }
 
 -- | An entry in the timing history table
--- Tracks clingo run times along with what changed and the model limit
+-- Tracks clingo run times along with what changed and model count info
 type TimingEntry =
   { diffSummary :: String        -- Brief description of what changed
   , fileDiffs :: Array FileDiff  -- Detailed per-file diffs for modal
-  , modelLimit :: Int            -- Number of models requested
+  , modelLimit :: Int            -- Max models requested (0 = all)
+  , actualModelCount :: Int      -- Actual number of models found
+  , moreModels :: Boolean        -- True if there were more models than returned
   , totalTime :: Number          -- Total solve time in seconds
   , solveTime :: Number          -- Just the solve time in seconds
   , runIndex :: Int              -- Sequential index of this run (for uniqueness)
@@ -935,7 +937,7 @@ renderTimingTable entries =
                         [ HP.style "background: #e8e8e8;" ]
                         [ HH.th [ HP.style "padding: 8px; text-align: left; border-bottom: 2px solid #ccc;" ] [ HH.text "#" ]
                         , HH.th [ HP.style "padding: 8px; text-align: left; border-bottom: 2px solid #ccc;" ] [ HH.text "Changes vs Original" ]
-                        , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Models" ]
+                        , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Models (found/max)" ]
                         , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Solve (s)" ]
                         , HH.th [ HP.style "padding: 8px; text-align: right; border-bottom: 2px solid #ccc;" ] [ HH.text "Total (s)" ]
                         ]
@@ -960,7 +962,7 @@ renderTimingTable entries =
             [ HH.text entry.diffSummary ]
         , HH.td
             [ HP.style "padding: 6px 8px; text-align: right;" ]
-            [ HH.text $ if entry.modelLimit == 0 then "all" else show entry.modelLimit ]
+            [ HH.text $ formatModelCount entry ]
         , HH.td
             [ HP.style "padding: 6px 8px; text-align: right; color: #2196F3;" ]
             [ HH.text $ formatTime entry.solveTime ]
@@ -968,6 +970,13 @@ renderTimingTable entries =
             [ HP.style "padding: 6px 8px; text-align: right; color: #4CAF50;" ]
             [ HH.text $ formatTime entry.totalTime ]
         ]
+
+    -- Format model count as "actual/max" with "+" if more models exist
+    formatModelCount :: TimingEntry -> String
+    formatModelCount e =
+      let actual = show e.actualModelCount <> (if e.moreModels then "+" else "")
+          maxStr = if e.modelLimit == 0 then "all" else show e.modelLimit
+      in actual <> "/" <> maxStr
 
     -- Format time in seconds with appropriate precision
     formatTime :: Number -> String
@@ -1008,7 +1017,7 @@ renderDiffModal (Just entry) =
                 [ HH.strong_ [ HH.text $ "Run #" <> show entry.runIndex <> " - Diff Details" ]
                 , HH.div
                     [ HP.style "font-size: 12px; opacity: 0.9; margin-top: 4px;" ]
-                    [ HH.text $ entry.diffSummary <> " | Models: " <> (if entry.modelLimit == 0 then "all" else show entry.modelLimit)
+                    [ HH.text $ entry.diffSummary <> " | Models: " <> formatModalModelCount entry
                         <> " | Time: " <> show entry.totalTime <> "s"
                     ]
                 ]
@@ -1089,6 +1098,13 @@ renderDiffModal (Just entry) =
                 ]
             ]
         ]
+  where
+    -- Format model count for modal display: "actual/max" with "+" if more exist
+    formatModalModelCount :: TimingEntry -> String
+    formatModalModelCount e =
+      let actual = show e.actualModelCount <> (if e.moreModels then "+" else "")
+          maxStr = if e.modelLimit == 0 then "all" else show e.modelLimit
+      in actual <> "/" <> maxStr
 
 -- | Render the predicate list panel (slide-in from right) with backdrop
 renderPredicatePanel :: forall m. Boolean -> Array ASP.Predicate -> H.ComponentHTML Action Slots m
@@ -1322,39 +1338,46 @@ handleAction = case _ of
     -- This follows Clingo's behavior: try CWD first, then relative to including file
     let fullProgram = Clingo.resolveIncludesWithPath entryProgram entryFile resolver
     result <- H.liftAff $ Clingo.run fullProgram numModels
-    -- Extract timing and display from result
-    let { display, timing } = case result of
+    -- Extract timing, model info, and display from result
+    let { display, timing, modelInfo } = case result of
           Clingo.Satisfiable res ->
             { display: ResultSuccess $ extractWitnesses res
             , timing: Just res."Time"
+            , modelInfo: Just { count: res."Models"."Number", more: res."Models"."More" == "yes" }
             }
           Clingo.OptimumFound res ->
             { display: ResultSuccess $ extractWitnesses res
             , timing: Just res."Time"
+            , modelInfo: Just { count: res."Models"."Number", more: res."Models"."More" == "yes" }
             }
           Clingo.Unsatisfiable res ->
             { display: ResultUnsat
             , timing: Just res."Time"
+            , modelInfo: Just { count: 0, more: false }
             }
           Clingo.Unknown res ->
             { display: ResultError "Result unknown"
             , timing: Just res."Time"
+            , modelInfo: Just { count: res."Models"."Number", more: res."Models"."More" == "yes" }
             }
           Clingo.Error err ->
             { display: ResultError err
             , timing: Nothing
+            , modelInfo: Nothing
             }
     -- Create timing entry if we have timing data
-    let newEntry = case timing of
-          Just t -> Just
+    let newEntry = case timing, modelInfo of
+          Just t, Just m -> Just
             { diffSummary: diffResult.summary
             , fileDiffs: diffResult.fileDiffs
             , modelLimit: numModels
+            , actualModelCount: m.count
+            , moreModels: m.more
             , totalTime: t."Total"
             , solveTime: t."Solve"
             , runIndex: state.nextRunIndex
             }
-          Nothing -> Nothing
+          _, _ -> Nothing
     -- Update state with result and timing history
     H.modify_ \s -> s
       { isLoading = false
