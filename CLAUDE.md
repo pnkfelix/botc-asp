@@ -154,6 +154,22 @@ npm run dev         # Watch + rebuild on changes (NOT available in CCR!)
 - `sat_*.lp` - Test that SHOULD be satisfiable (valid scenario)
 - `unsat_*.lp` - Test that SHOULD be unsatisfiable (invalid scenario)
 
+### ASP Coding Conventions
+
+**Variable Safety:** All variables in a rule head must appear positively in the body (be "safe"). This is a common source of errors.
+
+```asp
+% BAD - anonymous variables in head are "unsafe":
+game_over(night(N2, _, _)) :- evil_wins(day(N, 0)), night_number(N2), N2 > N.
+% Error: unsafe variables '#Anon0', '#Anon1'
+
+% GOOD - use named variables grounded through time(T):
+game_over(T) :- evil_wins(day(N, 0)), time(T), T = night(N2, R, S), N2 > N.
+% T is grounded by time(T), unification binds N2, R, S
+```
+
+**Key principle:** If you need to match a term structure in the head but don't care about some components, use `time(T)` to ground T first, then unify to extract components with named variables.
+
 ### PureScript/JavaScript FFI Pattern
 Each FFI module has a pair of files:
 - `ModuleName.purs` - PureScript interface with `foreign import`
