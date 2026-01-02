@@ -1707,8 +1707,10 @@ handleAction = case _ of
     -- Navigate to the included file
     H.modify_ \s -> s { currentFile = targetPath, navigateIncludeTarget = Nothing }
 
-  CancelNavigateToInclude ->
+  CancelNavigateToInclude -> do
     H.modify_ \s -> s { navigateIncludeTarget = Nothing }
+    -- Refocus the textarea so cursor position is preserved
+    liftEffect $ TU.focusTextarea "editor-textarea"
 
   ShowTimingDiff entry ->
     H.modify_ \s -> s { selectedTimingEntry = Just entry }
