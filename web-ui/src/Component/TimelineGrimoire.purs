@@ -1549,23 +1549,28 @@ calculateGridDimensions n
 
 -- | Assign grid positions to players around the perimeter (clockwise from top-left)
 -- Returns array of {row, col} for each player index
--- DEBUG VERSION: Also returns debug strings for each component
+-- Note: PureScript's `..` operator returns descending range when start > end (e.g., 1..0 = [1,0]),
+-- so we must guard against that for rightCol/leftCol which should be empty for small grids.
 assignPerimeterPositions :: Int -> Int -> Int -> Array { row :: Int, col :: Int }
 assignPerimeterPositions playerCount cols rows =
   let
     -- Walk around the perimeter: top row (left to right), right column (top to bottom),
     -- bottom row (right to left), left column (bottom to top)
-    topRowIndices = 0 .. (cols - 1)
-    topRow = map (\c -> { row: 0, col: c }) topRowIndices
+    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
 
-    rightColIndices = 1 .. (rows - 2)
-    rightCol = map (\r -> { row: r, col: cols - 1 }) rightColIndices
+    -- Right column: rows 1 to (rows-2), i.e., middle rows only (excludes corners)
+    -- For a 2-row grid, this should be empty (no middle rows)
+    rightCol = if rows <= 2
+               then []
+               else map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
 
-    bottomRowIndices = Array.reverse (0 .. (cols - 1))
-    bottomRow = map (\c -> { row: rows - 1, col: c }) bottomRowIndices
+    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
 
-    leftColIndices = Array.reverse (1 .. (rows - 2))
-    leftCol = map (\r -> { row: r, col: 0 }) leftColIndices
+    -- Left column: rows (rows-2) down to 1, i.e., middle rows only (excludes corners)
+    -- For a 2-row grid, this should be empty (no middle rows)
+    leftCol = if rows <= 2
+              then []
+              else map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
 
     allPositions = topRow <> rightCol <> bottomRow <> leftCol
   in
@@ -1575,29 +1580,32 @@ assignPerimeterPositions playerCount cols rows =
 assignPerimeterPositionsDebug :: Int -> Int -> Int -> { positions :: Array { row :: Int, col :: Int }, debug :: String }
 assignPerimeterPositionsDebug playerCount cols rows =
   let
-    topRowIndices = 0 .. (cols - 1)
-    topRow = map (\c -> { row: 0, col: c }) topRowIndices
+    topRow = map (\c -> { row: 0, col: c }) (0 .. (cols - 1))
 
-    rightColIndices = 1 .. (rows - 2)
-    rightCol = map (\r -> { row: r, col: cols - 1 }) rightColIndices
+    -- Right column: rows 1 to (rows-2), i.e., middle rows only (excludes corners)
+    -- For a 2-row grid, this should be empty (no middle rows)
+    rightCol = if rows <= 2
+               then []
+               else map (\r -> { row: r, col: cols - 1 }) (1 .. (rows - 2))
 
-    bottomRowIndices = Array.reverse (0 .. (cols - 1))
-    bottomRow = map (\c -> { row: rows - 1, col: c }) bottomRowIndices
+    bottomRow = map (\c -> { row: rows - 1, col: c }) (Array.reverse (0 .. (cols - 1)))
 
-    leftColIndices = Array.reverse (1 .. (rows - 2))
-    leftCol = map (\r -> { row: r, col: 0 }) leftColIndices
+    -- Left column: rows (rows-2) down to 1, i.e., middle rows only (excludes corners)
+    -- For a 2-row grid, this should be empty (no middle rows)
+    leftCol = if rows <= 2
+              then []
+              else map (\r -> { row: r, col: 0 }) (Array.reverse (1 .. (rows - 2)))
 
     allPositions = topRow <> rightCol <> bottomRow <> leftCol
 
-    showIndices arr = "[" <> intercalate "," (map show arr) <> "]"
     showPos p = "(" <> show p.row <> "," <> show p.col <> ")"
     showPosArr arr = "[" <> intercalate "," (map showPos arr) <> "]"
 
     debugStr = "cols=" <> show cols <> " rows=" <> show rows
-            <> " | topIdx=" <> showIndices topRowIndices
-            <> " | bottomIdx=" <> showIndices bottomRowIndices
             <> " | topRow=" <> showPosArr topRow
+            <> " | rightCol=" <> showPosArr rightCol
             <> " | bottomRow=" <> showPosArr bottomRow
+            <> " | leftCol=" <> showPosArr leftCol
             <> " | all=" <> showPosArr allPositions
   in
     { positions: take playerCount allPositions, debug: debugStr }
