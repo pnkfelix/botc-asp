@@ -7,7 +7,7 @@ module Component.TimelineGrimoire
 import Prelude
 
 import AnswerSetParser as ASP
-import Data.Array (elem, filter, foldl, head, last, length, mapWithIndex, nub, null, sortBy, take, (..), findIndex)
+import Data.Array (elem, filter, findMap, foldl, head, last, length, mapWithIndex, nub, null, sortBy, take, (..), findIndex)
 import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Foldable (fold, intercalate, minimumBy)
@@ -160,9 +160,16 @@ initialState atomStrings =
 -- | Get all unique time points from atoms
 -- | Only includes time points from event predicates and structural predicates (time, acting_role).
 -- | Excludes state predicates (alive, dead, reminder_on) since those represent ongoing state.
+-- | Also excludes time points that occur after the game ends.
 getAllTimePoints :: Array ASP.Atom -> Array ASP.TimePoint
 getAllTimePoints atoms =
-  nub $ sortBy ASP.compareTimePoints $ Array.mapMaybe getTimeFromAtom atoms
+  let
+    allTimes = nub $ sortBy ASP.compareTimePoints $ Array.mapMaybe getTimeFromAtom atoms
+    gameOverTime = findGameOverTime atoms
+  in
+    case gameOverTime of
+      Nothing -> allTimes
+      Just endTime -> filter (\t -> ASP.compareTimePoints t endTime /= GT) allTimes
   where
     getTimeFromAtom atom =
       case ASP.atomCategory atom of
@@ -181,6 +188,14 @@ getAllTimePoints atoms =
     getTimePointFromAtom (ASP.Executed _ d) = Just (ASP.Day d "exec")  -- Executions happen during day
     getTimePointFromAtom (ASP.GameOver t _) = Just t  -- Game over at start of day (evil) or exec (good)
     getTimePointFromAtom _ = Nothing
+
+-- | Find the time point when the game ends (if any)
+findGameOverTime :: Array ASP.Atom -> Maybe ASP.TimePoint
+findGameOverTime atoms =
+  Array.findMap getGameOverTime atoms
+  where
+    getGameOverTime (ASP.GameOver t _) = Just t
+    getGameOverTime _ = Nothing
 
 -- | Find the original source string for an atom matching a given time point
 -- | Preference order:

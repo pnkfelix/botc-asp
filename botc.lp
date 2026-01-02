@@ -581,6 +581,5 @@ d_died(P, T) :- died(P, T).
 % d_death_announced/2 - Death is publicly announced
 % Night deaths are announced at dawn, execution deaths are announced at execution time.
 % This is what appears in the timeline as the "public" death event.
-% Dawn announcements are suppressed if the game has already ended.
-d_death_announced(P, dawn(N)) :- died(P, night(N, _, _)), not game_over(dawn(N)).
+d_death_announced(P, dawn(N)) :- died(P, night(N, _, _)).
 d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
