@@ -31,6 +31,7 @@ import Halogen.HTML.Properties as HP
 import TextareaUtils as TU
 import Type.Proxy (Proxy(..))
 import UrlParams as UP
+import EarlyParser (parsePlayerCount)
 
 -- | Child slots for embedded components
 type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
@@ -1330,7 +1331,13 @@ handleAction = case _ of
     H.modify_ \s -> s { currentFile = fileName, showFileDirectory = false }
 
   SetFileContent content -> do
+    state <- H.get
     H.modify_ \s -> s { files = Map.insert s.currentFile content s.files }
+    -- If editing inst.lp, sync player_count to URL for persistence across reloads
+    when (state.currentFile == "inst.lp") do
+      case parsePlayerCount content of
+        Just n -> liftEffect $ UP.setUrlParam "player_count" (show n)
+        Nothing -> pure unit
 
   ToggleFileDirectory ->
     H.modify_ \s -> s { showFileDirectory = not s.showFileDirectory }
