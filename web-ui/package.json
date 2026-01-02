@@ -20,6 +20,7 @@
     "spago": "^0.93.40"
   },
   "dependencies": {
-    "clingo-wasm": "^0.3.2"
+    "clingo-wasm": "^0.3.2",
+    "diff": "^7.0.0"
   }
 }
