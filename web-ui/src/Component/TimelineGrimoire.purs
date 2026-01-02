@@ -1033,10 +1033,22 @@ renderHtmlGrimoire state =
     rows = gridDims.rows
     -- Assign players to perimeter positions (clockwise from top-left)
     playerPositions = assignPerimeterPositions playerCount cols rows
+    -- Debug info for diagnosing grid issues
+    positionCount = length playerPositions
+    playerNames = map _.name gameState.players
+    debugInfo = "Grid debug: " <> show playerCount <> " players, "
+             <> show cols <> "x" <> show rows <> " grid, "
+             <> show positionCount <> " positions"
   in
     HH.div
       [ HP.style "background: #f5f5f5; border-radius: 8px; padding: 15px;" ]
-      [ -- Player grid with hollow center
+      [ -- Debug panel (temporary - can be removed once issue is fixed)
+        HH.div
+          [ HP.style "font-size: 10px; color: #666; margin-bottom: 8px; padding: 4px; background: #e0e0e0; border-radius: 4px;" ]
+          [ HH.text debugInfo
+          , HH.text $ " | Players: " <> intercalate ", " playerNames
+          ]
+      , -- Player grid with hollow center
         -- Note: JS handles all drag events via pointer events on document
         HH.div
           [ HP.style $ "display: grid; grid-template-columns: repeat(" <> show cols <> ", minmax(100px, 1fr)); "
