@@ -8,13 +8,13 @@ sweetheart_died(Sweetheart, N) :-
     assigned(0, Sweetheart, sweetheart),
     died(Sweetheart, T),
     time(T),
-    T = night(N, RO, S).
+    T = night(N, _, _).
 
 sweetheart_died(Sweetheart, N) :-
     assigned(0, Sweetheart, sweetheart),
     died(Sweetheart, T),
     time(T),
-    T = day(N, Phase).
+    T = day(N, _).
 
 sweetheart_died(Sweetheart, N) :-
     assigned(0, Sweetheart, sweetheart),
@@ -29,11 +29,11 @@ sweetheart_died(Sweetheart, N) :-
 % The chosen player is drunk from now on (permanent)
 reminder_on(sweetheart_drunk, P, T) :-
     sweetheart_drunk_target(P, N),
-    time(T), T = night(N2, RO, S), N2 >= N.
+    time(T), T = night(N2, _, _), N2 >= N.
 
 reminder_on(sweetheart_drunk, P, T) :-
     sweetheart_drunk_target(P, N),
-    time(T), T = day(N2, Phase), N2 >= N.
+    time(T), T = day(N2, _), N2 >= N.
 
 reminder_on(sweetheart_drunk, P, T) :-
     sweetheart_drunk_target(P, N),

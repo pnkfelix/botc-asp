@@ -40,14 +40,14 @@ reminder_on(phil_drunk, P, T) :-
     functioning(Philosopher, night(N, RoleOrd, 3)),
     assigned(0, P, Role),
     P != Philosopher,
-    time(T), T = night(N2, RO, S), N2 >= N.
+    time(T), T = night(N2, _, _), N2 >= N.
 
 reminder_on(phil_drunk, P, T) :-
     philosopher_chooses(Philosopher, Role, night(N, RoleOrd, 2)),
     functioning(Philosopher, night(N, RoleOrd, 3)),
     assigned(0, P, Role),
     P != Philosopher,
-    time(T), T = day(N2, Phase), N2 >= N.
+    time(T), T = day(N2, _), N2 >= N.
 
 reminder_on(phil_drunk, P, T) :-
     philosopher_chooses(Philosopher, Role, night(N, RoleOrd, 2)),

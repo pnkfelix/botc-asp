@@ -59,11 +59,11 @@ vigor_minion_keeps_ability(Minion) :-
 % The chosen townsfolk is poisoned permanently (as long as the minion stays dead)
 reminder_on(vigor_poisoned, P, T) :-
     vigor_poison_target(_, P, N),
-    time(T), T = night(N2, RO, S), N2 >= N.
+    time(T), T = night(N2, _, _), N2 >= N.
 
 reminder_on(vigor_poisoned, P, T) :-
     vigor_poison_target(_, P, N),
-    time(T), T = day(N2, Phase), N2 >= N.
+    time(T), T = day(N2, _), N2 >= N.
 
 reminder_on(vigor_poisoned, P, T) :-
     vigor_poison_target(_, P, N),

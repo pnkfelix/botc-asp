@@ -60,11 +60,11 @@ assigned(N, Target, fang_gu) :-
 
 registers_as(Target, evil, T) :-
     fang_gu_jumped(_, Target, N),
-    time(T), T = night(N2, RO, S), N2 >= N.
+    time(T), T = night(N2, _, _), N2 >= N.
 
 registers_as(Target, evil, T) :-
     fang_gu_jumped(_, Target, N),
-    time(T), T = day(N2, Phase), N2 >= N.
+    time(T), T = day(N2, _), N2 >= N.
 
 registers_as(Target, evil, T) :-
     fang_gu_jumped(_, Target, N),
