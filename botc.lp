@@ -28,17 +28,21 @@ night_number(N) :- night_number(N+1), N >= 1.  % fill in all nights below
 
 time(night(N, 0, 0)) :- night_number(N), N > 1.  % setup state for other nights
 
+% Only generate time points for roles whose player is alive at start of night
+% This prevents dead players' roles from appearing in the timeline
 time(night(N, RoleOrd, S)) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
-    assigned(0, _, Role).
+    assigned(0, Player, Role),
+    alive(Player, night(N, 0, 0)).
 
 time(night(N, RoleOrd, S)) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
-    received(_, Role).
+    received(Player, Role),
+    alive(Player, night(N, 0, 0)).
 
 % Which role is acting at a given time point
 % Includes both assigned roles and roles players think they are (received tokens)
@@ -52,17 +56,21 @@ acting_role(night(1, RoleOrd, S), Role) :-
     first_night_substep(Role, S, _),
     received(_, Role).
 
+% Only generate acting_role for roles whose player is alive at start of night
+% This prevents dead players from "waking" in subsequent nights
 acting_role(night(N, RoleOrd, S), Role) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
-    assigned(0, _, Role).
+    assigned(0, Player, Role),
+    alive(Player, night(N, 0, 0)).
 
 acting_role(night(N, RoleOrd, S), Role) :-
     night_number(N), N > 1,
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
-    received(_, Role).
+    received(Player, Role),
+    alive(Player, night(N, 0, 0)).
 
 % Ordering: next(T1, T2) means T2 immediately follows T1
 % Ordering is just numeric comparison on (RoleOrder, Substep) within same night
