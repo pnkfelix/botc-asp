@@ -1,0 +1,38 @@
+name: ASP Logic Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**/*.lp'
+      - 'run_tests.py'
+      - '.github/workflows/test-asp.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.lp'
+      - 'run_tests.py'
+      - '.github/workflows/test-asp.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Cache Nix store
+        uses: actions/cache@v4
+        with:
+          path: /nix/store
+          key: nix-${{ hashFiles('shell.nix') }}
+          restore-keys: |
+            nix-
+
+      - name: Run ASP tests
+        run: |
+          nix-shell --run "python run_tests.py --format=plain --no-save-timing-data --hide-timing-history"
