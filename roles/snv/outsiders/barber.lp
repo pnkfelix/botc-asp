@@ -9,7 +9,7 @@ other_night_substep(barber, 3, st_places(barber_swap)).
 barber_died_tonight(Barber, N) :-
     assigned(0, Barber, barber),
     died(Barber, T),
-    time(T), T = night(N, RO, S).
+    T = night(N, _, _).
 
 barber_died_today(Barber, N) :-
     assigned(0, Barber, barber),

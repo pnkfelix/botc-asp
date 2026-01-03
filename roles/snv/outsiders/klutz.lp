@@ -8,7 +8,7 @@
 klutz_died(Klutz, N) :-
     assigned(0, Klutz, klutz),
     died(Klutz, T),
-    time(T), T = night(N, RO, S).
+    T = night(N, _, _).
 
 klutz_died(Klutz, N) :-
     assigned(0, Klutz, klutz),

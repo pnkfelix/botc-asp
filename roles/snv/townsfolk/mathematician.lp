@@ -16,7 +16,7 @@ ability_malfunctioned(P, T) :-
 % For night 1, count from night start; for other nights, count from previous dawn
 abnormal_ability_count(N, NightNum) :-
     night_number(NightNum),
-    N = #count { P : ability_malfunctioned(P, T), time(T), T = night(NightNum, RO, S) }.
+    N = #count { P : ability_malfunctioned(P, T), T = night(NightNum, _, _) }.
 
 % First night
 st_tells_core(mathematician, Math, count(N), T) :-
