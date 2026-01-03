@@ -108,6 +108,10 @@ export const resolveIncludesImpl = (program) => (fileResolver) => {
 //   tb_townsfolk(washerwoman; librarian; ...).
 //   snv_outsider(butler; drunk; ...).
 // Returns: { townsfolk: [...], outsiders: [...], minions: [...], demons: [...] }
+//
+// IMPORTANT: Only extracts from FACTS (lines without ':-'), not from rule bodies.
+// This prevents false positives like extracting "X" from "demon(X) :- bmr_demon(X)."
+// or "P, T" from "not protected_from_demon(P, T)."
 export const extractScriptRolesImpl = (program) => {
   const result = {
     townsfolk: [],
@@ -120,22 +124,40 @@ export const extractScriptRolesImpl = (program) => {
   // The prefix can be anything (tb, snv, bmr, etc.)
   // Categories: townsfolk, outsider, minion, demon
   const patterns = [
-    { category: 'townsfolk', regex: /\b\w+_townsfolk\s*\(\s*([^)]+)\s*\)\s*\./g },
-    { category: 'outsiders', regex: /\b\w+_outsider\s*\(\s*([^)]+)\s*\)\s*\./g },
-    { category: 'minions', regex: /\b\w+_minion\s*\(\s*([^)]+)\s*\)\s*\./g },
-    { category: 'demons', regex: /\b\w+_demon\s*\(\s*([^)]+)\s*\)\s*\./g }
+    { category: 'townsfolk', regex: /\b\w+_townsfolk\s*\(\s*([^)]+)\s*\)\s*\./ },
+    { category: 'outsiders', regex: /\b\w+_outsider\s*\(\s*([^)]+)\s*\)\s*\./ },
+    { category: 'minions', regex: /\b\w+_minion\s*\(\s*([^)]+)\s*\)\s*\./ },
+    { category: 'demons', regex: /\b\w+_demon\s*\(\s*([^)]+)\s*\)\s*\./ }
   ];
 
-  for (const { category, regex } of patterns) {
-    let match;
-    while ((match = regex.exec(program)) !== null) {
-      // Split on semicolon and extract role names
-      const rolesStr = match[1];
-      const roles = rolesStr.split(';').map(r => r.trim()).filter(r => r.length > 0);
-      // Add to the category, avoiding duplicates
-      for (const role of roles) {
-        if (!result[category].includes(role)) {
-          result[category].push(role);
+  // Process line by line to only extract from facts (no ':-')
+  const lines = program.split('\n');
+
+  for (const line of lines) {
+    // Skip lines that are rules (contain ':-') - we only want facts
+    if (line.includes(':-')) {
+      continue;
+    }
+
+    // Skip comment lines
+    const trimmedLine = line.trim();
+    if (trimmedLine.startsWith('%')) {
+      continue;
+    }
+
+    for (const { category, regex } of patterns) {
+      const match = regex.exec(line);
+      if (match) {
+        // Split on semicolon and extract role names
+        const rolesStr = match[1];
+        const roles = rolesStr.split(';').map(r => r.trim()).filter(r => r.length > 0);
+        // Add to the category, avoiding duplicates
+        // Also filter out anything that looks like a variable (contains uppercase or is just '_')
+        for (const role of roles) {
+          const isValidRoleName = /^[a-z][a-z0-9_]*$/.test(role);
+          if (isValidRoleName && !result[category].includes(role)) {
+            result[category].push(role);
+          }
         }
       }
     }
