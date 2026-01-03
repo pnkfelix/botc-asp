@@ -25,14 +25,6 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v27
 
-      - name: Cache Nix store
-        uses: actions/cache@v4
-        with:
-          path: /nix/store
-          key: nix-${{ hashFiles('shell.nix') }}
-          restore-keys: |
-            nix-
-
       - name: Run ASP tests
         run: |
-          nix-shell --run "python run_tests.py --format=plain --no-save-timing-data --hide-timing-history"
+          nix-shell -p clingo python3 --run "python run_tests.py --format=plain --no-save-timing-data --hide-timing-history"
