@@ -27,4 +27,4 @@ jobs:
 
       - name: Run ASP tests
         run: |
-          nix-shell -p clingo python3 --run "python run_tests.py --format=plain --no-save-timing-data --hide-timing-history"
+          nix shell nixpkgs#clingo nixpkgs#python3 --command python run_tests.py --format=plain --no-save-timing-data --hide-timing-history
