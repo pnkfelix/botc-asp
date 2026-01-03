@@ -34,7 +34,7 @@ sage_died_tonight(Sage, N) :-
 :- sage_shown(Sage, P1, P2, T),
    functioning(Sage, T),
    current_demon(Demon, N),
-   T = night(N, _, _),
+   time(T), T = night(N, RO, S),
    P1 != Demon,
    P2 != Demon.
 

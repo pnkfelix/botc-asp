@@ -312,10 +312,10 @@ registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P)
 % If assigned a demon role at day N, register as demon for all times after day N
 registers_as(P, demon, T) :-
     assigned(N, P, R), demon(R), N > 0,
-    time(T), T = night(N2, _, _), N2 > N.
+    time(T), T = night(N2, RO, S), N2 > N.
 registers_as(P, demon, T) :-
     assigned(N, P, R), demon(R), N > 0,
-    time(T), T = day(N2, _), N2 > N.
+    time(T), T = day(N2, Phase), N2 > N.
 
 % If a player may mis-register, ST chooses for each category they may misregister as
 { registers_as(P, C, T) } :- may_misregister_as(P, C), time(T).
@@ -466,8 +466,8 @@ alive(P, day(N, 0)) :- alive(P, dawn(N)), not died(P, dawn(N)), not dead(P, dawn
 
 % Helper: find the final time point of a night
 final_night_time(N, T) :-
-    time(T), T = night(N, _, _),
-    not next(T, T2) : time(T2), T2 = night(N, _, _).
+    time(T), T = night(N, RO, S),
+    not next(T, T2) : time(T2), T2 = night(N, RO2, S2).
 
 % Alive at start of night N+1 = alive at end of day N
 % Don't propagate if game ended on day N

@@ -49,11 +49,11 @@ assigned(N, Demon, snake_charmer) :-
 % Former demon is poisoned after becoming snake charmer
 reminder_on(sc_poisoned, Demon, T) :-
     snake_charmer_swaps(_, Demon, N),
-    time(T), T = night(N2, _, _), N2 >= N.
+    time(T), T = night(N2, RO, S), N2 >= N.
 
 reminder_on(sc_poisoned, Demon, T) :-
     snake_charmer_swaps(_, Demon, N),
-    time(T), T = day(N2, _), N2 >= N.
+    time(T), T = day(N2, Phase), N2 >= N.
 
 reminder_on(sc_poisoned, Demon, T) :-
     snake_charmer_swaps(_, Demon, N),
@@ -72,11 +72,11 @@ current_demon(SC, N2) :-
 % The former snake charmer is now evil
 registers_as(SC, evil, T) :-
     snake_charmer_swaps(SC, _, N),
-    time(T), T = night(N2, _, _), N2 >= N.
+    time(T), T = night(N2, RO, S), N2 >= N.
 
 registers_as(SC, evil, T) :-
     snake_charmer_swaps(SC, _, N),
-    time(T), T = day(N2, _), N2 >= N.
+    time(T), T = day(N2, Phase), N2 >= N.
 
 registers_as(SC, evil, T) :-
     snake_charmer_swaps(SC, _, N),
