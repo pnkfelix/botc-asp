@@ -7,6 +7,8 @@ module TextareaUtils
   , highlightLP
   , syncScroll
   , updateHighlightOverlay
+  , copyToClipboard
+  , copyToClipboardWithEvent
   ) where
 
 import Prelude
@@ -14,6 +16,7 @@ import Prelude
 import Data.Maybe (Maybe)
 import Data.Nullable (Nullable, toMaybe)
 import Effect (Effect)
+import Web.Event.Event (Event)
 
 -- | Scroll a textarea to a specific line and select/highlight it
 -- | Takes the element ID and line number (1-indexed)
@@ -72,3 +75,17 @@ foreign import updateHighlightOverlayImpl :: String -> String -> String -> Effec
 
 updateHighlightOverlay :: String -> String -> String -> Effect Unit
 updateHighlightOverlay = updateHighlightOverlayImpl
+
+-- | Copy text to the clipboard
+-- | Returns true if successful, false otherwise
+foreign import copyToClipboardImpl :: String -> Effect Boolean
+
+copyToClipboard :: String -> Effect Boolean
+copyToClipboard = copyToClipboardImpl
+
+-- | Copy text to the clipboard and stop event propagation
+-- | Useful when the copy button is inside a clickable container
+foreign import copyToClipboardWithEventImpl :: Event -> String -> Effect Boolean
+
+copyToClipboardWithEvent :: Event -> String -> Effect Boolean
+copyToClipboardWithEvent = copyToClipboardWithEventImpl
