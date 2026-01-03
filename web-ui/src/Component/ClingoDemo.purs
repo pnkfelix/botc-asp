@@ -32,7 +32,7 @@ import TextareaUtils as TU
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 import Type.Proxy (Proxy(..))
 import UrlParams as UP
-import EarlyParser (parsePlayerCount)
+import EarlyParser (parsePlayerCount, parseScript)
 
 -- | Child slots for embedded components
 type Slots = ( timelineGrimoire :: H.Slot TG.Query TG.Output Unit )
@@ -208,6 +208,39 @@ updatePlayerCount newCount content =
       in if String.take 20 trimmed == "#const player_count "
            then "#const player_count = " <> show newCount <> "."
            else line
+
+-- | Valid script identifiers
+validScripts :: Array String
+validScripts = ["tb", "bmr", "snv", "carousel"]
+
+-- | Check if a script identifier is valid
+isValidScript :: String -> Boolean
+isValidScript scriptId = elem scriptId validScripts
+
+-- | Update script include in inst.lp content
+-- | Replaces the line '#include "SCRIPT.lp".' with the new script
+updateScript :: String -> String -> String
+updateScript newScript content =
+  if not (isValidScript newScript) then content
+  else
+    let
+      contentLines = split (Pattern "\n") content
+      updatedLines = map updateLine contentLines
+    in
+      intercalate "\n" updatedLines
+  where
+    updateLine line =
+      let trimmed = trim line
+      in if isScriptInclude trimmed
+           then "#include \"" <> newScript <> ".lp\"."
+           else line
+    -- Check if line is a script include (tb, bmr, snv, or carousel)
+    isScriptInclude str =
+      String.take 10 str == "#include \"" &&
+      (String.contains (Pattern "\"tb.lp\"") str ||
+       String.contains (Pattern "\"bmr.lp\"") str ||
+       String.contains (Pattern "\"snv.lp\"") str ||
+       String.contains (Pattern "\"carousel.lp\"") str)
 
 -- | Initial state with embedded .lp file contents
 initialState :: State
@@ -1426,19 +1459,28 @@ handleAction = case _ of
   Initialize -> do
     -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
     H.liftAff $ Clingo.init "./clingo.wasm"
-    -- Check for player_count URL parameter and update inst.lp if present
+    -- Check for URL parameters and update inst.lp if present
     maybePlayerCount <- liftEffect $ UP.getUrlParam "player_count"
-    case maybePlayerCount >>= Int.fromString of
-      Just n -> do
-        -- Update inst.lp with the new player_count
-        H.modify_ \s ->
+    maybeScript <- liftEffect $ UP.getUrlParam "script"
+    -- Apply URL parameter updates to inst.lp
+    let updateFromParams :: String -> String
+        updateFromParams content =
           let
-            instContent = fromMaybe "" $ Map.lookup "inst.lp" s.files
-            updatedContent = updatePlayerCount n instContent
-            updatedFiles = Map.insert "inst.lp" updatedContent s.files
-          in s { files = updatedFiles, isInitialized = true }
-      Nothing ->
-        H.modify_ \s -> s { isInitialized = true }
+            -- Apply player_count update if present
+            withPlayerCount = case maybePlayerCount >>= Int.fromString of
+              Just n -> updatePlayerCount n content
+              Nothing -> content
+            -- Apply script update if present and valid
+            withScript = case maybeScript of
+              Just scriptId | isValidScript scriptId -> updateScript scriptId withPlayerCount
+              _ -> withPlayerCount
+          in withScript
+    H.modify_ \s ->
+      let
+        instContent = fromMaybe "" $ Map.lookup "inst.lp" s.files
+        updatedContent = updateFromParams instContent
+        updatedFiles = Map.insert "inst.lp" updatedContent s.files
+      in s { files = updatedFiles, isInitialized = true }
     -- Initialize syntax highlighting for the initial file
     state <- H.get
     let content = fromMaybe "" $ Map.lookup state.currentFile state.files
@@ -1454,10 +1496,13 @@ handleAction = case _ of
   SetFileContent content -> do
     state <- H.get
     H.modify_ \s -> s { files = Map.insert s.currentFile content s.files }
-    -- If editing inst.lp, sync player_count to URL for persistence across reloads
+    -- If editing inst.lp, sync player_count and script to URL for persistence across reloads
     when (state.currentFile == "inst.lp") do
       case parsePlayerCount content of
         Just n -> liftEffect $ UP.setUrlParam "player_count" (show n)
+        Nothing -> pure unit
+      case parseScript content of
+        Just scriptId -> liftEffect $ UP.setUrlParam "script" scriptId
         Nothing -> pure unit
     -- Update syntax highlighting as content changes
     liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" content
