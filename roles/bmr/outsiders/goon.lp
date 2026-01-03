@@ -19,6 +19,7 @@ goon_first_target(Goon, Chooser, N) :-
     not earlier_goon_target(Goon, N, RoleOrd).
 
 earlier_goon_target(Goon, N, RoleOrd) :-
+    goon_targeted_by(Goon, _, _, night(N, RoleOrd, _)),
     goon_targeted_by(Goon, _, _, night(N, EarlierOrd, _)),
     EarlierOrd < RoleOrd.
 

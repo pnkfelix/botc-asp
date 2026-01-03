@@ -28,7 +28,7 @@ reminder_on(minstrel_drunk, P, T) :-
 
 % Drunk is active from execution until dusk next day
 minstrel_drunk_active(N, day(N, exec)) :- day_number(N).
-minstrel_drunk_active(N, night(N+1, _, _)) :- day_number(N), night_number(N+1).
+minstrel_drunk_active(N, T) :- day_number(N), time(T), T = night(M, _, _), M = N+1.
 minstrel_drunk_active(N, dawn(N+1)) :- day_number(N), day_number(N+1).
 
 % Token removed at dusk (start of day N+1, after dawn)
