@@ -11,7 +11,7 @@ moonchild_died_tonight(MC, N) :-
     night_number(N), N > 1,
     alive(MC, night(N, 0, 0)),
     died(MC, T),
-    T = night(N, _, _).
+    time(T), T = night(N, R, S).
 
 % Moonchild died during the day (executed)
 moonchild_died_today(MC, N) :-

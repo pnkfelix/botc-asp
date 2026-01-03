@@ -56,7 +56,7 @@ died(P, T) :- shabaloth_kill_succeeds(P, N), final_night_time(N, T), alive(P, ni
 shabaloth_killed_last_night(P, N) :-
     night_number(N), N > 2,
     shabaloth_target(_, P, _, N-1),
-    died(P, T), T = night(N-1, _, _).
+    died(P, T), time(T), T = night(N-1, R, S).
 
 % ST may choose to regurgitate one of last night's victims
 { shabaloth_regurgitates(P, N) : shabaloth_killed_last_night(P, N) } <= 1 :-
@@ -74,8 +74,8 @@ resurrected(P, N) :- shabaloth_regurgitates(P, N).
 
 alive(P, T) :-
     shabaloth_regurgitates(P, N),
-    time(T), T = night(M, _, _), M >= N.
+    time(T), T = night(M, R, S), M >= N.
 
 alive(P, T) :-
     shabaloth_regurgitates(P, N),
-    time(T), T = day(M, _), M >= N.
+    time(T), T = day(M, Phase), M >= N.

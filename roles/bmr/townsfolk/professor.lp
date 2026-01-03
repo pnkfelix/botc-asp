@@ -53,12 +53,12 @@ resurrected(P, N) :- professor_resurrects(P, N).
 alive(P, T) :-
     resurrected(P, N),
     time(T),
-    T = night(M, _, _), M >= N.
+    T = night(M, R, S), M >= N.
 
 alive(P, T) :-
     resurrected(P, N),
     time(T),
-    T = day(M, _), M >= N.
+    T = day(M, Phase), M >= N.
 
 alive(P, T) :-
     resurrected(P, N),
@@ -67,4 +67,4 @@ alive(P, T) :-
 
 % Remove death state after resurrection
 % The player is no longer dead after being resurrected
-:- dead(P, T), resurrected(P, N), time(T), T = night(M, _, _), M > N.
+:- dead(P, T), resurrected(P, N), time(T), T = night(M, R, S), M > N.

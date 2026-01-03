@@ -30,7 +30,7 @@ reminder_on(goon_drunk, Chooser, T) :-
     goon_drunk_active(N, T).
 
 goon_drunk_active(N, T) :-
-    time(T), T = night(N, _, _).
+    time(T), T = night(N, R, S).
 goon_drunk_active(N, dawn(N)) :- night_number(N).
 
 % Token removed at dusk (start of day)
@@ -57,8 +57,8 @@ goon_becomes_alignment(Goon, good, N) :-
 % Override registration for Goon after alignment change
 registers_as(Goon, evil, T) :-
     goon_becomes_alignment(Goon, evil, N),
-    time(T), T = night(M, _, _), M >= N.
+    time(T), T = night(M, R, S), M >= N.
 
 registers_as(Goon, evil, T) :-
     goon_becomes_alignment(Goon, evil, N),
-    time(T), T = day(M, _), M >= N.
+    time(T), T = day(M, Phase), M >= N.
