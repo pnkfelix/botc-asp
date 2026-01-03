@@ -23,7 +23,7 @@
 #include "roles/bmr/outsiders/tinker.lp".
 #include "roles/bmr/outsiders/moonchild.lp".
 #include "roles/bmr/outsiders/goon.lp".
-#include "roles/bmr/outsiders/lunatic.lp".
+% #include "roles/bmr/outsiders/lunatic.lp".  % TODO: debug performance issues
 
 % Minions
 #include "roles/bmr/minions/godfather.lp".
