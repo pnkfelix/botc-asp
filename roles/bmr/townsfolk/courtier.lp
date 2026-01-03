@@ -69,8 +69,8 @@ reminder_on(courtier_drunk, P, T) :-
 
 % Drunk is active for 3 nights and 3 days after the choice
 % Night N (when chosen), Day N, Night N+1, Day N+1, Night N+2, Day N+2
-courtier_drunk_active(N, night(M, _, _)) :- night_number(N), night_number(M), M >= N, M <= N+2.
-courtier_drunk_active(N, day(M, _)) :- night_number(N), day_number(M), M >= N, M <= N+2.
+courtier_drunk_active(N, T) :- night_number(N), time(T), T = night(M, _, _), M >= N, M <= N+2.
+courtier_drunk_active(N, T) :- night_number(N), time(T), T = day(M, _), M >= N, M <= N+2.
 courtier_drunk_active(N, dawn(M)) :- night_number(N), day_number(M), M >= N, M <= N+2.
 
 causes_impairment(courtier_drunk).
