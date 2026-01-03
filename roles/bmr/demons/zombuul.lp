@@ -62,7 +62,11 @@ zombuul_fake_death_used(Zombuul) :-
 % When Zombuul would die for the first time
 zombuul_would_die(Zombuul, T) :-
     assigned(0, Zombuul, zombuul),
-    (imp_kill_succeeds(Zombuul, T) ; executed(Zombuul, N), T = day(N, exec)).
+    imp_kill_succeeds(Zombuul, T).
+
+zombuul_would_die(Zombuul, day(N, exec)) :-
+    assigned(0, Zombuul, zombuul),
+    executed(Zombuul, N).
 
 zombuul_fakes_death(Zombuul, T) :-
     zombuul_would_die(Zombuul, T),
