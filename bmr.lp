@@ -2,6 +2,7 @@
 
 #include "roles/bmr/base.lp".
 #include "roles/bmr/registration.lp".
+#include "roles/bmr/reminder_metadata.lp".
 
 % Townsfolk
 #include "roles/bmr/townsfolk/grandmother.lp".
@@ -38,6 +39,3 @@
 
 % Game end conditions (depends on demon/minion logic above)
 #include "game_end.lp".
-
-% Lunatic appears to be a demon but is not
-mistaken_identity(lunatic, demon).
