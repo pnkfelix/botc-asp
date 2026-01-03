@@ -1,4 +1,5 @@
-% Sects & Violets Script
+% @script-name: Sects & Violets
+% @script-id: snv
 
 #include "roles/snv/base.lp".
 

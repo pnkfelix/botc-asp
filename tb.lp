@@ -1,4 +1,5 @@
-% Trouble Brewing Script
+% @script-name: Trouble Brewing
+% @script-id: tb
 
 #include "roles/tb/base.lp".
 #include "roles/tb/registration.lp".

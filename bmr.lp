@@ -1,4 +1,5 @@
-% Bad Moon Rising Script
+% @script-name: Bad Moon Rising
+% @script-id: bmr
 
 #include "roles/bmr/base.lp".
 #include "roles/bmr/registration.lp".
