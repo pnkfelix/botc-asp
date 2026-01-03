@@ -344,6 +344,31 @@ getGrimoireAtoms state =
       -- No result or error/unsat, use early parsing
       getEarlyAtomsFiltered state.files
 
+-- | Get script roles by resolving includes from the current files
+-- | This extracts role definitions from the resolved ASP program
+getScriptRoles :: Map.Map String String -> Clingo.ScriptRoles
+getScriptRoles files =
+  let
+    -- Use inst.lp as the entry point (same as RunClingo)
+    entryFile = "inst.lp"
+    entryProgram = fromMaybe "" $ Map.lookup entryFile files
+    resolver filename = Map.lookup filename files
+    -- Resolve all #include directives to get the full program
+    fullProgram = Clingo.resolveIncludesWithPath entryProgram entryFile resolver
+  in
+    Clingo.extractScriptRoles fullProgram
+
+-- | Get full input for TimelineGrimoire component (atoms + script roles)
+getGrimoireInput :: State -> TG.Input
+getGrimoireInput state =
+  let
+    atomData = getGrimoireAtoms state
+    scriptRoles = getScriptRoles state.files
+  in
+    { atoms: atomData.atoms
+    , scriptRoles: scriptRoles
+    }
+
 -- | Get early atoms filtered by player_count
 -- | Only includes game_chair atoms where chair position < player_count (0-indexed)
 getEarlyAtomsFiltered :: Map.Map String String -> { atoms :: Array String, isEarly :: Boolean, modelInfo :: String }
@@ -452,7 +477,7 @@ renderGrimoireSection state =
           ]
         else HH.text ""
     , if hasAtoms
-        then HH.slot _timelineGrimoire unit TG.component grimoireData.atoms HandleTimelineEvent
+        then HH.slot _timelineGrimoire unit TG.component (getGrimoireInput state) HandleTimelineEvent
         else HH.div
           [ HP.style "padding: 20px; background: #f5f5f5; border-radius: 4px; color: #666;" ]
           [ HH.text "No player data found. Add chair/2 facts to players.lp to see the grimoire." ]

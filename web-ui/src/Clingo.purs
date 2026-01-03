@@ -5,11 +5,13 @@ module Clingo
   , ClingoTime
   , ClingoError
   , SolveResult(..)
+  , ScriptRoles
   , run
   , init
   , restart
   , resolveIncludes
   , resolveIncludesWithPath
+  , extractScriptRoles
   ) where
 
 import Prelude
@@ -58,6 +60,14 @@ type ClingoError =
   , "Error" :: String
   }
 
+-- | Script roles extracted from resolved ASP program
+type ScriptRoles =
+  { townsfolk :: Array String
+  , outsiders :: Array String
+  , minions :: Array String
+  , demons :: Array String
+  }
+
 -- | Parse result type
 data SolveResult
   = Satisfiable ClingoResult
@@ -72,6 +82,7 @@ foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
 foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
 foreign import resolveIncludesWithPathImpl :: String -> String -> Fn1 String (Nullable String) -> String
+foreign import extractScriptRolesImpl :: String -> ScriptRoles
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
@@ -127,3 +138,9 @@ resolveIncludes program resolver =
 resolveIncludesWithPath :: String -> String -> (String -> Maybe String) -> String
 resolveIncludesWithPath program currentFilePath resolver =
   resolveIncludesWithPathImpl program currentFilePath (runFn1 \filename -> toNullable (resolver filename))
+
+-- | Extract script roles from a resolved ASP program
+-- | Parses role definitions like tb_townsfolk(washerwoman; librarian; ...).
+-- | Returns categorized role lists for the script
+extractScriptRoles :: String -> ScriptRoles
+extractScriptRoles = extractScriptRolesImpl

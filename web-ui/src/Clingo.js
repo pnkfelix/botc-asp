@@ -99,3 +99,44 @@ export const resolveIncludesWithPathImpl = (program) => (currentFilePath) => (fi
 export const resolveIncludesImpl = (program) => (fileResolver) => {
   return resolveIncludesWithPathImpl(program)("")(fileResolver);
 };
+
+// Extract script roles from a resolved ASP program
+// Looks for patterns like:
+//   tb_townsfolk(washerwoman; librarian; ...).
+//   snv_outsider(butler; drunk; ...).
+// Returns: { townsfolk: [...], outsiders: [...], minions: [...], demons: [...] }
+export const extractScriptRolesImpl = (program) => {
+  const result = {
+    townsfolk: [],
+    outsiders: [],
+    minions: [],
+    demons: []
+  };
+
+  // Match patterns like: prefix_category(role1; role2; ...).
+  // The prefix can be anything (tb, snv, bmr, etc.)
+  // Categories: townsfolk, outsider, minion, demon
+  const patterns = [
+    { category: 'townsfolk', regex: /\b\w+_townsfolk\s*\(\s*([^)]+)\s*\)\s*\./g },
+    { category: 'outsiders', regex: /\b\w+_outsider\s*\(\s*([^)]+)\s*\)\s*\./g },
+    { category: 'minions', regex: /\b\w+_minion\s*\(\s*([^)]+)\s*\)\s*\./g },
+    { category: 'demons', regex: /\b\w+_demon\s*\(\s*([^)]+)\s*\)\s*\./g }
+  ];
+
+  for (const { category, regex } of patterns) {
+    let match;
+    while ((match = regex.exec(program)) !== null) {
+      // Split on semicolon and extract role names
+      const rolesStr = match[1];
+      const roles = rolesStr.split(';').map(r => r.trim()).filter(r => r.length > 0);
+      // Add to the category, avoiding duplicates
+      for (const role of roles) {
+        if (!result[category].includes(role)) {
+          result[category].push(role);
+        }
+      }
+    }
+  }
+
+  return result;
+};
