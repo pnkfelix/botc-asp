@@ -47,4 +47,4 @@ dead(P, T) :- reminder_on(assassin_dead, P, T).
 died(P, T) :- assassin_kills(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % Override Sailor protection for Assassin
-:- assassin_kills(P, N), protected_from_death(P, T), T = night(N, _, _), not died(P, T).
+:- assassin_kills(P, N), protected_from_death(P, T), time(T), T = night(N, R, S), not died(P, T).
