@@ -11,7 +11,8 @@
     "copy:wasm": "cp node_modules/clingo-wasm/dist/clingo.wasm dist/ && cp node_modules/clingo-wasm/dist/clingo.web.worker.js dist/",
     "build": "npm run build-info && npm run embed-lp && npm run build:purs && npm run bundle && npm run copy:wasm",
     "dev": "npm run build && npx serve dist",
-    "clean": "rm -rf output .spago"
+    "clean": "rm -rf output .spago",
+    "check-asp": "node scripts/check-asp-syntax.js"
   },
   "devDependencies": {
     "esbuild": "^0.27.1",
