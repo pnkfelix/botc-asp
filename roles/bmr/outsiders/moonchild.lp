@@ -27,6 +27,10 @@ moonchild_died_today(MC, N) :-
 { moonchild_choice(MC, P, N) : player(P), P != MC, alive(P, day(N, exec)) } = 1 :-
     moonchild_died_today(MC, N).
 
+% Helper: Moonchild died on this day (either during night or execution)
+moonchild_died_day_n(MC, N) :- moonchild_died_tonight(MC, N).
+moonchild_died_day_n(MC, N) :- moonchild_died_today(MC, N).
+
 % Connect to player_chooses (Moonchild wakes at night to have their choice processed)
 player_chooses(moonchild, MC, point(P), night(N+1, RoleOrd, 2)) :-
     other_night_role_order(moonchild, RoleOrd),
@@ -38,7 +42,7 @@ player_chooses(moonchild, MC, point(P), night(N+1, RoleOrd, 2)) :-
 moonchild_kills(P, N) :-
     moonchild_choice(MC, P, N),
     assigned(0, MC, moonchild),
-    (moonchild_died_tonight(MC, N) ; moonchild_died_today(MC, N)),
+    moonchild_died_day_n(MC, N),
     functioning(MC, dawn(N)),
     actual_category(P, good),
     night_number(N+1).
