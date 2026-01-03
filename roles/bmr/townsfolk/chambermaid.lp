@@ -74,21 +74,19 @@ player_was_functioning_when_woke(P, R, N) :-
     alive(P, night(N, 0, 0)),
     functioning(P, night(N, RoleOrd, 1)).
 
+% Helper: P is one of the chambermaid's chosen targets for night N
+cm_target(CM, P, N) :- cm_choice(CM, P, 1, night(N, _, _)).
+cm_target(CM, P, N) :- cm_choice(CM, P, 2, night(N, _, _)).
+
 % Count how many of the chosen players woke
 cm_woke_count(CM, N, Count) :-
     assigned(0, CM, chambermaid),
-    night_number(N),
-    other_night_role_order(chambermaid, RoleOrd),
-    cm_choice(CM, P1, 1, night(N, RoleOrd, 2)),
-    cm_choice(CM, P2, 2, night(N, RoleOrd, 3)),
-    Count = #count { P : (P = P1 ; P = P2), woke_due_to_ability(P, N) }.
+    night_number(N), N > 1,
+    Count = #count { P : cm_target(CM, P, N), woke_due_to_ability(P, N) }.
 
 cm_woke_count(CM, 1, Count) :-
     assigned(0, CM, chambermaid),
-    first_night_role_order(chambermaid, RoleOrd),
-    cm_choice(CM, P1, 1, night(1, RoleOrd, 2)),
-    cm_choice(CM, P2, 2, night(1, RoleOrd, 3)),
-    Count = #count { P : (P = P1 ; P = P2), woke_due_to_ability(P, 1) }.
+    Count = #count { P : cm_target(CM, P, 1), woke_due_to_ability(P, 1) }.
 
 % ST tells Chambermaid the count (if functioning)
 st_tells_core(chambermaid, CM, count(Count), night(1, RoleOrd, 4)) :-
