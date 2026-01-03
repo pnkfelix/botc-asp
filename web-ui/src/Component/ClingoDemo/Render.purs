@@ -537,9 +537,10 @@ renderResult state = case state.result of
     renderAnswerSet filterExpr selectedIdx idx atoms =
       let
         isSelected = idx == selectedIdx
-        -- Apply filter to atoms
+        -- Apply filter to atoms (handles space-separated atoms in array elements)
         filteredAtoms = FE.filterAtoms filterExpr atoms
-        totalAtomCount = length atoms
+        -- Count individual atoms (not lines) for accurate display
+        totalAtomCount = FE.countAtoms atoms
         filteredAtomCount = length filteredAtoms
         isFiltered = filterExpr /= "" && filteredAtomCount /= totalAtomCount
         atomsText = intercalate " " filteredAtoms
