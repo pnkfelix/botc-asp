@@ -61,8 +61,11 @@ export const resolveIncludesWithPathImpl = (program) => (currentFilePath) => (fi
 
     const currentDir = getDirectory(filePath);
 
-    // Match #include "filename".
-    return content.replace(/#include\s+"([^"]+)"\s*\./g, (match, includePath) => {
+    // Match #include "filename" at the start of a line (with optional leading whitespace).
+    // Use multiline mode (m) so ^ matches start of each line.
+    // (\s*) matches only whitespace before #include, which naturally excludes
+    // commented-out includes (% is not whitespace) and malformed lines.
+    return content.replace(/^(\s*)#include\s+"([^"]+)"\s*\./gm, (match, prefix, includePath) => {
       // Try to resolve the path:
       // 1. First, try as-is (relative to working directory / root)
       // 2. If not found, try relative to the current file's directory
