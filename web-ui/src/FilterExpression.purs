@@ -36,6 +36,9 @@ foreign import validateFilterImpl :: Fn1 String String
 -- | Test if an atom matches a compiled filter
 foreign import testFilterImpl :: Fn2 FilterFn String Boolean
 
+-- | Count total individual atoms (handles space-separated atoms in array elements)
+foreign import countAtomsImpl :: Fn1 (Array String) Int
+
 -- | Compile a filter expression into a reusable filter function
 compileFilter :: String -> FilterFn
 compileFilter = runFn1 compileFilterImpl
@@ -51,3 +54,7 @@ validateFilter = runFn1 validateFilterImpl
 -- | Check if filter expression is valid
 isValidFilter :: String -> Boolean
 isValidFilter expr = validateFilter expr == ""
+
+-- | Count total individual atoms (handles space-separated atoms in array elements)
+countAtoms :: Array String -> Int
+countAtoms = runFn1 countAtomsImpl

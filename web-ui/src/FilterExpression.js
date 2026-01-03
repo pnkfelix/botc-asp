@@ -253,9 +253,22 @@ export const compileFilterImpl = (expr) => {
 };
 
 // Filter an array of atoms using a filter expression
+// Handles both individual atoms and space-separated lines of atoms
 export const filterAtomsImpl = (expr, atoms) => {
   const matcher = compileFilterImpl(expr);
-  return atoms.filter(matcher);
+
+  // Flatten atoms: split any space-separated strings into individual atoms
+  const allAtoms = [];
+  for (const item of atoms) {
+    // Split by whitespace to handle lines containing multiple atoms
+    const parts = item.trim().split(/\s+/);
+    for (const part of parts) {
+      if (part) allAtoms.push(part);
+    }
+  }
+
+  // Filter individual atoms
+  return allAtoms.filter(matcher);
 };
 
 // Check if a filter expression is valid (returns error message or empty string)
@@ -275,4 +288,16 @@ export const validateFilterImpl = (expr) => {
 // Test if an atom matches a compiled filter function
 export const testFilterImpl = (filterFn, atom) => {
   return filterFn(atom);
+};
+
+// Count total individual atoms (handles space-separated atoms in array elements)
+export const countAtomsImpl = (atoms) => {
+  let count = 0;
+  for (const item of atoms) {
+    const parts = item.trim().split(/\s+/);
+    for (const part of parts) {
+      if (part) count++;
+    }
+  }
+  return count;
 };
