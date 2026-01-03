@@ -29,6 +29,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import TextareaUtils as TU
+import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 import Type.Proxy (Proxy(..))
 import UrlParams as UP
 import EarlyParser (parsePlayerCount)
@@ -131,6 +132,8 @@ data Action
   | CancelNavigateToInclude     -- Cancel the navigation dialog
   | ShowTimingDiff TimingEntry  -- Show diff modal for a timing entry
   | CloseDiffModal              -- Close the diff modal
+  | CopyToClipboard String      -- Copy text to clipboard
+  | CopyToClipboardStopPropagation MouseEvent String  -- Copy and stop event propagation
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)
@@ -849,9 +852,15 @@ renderResult state = case state.result of
 
   Just (ResultError err) ->
     HH.div
-      [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace; white-space: pre-wrap;" ]
-      [ HH.strong_ [ HH.text "Error: " ]
-      , HH.text err
+      [ HP.style "padding: 20px; background: #ffebee; border-radius: 4px; color: #c62828; font-family: monospace; white-space: pre-wrap; position: relative;" ]
+      [ HH.div
+          [ HP.style "display: flex; justify-content: space-between; align-items: flex-start;" ]
+          [ HH.div_
+              [ HH.strong_ [ HH.text "Error: " ]
+              , HH.text err
+              ]
+          , renderCopyButton err
+          ]
       ]
 
   Just ResultUnsat ->
@@ -948,6 +957,7 @@ renderResult state = case state.result of
           totalAtomCount = length atoms
           filteredAtomCount = length filteredAtoms
           isFiltered = filterExpr /= "" && filteredAtomCount /= totalAtomCount
+          atomsText = intercalate " " filteredAtoms
           baseStyle = "margin-top: 8px; padding: 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; "
           selectedStyle = if isSelected
             then "background: #c8e6c9; border: 2px solid #4CAF50;"
@@ -959,19 +969,80 @@ renderResult state = case state.result of
           , HE.onClick \_ -> SelectModel idx
           ]
           [ HH.div
-              [ HP.style $ "font-weight: bold; margin-bottom: 4px; font-size: 12px; "
-                  <> if isSelected then "color: #1b5e20;" else "color: #388e3c;"
-              ]
-              [ HH.text $ "Answer Set " <> show (idx + 1)
-                  <> (if isSelected then " ✓" else "")
-                  <> (if isFiltered then " (" <> show filteredAtomCount <> "/" <> show totalAtomCount <> " atoms)" else "")
+              [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;" ]
+              [ HH.span
+                  [ HP.style $ "font-weight: bold; font-size: 12px; "
+                      <> if isSelected then "color: #1b5e20;" else "color: #388e3c;"
+                  ]
+                  [ HH.text $ "Answer Set " <> show (idx + 1)
+                      <> (if isSelected then " ✓" else "")
+                      <> (if isFiltered then " (" <> show filteredAtomCount <> "/" <> show totalAtomCount <> " atoms)" else "")
+                  ]
+              , renderCopyButtonSmall atomsText
               ]
           , HH.code
               [ HP.style $ "display: block; font-family: monospace; white-space: pre-wrap; color: #1b5e20; font-size: 11px; max-height: 60px; overflow-y: auto; "
                   <> "-webkit-overflow-scrolling: touch;"
               ]
-              [ HH.text $ intercalate " " filteredAtoms ]
+              [ HH.text atomsText ]
           ]
+
+-- | Render a copy button with clipboard icon
+-- | Uses inline SVG for the icon
+renderCopyButton :: forall m. String -> H.ComponentHTML Action Slots m
+renderCopyButton textToCopy =
+  HH.button
+    [ HP.style $ "background: transparent; border: 1px solid #ccc; border-radius: 4px; "
+        <> "padding: 4px 8px; cursor: pointer; display: flex; align-items: center; gap: 4px; "
+        <> "color: #666; font-size: 11px; transition: all 0.2s; flex-shrink: 0;"
+    , HP.title "Copy to clipboard"
+    , HE.onClick \_ -> CopyToClipboard textToCopy
+    ]
+    [ renderCopyIcon
+    , HH.text "Copy"
+    ]
+
+-- | Render a smaller copy button (icon only) for compact spaces
+-- | Stops event propagation to prevent triggering parent click handlers
+renderCopyButtonSmall :: forall m. String -> H.ComponentHTML Action Slots m
+renderCopyButtonSmall textToCopy =
+  HH.button
+    [ HP.style $ "background: transparent; border: 1px solid #ccc; border-radius: 3px; "
+        <> "padding: 2px 4px; cursor: pointer; display: flex; align-items: center; "
+        <> "color: #666; transition: all 0.2s; flex-shrink: 0;"
+    , HP.title "Copy to clipboard"
+    , HE.onClick \e -> CopyToClipboardStopPropagation e textToCopy
+    ]
+    [ renderCopyIcon
+    ]
+
+-- | Render the clipboard/copy icon SVG
+renderCopyIcon :: forall m w i. HH.HTML w i
+renderCopyIcon =
+  HH.span
+    [ HP.style "width: 14px; height: 14px; display: inline-block;" ]
+    [ HH.element (HH.ElemName "svg")
+        [ HP.attr (HH.AttrName "viewBox") "0 0 24 24"
+        , HP.attr (HH.AttrName "fill") "none"
+        , HP.attr (HH.AttrName "stroke") "currentColor"
+        , HP.attr (HH.AttrName "stroke-width") "2"
+        , HP.style "width: 100%; height: 100%;"
+        ]
+        [ HH.element (HH.ElemName "rect")
+            [ HP.attr (HH.AttrName "x") "9"
+            , HP.attr (HH.AttrName "y") "9"
+            , HP.attr (HH.AttrName "width") "13"
+            , HP.attr (HH.AttrName "height") "13"
+            , HP.attr (HH.AttrName "rx") "2"
+            , HP.attr (HH.AttrName "ry") "2"
+            ]
+            []
+        , HH.element (HH.ElemName "path")
+            [ HP.attr (HH.AttrName "d") "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+            ]
+            []
+        ]
+    ]
 
 -- | Render the timing history table
 -- | Shows a table with diff description, model limit, and timing for each run
@@ -1742,6 +1813,14 @@ handleAction = case _ of
 
   CloseDiffModal ->
     H.modify_ \s -> s { selectedTimingEntry = Nothing }
+
+  CopyToClipboard text -> do
+    _ <- liftEffect $ TU.copyToClipboard text
+    pure unit
+
+  CopyToClipboardStopPropagation mouseEvent text -> do
+    _ <- liftEffect $ TU.copyToClipboardWithEvent (toEvent mouseEvent) text
+    pure unit
 
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation

@@ -338,6 +338,45 @@ export const updateHighlightOverlayImpl = (textareaId) => (overlayId) => (code) 
   }
 };
 
+// Copy text to clipboard
+// Returns true if successful, false otherwise
+export const copyToClipboardImpl = (text) => () => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+    });
+    return true;
+  } else {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return true;
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      document.body.removeChild(textarea);
+      return false;
+    }
+  }
+};
+
+// Copy text to clipboard and stop event propagation
+// Takes event and text, returns true if copy successful
+export const copyToClipboardWithEventImpl = (event) => (text) => () => {
+  // Stop the event from bubbling up (e.g., to prevent selecting the answer set)
+  if (event && event.stopPropagation) {
+    event.stopPropagation();
+  }
+  // Use the regular copy function
+  return copyToClipboardImpl(text)();
+};
+
 // Detect if the cursor is on an #include directive and return the file path
 // Returns null if not on an include, or the file path string if found
 export const getIncludeAtCursorImpl = (elementId) => () => {
