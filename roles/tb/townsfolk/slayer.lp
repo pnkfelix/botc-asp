@@ -8,7 +8,7 @@ reminder_on(sla_no_ability, Slayer, day(N, 0)) :- slayer_shot(Slayer, _, N).
 
 :- slayer_shot(Slayer, _, N),
    reminder_on(sla_no_ability, Slayer, T),
-   time(T), T = day(N2, Phase), N2 < N.
+   T = day(N2, _), N2 < N.
 
 died(Target, day(N, 0)) :-
     slayer_shot(Slayer, Target, N),
