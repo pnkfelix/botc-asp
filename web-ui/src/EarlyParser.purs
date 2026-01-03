@@ -5,6 +5,7 @@ module EarlyParser
   , extractFromFiles
   , extractPlayerCount
   , parsePlayerCount
+  , parseScript
   ) where
 
 import Prelude
@@ -185,3 +186,32 @@ parsePlayerCountLine r line =
 parsePlayerCountFromAny :: Array String -> Maybe Int
 parsePlayerCountFromAny contents =
   head $ mapMaybe parsePlayerCount contents
+
+-- | Parse #include "SCRIPT.lp" from inst.lp content
+-- | Returns the script id (e.g., "tb", "bmr", "snv")
+-- | Only matches script files (tb.lp, bmr.lp, snv.lp, carousel.lp), not botc.lp or players.lp
+parseScript :: String -> Maybe String
+parseScript content =
+  let
+    contentLines = split (Pattern "\n") content
+    -- Match #include "SCRIPT.lp". pattern where SCRIPT is tb, bmr, snv, or carousel
+    scriptRegex = hush $ regex """#include\s+"(tb|bmr|snv|carousel)\.lp"\s*\.""" noFlags
+  in
+    case scriptRegex of
+      Just r -> findFirstScriptMatch r contentLines
+      Nothing -> Nothing
+
+-- | Find first matching line and extract the script id
+findFirstScriptMatch :: Regex -> Array String -> Maybe String
+findFirstScriptMatch r lines =
+  head $ mapMaybe (parseScriptLine r) lines
+
+-- | Parse a single line for #include "SCRIPT.lp"
+parseScriptLine :: Regex -> String -> Maybe String
+parseScriptLine r line =
+  case match r (trim line) of
+    Just groups ->
+      case NEA.index groups 1 of
+        Just (Just scriptId) -> Just scriptId
+        _ -> Nothing
+    Nothing -> Nothing
