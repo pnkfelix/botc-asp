@@ -2,6 +2,8 @@ module Component.TimelineGrimoire
   ( component
   , Query
   , Output(..)
+  , Input
+  , ScriptRoles
   ) where
 
 import Prelude
@@ -84,20 +86,26 @@ type State =
   , viewMode :: ViewMode                 -- SVG (circular) or HTML (grid) view
   , bagCollapsed :: Boolean              -- Whether the bag panel is collapsed
   , scriptCollapsed :: Boolean           -- Whether the script panel is collapsed
+  , scriptRoles :: ScriptRoles           -- Script roles extracted from included files
   }
 
--- | Trouble Brewing script roles by category
-tbTownsfolk :: Array String
-tbTownsfolk = ["washerwoman", "librarian", "investigator", "chef", "empath", "fortune_teller", "undertaker", "monk", "ravenkeeper", "virgin", "slayer", "soldier", "mayor"]
+-- | Script roles by category (dynamically extracted from included files)
+type ScriptRoles =
+  { townsfolk :: Array String
+  , outsiders :: Array String
+  , minions :: Array String
+  , demons :: Array String
+  }
 
-tbOutsiders :: Array String
-tbOutsiders = ["butler", "drunk", "recluse", "saint"]
+-- | Input type for the component: atoms and script roles
+type Input =
+  { atoms :: Array String
+  , scriptRoles :: ScriptRoles
+  }
 
-tbMinions :: Array String
-tbMinions = ["poisoner", "spy", "scarlet_woman", "baron"]
-
-tbDemons :: Array String
-tbDemons = ["imp"]
+-- | Default (empty) script roles for when none are provided
+emptyScriptRoles :: ScriptRoles
+emptyScriptRoles = { townsfolk: [], outsiders: [], minions: [], demons: [] }
 
 -- | Component query type (empty - no queries supported)
 data Query :: forall k. k -> Type
@@ -106,7 +114,7 @@ data Query a
 -- | Component actions
 data Action
   = Initialize                            -- Set up JS drag handler
-  | ReceiveAtoms (Array String)
+  | ReceiveInput Input                    -- Receive new input (atoms and script roles)
   | SelectTimePoint ASP.TimePoint
   | ClickTimelineEvent ASP.TimelineEvent  -- User clicked on a specific event
   | ToggleViewMode                        -- Switch between SVG and HTML views
@@ -123,23 +131,23 @@ data Action
   | HandleRoleDrop RoleDrag.DropEvent
 
 -- | The Halogen component with output events
-component :: forall m. MonadEffect m => H.Component Query (Array String) Output m
+component :: forall m. MonadEffect m => H.Component Query Input Output m
 component =
   H.mkComponent
     { initialState
     , render
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
-        , receive = Just <<< ReceiveAtoms
+        , receive = Just <<< ReceiveInput
         , initialize = Just Initialize
         }
     }
 
 -- | Initial state from input
-initialState :: Array String -> State
-initialState atomStrings =
+initialState :: Input -> State
+initialState input =
   let
-    parsedAtoms = ASP.parseAnswerSetWithOriginals atomStrings
+    parsedAtoms = ASP.parseAnswerSetWithOriginals input.atoms
     atoms = map _.atom parsedAtoms
     timeline = ASP.extractTimelineWithSources parsedAtoms
     allTimes = getAllTimePoints atoms
@@ -155,6 +163,7 @@ initialState atomStrings =
     , viewMode: HtmlView  -- Default to HTML view for better mobile support
     , bagCollapsed: false    -- Bag panel starts expanded
     , scriptCollapsed: false -- Script panel starts expanded
+    , scriptRoles: input.scriptRoles
     }
 
 -- | Get all unique time points from atoms
@@ -460,13 +469,13 @@ renderScriptPanel state =
               <> "background: white; padding: 8px 8px 8px 20px;"  -- Extra left padding for scroll touch area
           ]
           [ -- Townsfolk section
-            renderScriptSection "Townsfolk" tbTownsfolk timeStr
+            renderScriptSection "Townsfolk" state.scriptRoles.townsfolk timeStr
           -- Outsiders section
-          , renderScriptSection "Outsiders" tbOutsiders timeStr
+          , renderScriptSection "Outsiders" state.scriptRoles.outsiders timeStr
           -- Minions section
-          , renderScriptSection "Minions" tbMinions timeStr
+          , renderScriptSection "Minions" state.scriptRoles.minions timeStr
           -- Demons section
-          , renderScriptSection "Demons" tbDemons timeStr
+          , renderScriptSection "Demons" state.scriptRoles.demons timeStr
           ]
     ]
 
@@ -1389,9 +1398,9 @@ handleAction = case _ of
     liftEffect $ void $ RoleDrag.subscribeToDrops \dropEvent ->
       HS.notify roleListener (HandleRoleDrop dropEvent)
 
-  ReceiveAtoms atomStrings -> do
+  ReceiveInput input -> do
     currentState <- H.get
-    let parsedAtoms = ASP.parseAnswerSetWithOriginals atomStrings
+    let parsedAtoms = ASP.parseAnswerSetWithOriginals input.atoms
     let atoms = map _.atom parsedAtoms
     let timeline = ASP.extractTimelineWithSources parsedAtoms
     let allTimes = getAllTimePoints atoms
@@ -1411,6 +1420,7 @@ handleAction = case _ of
       , timeline = timeline
       , allTimePoints = allTimes
       , selectedTime = preservedTime
+      , scriptRoles = input.scriptRoles
       }
 
   SelectTimePoint t -> do
