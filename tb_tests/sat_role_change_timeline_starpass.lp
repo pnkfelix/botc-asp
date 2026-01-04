@@ -1,9 +1,13 @@
 % Test: Imp starpass and minion is told at dawn(N)
 % When the Imp kills itself and starpass occurs,
 % there should be a timeline event for ST telling the new demon about the role change.
-#include "base.lp".
 
+% Include files directly (not base.lp) so we can set player_count first
 #const player_count = 5.
+#include "../botc.lp".
+#include "../tb.lp".
+#include "../players.lp".
+
 needs_night(2).
 
 % Setup: 5 players with passive roles to minimize solver complexity

@@ -1,9 +1,13 @@
 % Test: Scarlet Woman becomes demon and is told at dawn(N+1)
 % When the demon is executed and SW becomes the new demon,
 % there should be a timeline event for ST telling SW about the role change.
-#include "base.lp".
 
+% Include files directly (not base.lp) so we can set player_count first
 #const player_count = 5.
+#include "../botc.lp".
+#include "../tb.lp".
+#include "../players.lp".
+
 needs_night(2).
 
 % Setup: 5 players (need 5+ alive at day start for SW trigger)
