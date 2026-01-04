@@ -196,6 +196,7 @@ getAllTimePoints atoms =
     getTimePointFromAtom (ASP.ActingRole t _) = Just t
     getTimePointFromAtom (ASP.Executed _ d) = Just (ASP.Day d "exec")  -- Executions happen during day
     getTimePointFromAtom (ASP.GameOver t _) = Just t  -- Game over at start of day (evil) or exec (good)
+    getTimePointFromAtom (ASP.AssignedChange t _ _ _) = Just t  -- Role change at dawn/exec
     getTimePointFromAtom _ = Nothing
 
 -- | Find the time point when the game ends (if any)
@@ -696,9 +697,11 @@ eventAtTime t (ASP.RoleAction r) = r.time == t
 eventAtTime t (ASP.TokenPlaced r) = r.time == t
 eventAtTime t (ASP.Death d) = d.time == t
 eventAtTime t (ASP.GameOverEvent g) = g.time == t
+eventAtTime t (ASP.CharacterAssignment c) = c.time == t
 eventAtTime (ASP.Day d _) (ASP.Execution e) = e.day == d  -- Executions appear under their day
 eventAtTime _ (ASP.Execution _) = false
 eventAtTime _ (ASP.GameOverEvent _) = false
+eventAtTime _ (ASP.CharacterAssignment _) = false
 
 -- | Render a single event (clickable for navigation)
 renderEvent :: forall cs m. ASP.TimelineEvent -> H.ComponentHTML Action cs m
@@ -756,6 +759,17 @@ renderEvent event =
         , HP.title "Click to highlight this atom in the answer set"
         ]
         [ HH.text $ "🏆 GAME OVER - " <> (if r.winner == "good" then "Good" else "Evil") <> " wins!" ]
+    ASP.CharacterAssignment r ->
+      HH.div
+        [ HP.style $ "font-size: 12px; color: #6a1b9a; margin: 4px 0; font-weight: bold; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s; "
+            <> "background: #f3e5f5; border-left: 3px solid #9c27b0;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to highlight this atom in the answer set"
+        ]
+        [ HH.text $ r.player <> " becomes " <> formatRoleName r.newRole
+            <> " (was " <> formatRoleName r.oldRole <> ")"
+        ]
 
 -- | Render the grimoire (players in a circle)
 renderGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
@@ -1513,6 +1527,11 @@ handleAction = case _ of
             { sourceAtom: r.sourceAtom
             , predicateName: "d_game_over"
             , predicateArity: 2
+            }
+          ASP.CharacterAssignment r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "d_assigned_change"
+            , predicateArity: 4
             }
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo

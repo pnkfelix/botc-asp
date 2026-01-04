@@ -653,3 +653,24 @@ role_changed(P, OldRole, NewRole, N) :- role_changed_at_night(P, OldRole, NewRol
 % d_st_tells_role_change/3 - Timeline event for role change notification
 % This is the event of the ST telling a player about their new role.
 d_st_tells_role_change(P, R, T) :- st_tells_role_change(P, R, T).
+
+% d_assigned_change/4 - Player's character assignment changes mid-game
+% This is the event of a role transfer (starpass, Scarlet Woman becoming demon, etc.)
+% Format: d_assigned_change(Time, Player, OldRole, NewRole)
+% For night events (starpass), this fires at dawn when the change becomes effective.
+% For day events (Scarlet Woman), this fires at the execution time.
+
+% Scarlet Woman case: role change happens at execution time
+d_assigned_change(day(N, exec), Player, OldRole, NewRole) :-
+    sw_becomes_demon(Player, N),    % Scarlet Woman triggered on day N
+    assigned(N, Player, NewRole),   % Mid-game assignment
+    assigned(0, Player, OldRole),   % Original role
+    OldRole != NewRole.             % Actually changed
+
+% Night events (starpass): role change effective at dawn
+d_assigned_change(dawn(N), Player, OldRole, NewRole) :-
+    assigned(N, Player, NewRole),   % Mid-game assignment at night N
+    N > 0,                          % Not initial assignment
+    assigned(0, Player, OldRole),   % Original role
+    OldRole != NewRole,             % Actually changed
+    not sw_becomes_demon(Player, N). % Not a Scarlet Woman case
