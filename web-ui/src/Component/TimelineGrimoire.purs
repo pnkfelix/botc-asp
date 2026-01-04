@@ -301,13 +301,14 @@ render state =
     , renderReminderDebugPanel state gameState
     ]
 
--- | Render the bag panel (collapsible, shows tokens in the physical bag)
+-- | Render the bag panel (collapsible, shows tokens in the physical bag and bluffs)
 renderBagPanel :: forall cs m.
   State ->
   { players :: Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean }
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
   , bagTokens :: Array String
+  , bluffTokens :: Array String
   , assignedNotInBag :: Array String
   } ->
   H.ComponentHTML Action cs m
@@ -340,6 +341,29 @@ renderBagPanel state gameState =
               [ HP.style "margin: 0; color: #333; font-size: 14px;" ]
               [ HH.text "Bag" ]
         ]
+    -- Bluffs section (shown to demon, above bag)
+    , if state.bagCollapsed
+        then HH.text ""
+        else HH.div
+          [ HP.style "margin-bottom: 12px;" ]
+          [ HH.h4
+              [ HP.style "margin: 0 0 8px 0; color: #666; font-size: 12px; font-weight: normal;" ]
+              [ HH.text "Bluffs (shown to demon)" ]
+          , HH.div
+              [ HP.style $ "border: 1px solid #9370db; border-radius: 4px; "
+                  <> "background: #f8f5ff; padding: 8px; min-height: 64px;"
+              -- Make bluffs container a drop target
+              , HP.attr (HH.AttrName "data-player") "__bluffs__"
+              ]
+              [ if null gameState.bluffTokens
+                  then HH.p
+                    [ HP.style "color: #666; font-style: italic; font-size: 12px; margin: 0;" ]
+                    [ HH.text "Drag 3 good roles here" ]
+                  else HH.div
+                    [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
+                    (map (renderBluffToken timeStr) gameState.bluffTokens)
+              ]
+          ]
     -- Bag content (hidden when collapsed)
     , if state.bagCollapsed
         then HH.text ""
@@ -426,6 +450,32 @@ renderBagToken timeStr role =
     , HP.attr (HH.AttrName "data-role-color") roleColor
     , HP.attr (HH.AttrName "data-role-display") (formatRoleName role)
     , HP.title (formatRoleName role)
+    ]
+    [ HH.text $ formatRoleName role ]
+
+-- | Render a single token in the bluffs section (draggable)
+renderBluffToken :: forall cs m.
+  String ->  -- time string
+  String ->  -- role name
+  H.ComponentHTML Action cs m
+renderBluffToken timeStr role =
+  let
+    roleColor = getRoleColor role
+  in
+  HH.div
+    [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
+        <> "background: " <> roleColor <> "; "
+        <> "border: 2px solid #9370db; box-shadow: 0 1px 3px rgba(0,0,0,0.2); "
+        <> "display: flex; align-items: center; justify-content: center; "
+        <> "cursor: grab; touch-action: none; user-select: none; "
+        <> "font-size: 8px; font-weight: bold; color: white; text-align: center; padding: 2px;"
+    -- Data attributes for drag - uses __bluffs__ as source indicator
+    , HP.attr (HH.AttrName "data-role-token") role
+    , HP.attr (HH.AttrName "data-role-player") "__bluffs__"
+    , HP.attr (HH.AttrName "data-role-time") timeStr
+    , HP.attr (HH.AttrName "data-role-color") roleColor
+    , HP.attr (HH.AttrName "data-role-display") (formatRoleName role)
+    , HP.title $ (formatRoleName role) <> " (bluff)"
     ]
     [ HH.text $ formatRoleName role ]
 

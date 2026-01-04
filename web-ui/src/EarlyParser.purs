@@ -49,8 +49,11 @@ extractEarlyAtoms playersContent instContent =
     bagAtoms = case instContent of
       Just content -> parseAssertDrawnFacts content
       Nothing -> []
+    bluffAtoms = case instContent of
+      Just content -> parseAssertBluffFacts content
+      Nothing -> []
   in
-    chairAtoms <> receivedAtoms <> bagAtoms
+    chairAtoms <> receivedAtoms <> bagAtoms <> bluffAtoms
 
 -- | Parse chair/2 facts from players.lp content
 -- | Format: chair(player, position).
@@ -138,6 +141,35 @@ parseAssertDrawnLine r line =
         Just (Just role) ->
           -- Return as bag(role) so it shows in the bag panel
           Just $ "bag(" <> role <> ")"
+        _ -> Nothing
+    Nothing -> Nothing
+
+-- | Parse assert_bluff(role) facts from inst.lp content
+-- | Returns bluff(role) atoms so they display in pre-solve bluffs panel
+parseAssertBluffFacts :: String -> Array String
+parseAssertBluffFacts content =
+  let
+    -- Split into lines and parse each
+    contentLines = split (Pattern "\n") content
+    -- Filter out commented lines first
+    activeLines = filter (not <<< isCommentLine) contentLines
+    -- Match assert_bluff(role). pattern
+    assertBluffRegex = hush $ regex """assert_bluff\s*\(\s*(\w+)\s*\)\s*\.""" noFlags
+  in
+    case assertBluffRegex of
+      Just r -> mapMaybe (parseAssertBluffLine r) activeLines
+      Nothing -> []
+
+-- | Parse a single line for assert_bluff(role) fact
+parseAssertBluffLine :: Regex -> String -> Maybe String
+parseAssertBluffLine r line =
+  case match r (trim line) of
+    Just groups ->
+      -- groups is NonEmptyArray: [fullMatch, role]
+      case NEA.index groups 1 of
+        Just (Just role) ->
+          -- Return as bluff(role) so it shows in the bluffs panel
+          Just $ "bluff(" <> role <> ")"
         _ -> Nothing
     Nothing -> Nothing
 

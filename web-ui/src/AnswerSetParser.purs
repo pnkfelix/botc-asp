@@ -41,6 +41,7 @@ data Atom
   | Chair String Int                    -- game_chair(player, position)
   | Executed String Int                 -- d_executed(player, day)
   | Bag String                          -- bag(role) - role is in the physical bag
+  | Bluff String                        -- bluff(role) - role shown to demon as bluff
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -89,6 +90,7 @@ atomCategory = case _ of
   Time _                -> StructuralPredicate
   ActingRole _ _        -> StructuralPredicate
   Bag _                 -> StructuralPredicate
+  Bluff _               -> StructuralPredicate
   -- Unknown
   UnknownAtom _         -> OtherPredicate
 
@@ -199,6 +201,7 @@ type GameState =
   , reminders :: Array { token :: String, player :: String, placedAt :: TimePoint }
   , time :: TimePoint
   , bagTokens :: Array String  -- roles in the physical bag
+  , bluffTokens :: Array String  -- roles shown to demon as bluffs
   , assignedNotInBag :: Array String  -- roles assigned to players but not received (e.g., Drunk)
   }
 
@@ -222,7 +225,8 @@ parseAtom atomStr =
       parseActingRole trimmed <|>
       parseChair trimmed <|>
       parseExecuted trimmed <|>
-      parseBag trimmed
+      parseBag trimmed <|>
+      parseBluff trimmed
 
 -- | Parse assigned(T, Player, Role)
 parseAssigned :: String -> Maybe Atom
@@ -433,6 +437,14 @@ parseBag s = do
   let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bag(" and ")"
   Just $ Bag (trim rest)
 
+-- | Parse bluff(Role)
+parseBluff :: String -> Maybe Atom
+parseBluff s = do
+  let pattern = "bluff("
+  _ <- if take (length pattern) s == pattern then Just unit else Nothing
+  let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bluff(" and ")"
+  Just $ Bluff (trim rest)
+
 -- | Parse a time string like "night(1,2,3)", "dawn(1)", or "day(1,0)"
 parseTime :: String -> TimePoint
 parseTime s =
@@ -597,6 +609,9 @@ buildGameState atoms targetTime =
     -- Get bag tokens (roles in the physical bag)
     bagTokens = mapMaybe getBagToken atoms
 
+    -- Get bluff tokens (roles shown to demon as bluffs)
+    bluffTokens = mapMaybe getBluffToken atoms
+
     -- Get chairs
     chairs = mapMaybe getChair atoms
 
@@ -657,11 +672,15 @@ buildGameState atoms targetTime =
     , reminders: remindersAtTime
     , time: targetTime
     , bagTokens
+    , bluffTokens
     , assignedNotInBag
     }
   where
     getBagToken (Bag role) = Just role
     getBagToken _ = Nothing
+
+    getBluffToken (Bluff role) = Just role
+    getBluffToken _ = Nothing
 
     getChair (Chair name pos) = Just { name, pos }
     getChair _ = Nothing
@@ -879,6 +898,7 @@ atomToPredicateName = case _ of
   Chair _ _              -> { name: "game_chair", arity: 2 }
   Executed _ _           -> { name: "d_executed", arity: 2 }
   Bag _                  -> { name: "bag", arity: 1 }
+  Bluff _                -> { name: "bluff", arity: 1 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =

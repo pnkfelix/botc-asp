@@ -465,3 +465,27 @@ modifyInstLpForRole content _oldPattern newConstraint role fromPlayer toPlayer =
                    else modifiedLines <> ["", addedComment, newConstraint]
   in
     intercalate "\n" finalLines
+
+-- | Comment out a specific constraint in inst.lp content
+-- | Used when moving a role from bag to bluffs (removes from bag)
+commentOutConstraint :: String -> String -> String
+commentOutConstraint content constraintPattern =
+  let
+    -- Split content into lines
+    contentLines = String.split (String.Pattern "\n") content
+    -- Comment out any line matching the pattern
+    modifiedLines = map (commentOutIfExact constraintPattern) contentLines
+  in
+    intercalate "\n" modifiedLines
+
+-- | Comment out a line if it exactly matches the pattern
+commentOutIfExact :: String -> String -> String
+commentOutIfExact patternStr line =
+  let
+    trimmedLine = trim line
+    trimmedPattern = trim patternStr
+    firstChar = String.take 1 trimmedLine
+  in
+    if trimmedLine == trimmedPattern && firstChar /= "%"
+      then "% " <> line <> "  % moved to bluffs"
+      else line
