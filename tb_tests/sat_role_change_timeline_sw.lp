@@ -1,4 +1,4 @@
-% Test: Scarlet Woman becomes demon and is told at dawn(N+1)
+% Test: Scarlet Woman becomes demon and is told immediately at execution
 % When the demon is executed and SW becomes the new demon,
 % there should be a timeline event for ST telling SW about the role change.
 
@@ -35,9 +35,8 @@ executed(courtney, 1).
 % Assert: generic role_changed should also work
 :- not role_changed(steph, scarlet_woman, imp, 1).
 
-% Assert: ST should tell steph about role change at dawn(2)
-% (after night 2, which follows day 1)
-:- not st_tells_role_change(steph, imp, dawn(2)).
+% Assert: ST should tell steph about role change immediately at execution
+:- not st_tells_role_change(steph, imp, day(1, exec)).
 
 % Assert: timeline event should be generated
-:- not d_st_tells_role_change(steph, imp, dawn(2)).
+:- not d_st_tells_role_change(steph, imp, day(1, exec)).
