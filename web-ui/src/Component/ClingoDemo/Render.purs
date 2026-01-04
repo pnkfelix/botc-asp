@@ -998,7 +998,7 @@ renderNavigateIncludeDialog (Just targetPath) files =
                 [ HP.style $ "padding: 8px 16px; font-size: 14px; cursor: pointer; "
                     <> "background: " <> (if fileExists then "#4CAF50" else "#ccc") <> "; "
                     <> "color: white; border: none; border-radius: 4px;"
-                , HE.onClick \_ -> ConfirmNavigateToInclude targetPath
+                , HE.onClick \e -> ConfirmNavigateToInclude e targetPath
                 , HP.disabled (not fileExists)
                 ]
                 [ HH.text "Open File" ]

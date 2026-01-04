@@ -478,9 +478,15 @@ handleAction = case _ of
       Nothing ->
         pure unit  -- Not on an include, do nothing
 
-  ConfirmNavigateToInclude targetPath -> do
+  ConfirmNavigateToInclude mouseEvent targetPath -> do
+    -- Stop event propagation so CancelNavigateToInclude doesn't also fire
+    liftEffect $ TU.stopPropagation (toEvent mouseEvent)
     -- Navigate to the included file
     H.modify_ \s -> s { currentFile = targetPath, navigateIncludeTarget = Nothing }
+    -- Update syntax highlighting for the newly selected file
+    state <- H.get
+    let content = fromMaybe "" $ Map.lookup state.currentFile state.files
+    liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" content
 
   CancelNavigateToInclude -> do
     H.modify_ \s -> s { navigateIncludeTarget = Nothing }

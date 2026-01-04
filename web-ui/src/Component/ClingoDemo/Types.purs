@@ -107,7 +107,7 @@ data Action
   | Undo                        -- Undo the last token drag operation
   | Redo                        -- Redo the last undone token drag operation
   | TextareaClicked             -- Check if clicked on #include directive
-  | ConfirmNavigateToInclude String  -- Navigate to the included file
+  | ConfirmNavigateToInclude MouseEvent String  -- Navigate to the included file (with event for stopPropagation)
   | CancelNavigateToInclude     -- Cancel the navigation dialog
   | ShowTimingDiff TimingEntry  -- Show diff modal for a timing entry
   | CloseDiffModal              -- Close the diff modal

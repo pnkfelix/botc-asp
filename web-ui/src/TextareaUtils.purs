@@ -9,6 +9,7 @@ module TextareaUtils
   , updateHighlightOverlay
   , copyToClipboard
   , copyToClipboardWithEvent
+  , stopPropagation
   ) where
 
 import Prelude
@@ -89,3 +90,10 @@ foreign import copyToClipboardWithEventImpl :: Event -> String -> Effect Boolean
 
 copyToClipboardWithEvent :: Event -> String -> Effect Boolean
 copyToClipboardWithEvent = copyToClipboardWithEventImpl
+
+-- | Stop event propagation
+-- | Useful when a button is inside a clickable container
+foreign import stopPropagationImpl :: Event -> Effect Unit
+
+stopPropagation :: Event -> Effect Unit
+stopPropagation = stopPropagationImpl

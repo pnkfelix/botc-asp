@@ -366,6 +366,14 @@ export const copyToClipboardImpl = (text) => () => {
   }
 };
 
+// Stop event propagation
+// Useful when a button is inside a clickable container
+export const stopPropagationImpl = (event) => () => {
+  if (event && event.stopPropagation) {
+    event.stopPropagation();
+  }
+};
+
 // Copy text to clipboard and stop event propagation
 // Takes event and text, returns true if copy successful
 export const copyToClipboardWithEventImpl = (event) => (text) => () => {
