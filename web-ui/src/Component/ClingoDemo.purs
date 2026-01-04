@@ -29,7 +29,7 @@ import Web.UIEvent.MouseEvent (toEvent)
 
 -- Re-export types and render function for backwards compatibility
 import Component.ClingoDemo.Types (Action(..), ResultDisplay(..), Slots, State, TimingEntry, UndoEntry, answerSetPageSize)
-import Component.ClingoDemo.Utils (availableFiles, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updatePlayerCount, updateScript)
+import Component.ClingoDemo.Utils (availableFiles, commentOutConstraint, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updatePlayerCount, updateScript)
 import Component.ClingoDemo.Render (render)
 
 -- | The Halogen component
@@ -340,10 +340,33 @@ handleAction = case _ of
                   then "assert_distrib(" <> role <> ")."
                   else "assert_drawn(" <> role <> ")."
             let undoEntry = { instLpContent: instContent
-                            , description: "Add " <> role <> " to bag"
+                            , description: if fromPlayer == "__bluffs__"
+                                then "Move " <> role <> " from bluffs to bag"
+                                else "Add " <> role <> " to bag"
                             }
-            -- Add the constraint to inst.lp
-            let modifiedContent = instContent <> "\n" <> newConstraint
+            -- Add the constraint to inst.lp, and if from bluffs, remove from bluffs
+            let modifiedContent = if fromPlayer == "__bluffs__"
+                  then commentOutConstraint instContent ("assert_bluff(" <> role <> ").") <> "\n" <> newConstraint
+                  else instContent <> "\n" <> newConstraint
+            H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
+                              , undoStack = snoc s.undoStack undoEntry
+                              , redoStack = []
+                              }
+            -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
+            if isPostSolve then handleAction RunClingo else pure unit
+          else if toPlayer == "__bluffs__" then do
+            -- Dropping onto the bluffs panel: add assert_bluff
+            -- If from bag, remove from bag (comment out assert_drawn)
+            let newConstraint = "assert_bluff(" <> role <> ")."
+            let undoEntry = { instLpContent: instContent
+                            , description: if fromPlayer == "__bag__"
+                                then "Move " <> role <> " from bag to bluffs"
+                                else "Add " <> role <> " as bluff"
+                            }
+            -- Add the constraint to inst.lp, and if from bag, comment out the bag constraint
+            let modifiedContent = if fromPlayer == "__bag__"
+                  then commentOutConstraint instContent ("assert_drawn(" <> role <> ").") <> "\n" <> newConstraint
+                  else instContent <> "\n" <> newConstraint
             H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
                               , undoStack = snoc s.undoStack undoEntry
                               , redoStack = []
@@ -353,16 +376,20 @@ handleAction = case _ of
           else do
             -- Normal drop onto a player
             -- Detect if this is a copy operation from script/bag (special sources)
-            let isCopyOperation = take 2 fromPlayer == "__"
+            -- Bluffs is NOT a copy operation - dragging from bluffs removes from bluffs
+            let isCopyOperation = take 2 fromPlayer == "__" && fromPlayer /= "__bluffs__"
             let sourceDescription = case fromPlayer of
                   "__script__" -> "script"
                   "__bag__" -> "bag"
+                  "__bluffs__" -> "bluffs"
                   _ -> fromPlayer
             -- Push current state onto undo stack (before making changes)
             let undoEntry = { instLpContent: instContent
                             , description: if isCopyOperation
                                 then "Assign " <> role <> " from " <> sourceDescription <> " to " <> toPlayer
-                                else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
+                                else if fromPlayer == "__bluffs__"
+                                  then "Move " <> role <> " from bluffs to " <> toPlayer
+                                  else "Move " <> role <> " from " <> fromPlayer <> " to " <> toPlayer
                             }
             -- Create the new constraint (forces toPlayer to receive this token)
             let newConstraint = "assert_received(" <> toPlayer <> ", " <> role <> ")."
@@ -374,7 +401,11 @@ handleAction = case _ of
             -- Modify the content: comment out old constraint if present, add new one
             -- For copy operations, use sourceDescription for cleaner comments
             let effectiveFromPlayer = if isCopyOperation then sourceDescription else fromPlayer
-            let modifiedContent = modifyInstLpForRole instContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
+            -- If from bluffs, also remove from bluffs
+            let baseContent = if fromPlayer == "__bluffs__"
+                  then commentOutConstraint instContent ("assert_bluff(" <> role <> ").")
+                  else instContent
+            let modifiedContent = modifyInstLpForRole baseContent oldConstraintPattern newConstraint role effectiveFromPlayer toPlayer
             -- Update the virtual filesystem, push undo entry, and clear redo stack
             H.modify_ \s -> s { files = Map.insert "inst.lp" modifiedContent s.files
                               , undoStack = snoc s.undoStack undoEntry
