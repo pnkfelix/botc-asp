@@ -7,6 +7,7 @@
 #const player_count = 6.
 
 % Baron + 2 outsiders (1 base for 6 players + 1 from baron)
+% Note: must use players with chairs 0-5 for 6-player game
 assigned(0, taylor, baron).
 assigned(0, felix, drunk).
-assigned(0, kunjal, butler).
+assigned(0, courtney, butler).
