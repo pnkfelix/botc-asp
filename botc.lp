@@ -400,6 +400,16 @@ distrib(R) :- assigned(0, _, R).
 :- assert_received(P, R), not received(P, R).
 % assert_drawn(R) requires that role R is in the bag (was drawn from script into bag)
 :- assert_drawn(R), not bag(R).
+
+% Bluffs: 3 good roles shown to the demon that are not in the bag
+% A role can be a bluff if it's a good role (townsfolk or outsider) and not in the bag
+can_be_bluff(R) :- townsfolk(R), not bag(R).
+can_be_bluff(R) :- outsider(R), not bag(R).
+% Choose exactly 3 bluffs from available candidates
+{bluff(R) : can_be_bluff(R)} = 3.
+% assert_bluff(R) requires that role R must be a bluff
+:- assert_bluff(R), not bluff(R).
+
 %{distrib(X) : demon(X)} = 1.
 %{distrib(X) : minion(X)} = 1    :- 7 <= player_count <= 9.
 %{distrib(X) : townsfolk(X)} = 5 - A :- 7 <= player_count <= 9, outsider_adjustment(A).
