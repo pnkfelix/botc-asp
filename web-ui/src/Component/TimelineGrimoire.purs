@@ -698,10 +698,12 @@ eventAtTime t (ASP.TokenPlaced r) = r.time == t
 eventAtTime t (ASP.Death d) = d.time == t
 eventAtTime t (ASP.GameOverEvent g) = g.time == t
 eventAtTime t (ASP.CharacterAssignment c) = c.time == t
+eventAtTime t (ASP.RoleChangeNotification r) = r.time == t
 eventAtTime (ASP.Day d _) (ASP.Execution e) = e.day == d  -- Executions appear under their day
 eventAtTime _ (ASP.Execution _) = false
 eventAtTime _ (ASP.GameOverEvent _) = false
 eventAtTime _ (ASP.CharacterAssignment _) = false
+eventAtTime _ (ASP.RoleChangeNotification _) = false
 
 -- | Render a single event (clickable for navigation)
 renderEvent :: forall cs m. ASP.TimelineEvent -> H.ComponentHTML Action cs m
@@ -770,6 +772,15 @@ renderEvent event =
         [ HH.text $ r.player <> " becomes " <> formatRoleName r.newRole
             <> " (was " <> formatRoleName r.oldRole <> ")"
         ]
+    ASP.RoleChangeNotification r ->
+      HH.div
+        [ HP.style $ "font-size: 12px; color: #1565c0; margin: 4px 0; cursor: pointer; "
+            <> "padding: 4px 6px; border-radius: 4px; transition: background-color 0.2s; "
+            <> "background: #e3f2fd; border-left: 3px solid #1976d2;"
+        , HE.onClick \_ -> ClickTimelineEvent event
+        , HP.title "Click to highlight this atom in the answer set"
+        ]
+        [ HH.text $ "ST tells " <> r.player <> ": You are now the " <> formatRoleName r.newRole ]
 
 -- | Render the grimoire (players in a circle)
 renderGrimoire :: forall cs m. State -> H.ComponentHTML Action cs m
@@ -1532,6 +1543,11 @@ handleAction = case _ of
             { sourceAtom: r.sourceAtom
             , predicateName: "d_assigned_change"
             , predicateArity: 4
+            }
+          ASP.RoleChangeNotification r ->
+            { sourceAtom: r.sourceAtom
+            , predicateName: "d_st_tells_role_change"
+            , predicateArity: 3
             }
     -- Emit the output event
     H.raise $ TimelineEventClicked eventInfo
