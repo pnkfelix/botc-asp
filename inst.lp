@@ -45,6 +45,7 @@ needs_night(3).
 
 #show distrib/1.
 #show bag/1.
+#show bluff/1.
 %#show time/1.
 %#show next/2.
 %#show impaired/2.
