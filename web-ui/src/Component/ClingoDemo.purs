@@ -352,6 +352,10 @@ handleAction = case _ of
                               , undoStack = snoc s.undoStack undoEntry
                               , redoStack = []
                               }
+            -- Update syntax highlighting overlay if inst.lp is currently displayed
+            state' <- H.get
+            when (state'.currentFile == "inst.lp") do
+              liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" modifiedContent
             -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
             if isPostSolve then handleAction RunClingo else pure unit
           else if toPlayer == "__bluffs__" then do
@@ -371,6 +375,10 @@ handleAction = case _ of
                               , undoStack = snoc s.undoStack undoEntry
                               , redoStack = []
                               }
+            -- Update syntax highlighting overlay if inst.lp is currently displayed
+            state' <- H.get
+            when (state'.currentFile == "inst.lp") do
+              liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" modifiedContent
             -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
             if isPostSolve then handleAction RunClingo else pure unit
           else do
@@ -411,6 +419,10 @@ handleAction = case _ of
                               , undoStack = snoc s.undoStack undoEntry
                               , redoStack = []  -- Clear redo stack on new action
                               }
+            -- Update syntax highlighting overlay if inst.lp is currently displayed
+            state' <- H.get
+            when (state'.currentFile == "inst.lp") do
+              liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" modifiedContent
             -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
             if isPostSolve then handleAction RunClingo else pure unit
 
