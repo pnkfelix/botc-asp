@@ -239,6 +239,14 @@ def run_tests(test_files: list[Path], save_timings: bool = True, show_history: b
             msg += f" ({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})"
         print(msg)
 
+    # Print summary line of failed tests for easy copy/paste
+    if fail_count > 0:
+        failed_names = [r[0] for r in results if not r[4]]
+        if use_rich:
+            console.print(f"\nFailed tests: {' '.join(failed_names)}")
+        else:
+            print(f"\nFailed tests: {' '.join(failed_names)}")
+
     return fail_count
 
 
