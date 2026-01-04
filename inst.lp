@@ -3,19 +3,12 @@
 #include "players.lp".
 
 #const player_count = 8.
-% We are demoing three nights, so we write needs_night(3).
 needs_night(3).
-% These roles must be in play, but the solver chooses which players get them
+% Force specific roles into the game (solver chooses players)
 % assert_distrib(drunk).
-% assert_distrib(poisoner).
-% assert_distrib(washerwoman).
-% assert_distrib(librarian).
-% assert_distrib(investigator).
 
-% Anchor a few players to specific tokens to reduce solution jumping
+% Anchor players to specific roles to reduce solution jumping
 % received(felix, chef).
-% received(amanda, poisoner).
-% received(rob, washerwoman).
 
 % Town executes exactly one living player at the end of each day
 % (unless the game has already ended at the start of this day)
@@ -39,9 +32,7 @@ needs_night(3).
 % Note: Special cases like Shabbaloth will need separate handling
 :- player_chooses(imp, Imp, point(Target), T), Target != Imp, not alive(Target, T).
 
-% st_tells predicates for player-observed info (unwrapped for convenience):
-%   st_tells(role_or_player, value)           e.g. st_tells(chef, 2)
-%   st_tells(role_or_player, value, night)    e.g. st_tells(empath, 1, 2)
+% st_tells(role, value) or st_tells(role, value, night) for nightly info
 
 #show distrib/1.
 #show bag/1.
