@@ -298,6 +298,10 @@ handleAction = case _ of
                                 , undoStack = snoc s.undoStack undoEntry
                                 , redoStack = []  -- Clear redo stack on new action
                                 }
+              -- Update syntax highlighting overlay if inst.lp is currently displayed
+              state' <- H.get
+              when (state'.currentFile == "inst.lp") do
+                liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" modifiedContent
               -- Re-run Clingo with the new constraints
               handleAction RunClingo
     TG.RoleMoved { role, fromPlayer, toPlayer, time } -> do
