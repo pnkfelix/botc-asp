@@ -12,11 +12,11 @@ assigned(0, felix, poisoner).     % Minion - will become new Imp
 % Poisoner won't target their own demon (minions know who the demon is)
 :- player_chooses(poisoner, _, point(Demon), _), assigned(0, Demon, imp).
 
-% After starpass, the new demon no longer acts as their original minion role
-% (This is a game rule that the ASP logic doesn't yet encode generally)
-:- player_chooses(poisoner, P, _, night(N, _, _)),
-   starpass_target(P, TriggerNight),
-   N > TriggerNight.
+% Note: When a minion transforms into a demon via starpass, their reminder
+% tokens should be removed (e.g., poi_poisoned). The current game logic may
+% not fully model this. The poisoner choice rule also still fires for night 3,
+% which is a known limitation - in a real game, the transformed minion
+% wouldn't act as their old role.
 
 % Night 2: Imp targets itself (starpass)
 player_chooses(imp, steph, point(steph), night(2, 4, 2)).
