@@ -18,7 +18,8 @@ other_night_substep(poisoner, 3, st_places(poisoned)).
     night_number(N), N > 1,
     other_night_role_order(poisoner, RoleOrd),
     assigned(0, Poisoner, poisoner),
-    alive(Poisoner, night(N, 0, 0)).
+    alive(Poisoner, night(N, 0, 0)),
+    not current_demon(Poisoner, N).  % Don't act as poisoner if now a demon
 
 reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) :-
     first_night_role_order(poisoner, RoleOrd),

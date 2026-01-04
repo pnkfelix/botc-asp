@@ -13,10 +13,8 @@ assigned(0, felix, poisoner).     % Minion - will become new Imp
 :- player_chooses(poisoner, _, point(Demon), _), assigned(0, Demon, imp).
 
 % Note: When a minion transforms into a demon via starpass, their reminder
-% tokens should be removed (e.g., poi_poisoned). The current game logic may
-% not fully model this. The poisoner choice rule also still fires for night 3,
-% which is a known limitation - in a real game, the transformed minion
-% wouldn't act as their old role.
+% tokens (e.g., poi_poisoned) should ideally be removed. This isn't yet fully
+% modeled. The poisoner choice rule now correctly excludes current demons.
 
 % Night 2: Imp targets itself (starpass)
 player_chooses(imp, steph, point(steph), night(2, 4, 2)).
