@@ -36,6 +36,7 @@ data Atom
   | DeathAnnounced String TimePoint     -- d_death_announced(player, time) - death publicly announced
   | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
   | GameOver TimePoint String           -- d_game_over(time, winner) - game ends at time, winner is "good" or "evil"
+  | AssignedChange TimePoint String String String  -- d_assigned_change(time, player, oldRole, newRole) - role transfer
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
@@ -77,6 +78,7 @@ atomCategory = case _ of
   Died _ _              -> EventPredicate
   DeathAnnounced _ _    -> EventPredicate
   GameOver _ _          -> EventPredicate
+  AssignedChange _ _ _ _ -> EventPredicate
   -- State predicates: ongoing state, not events
   -- Note: reminder_on(token,player,time) represents accumulated state
   -- ("reminder is on player at time"), not the action of placing it.
@@ -192,6 +194,13 @@ data TimelineEvent
       , winner :: String  -- "good" or "evil"
       , sourceAtom :: String
       }
+  | CharacterAssignment
+      { time :: TimePoint
+      , player :: String
+      , oldRole :: String
+      , newRole :: String
+      , sourceAtom :: String
+      }
 
 derive instance eqTimelineEvent :: Eq TimelineEvent
 
@@ -221,6 +230,7 @@ parseAtom atomStr =
       parseDeathAnnounced trimmed <|>
       parseGhostVoteUsed trimmed <|>
       parseGameOver trimmed <|>
+      parseAssignedChange trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
       parseChair trimmed <|>
@@ -378,6 +388,25 @@ parseGameOver s =
        in case parseTimeAndRest rest of
             Just { time, rest: winner } ->
               Just $ GameOver time (trim winner)
+            Nothing -> Nothing
+     else Nothing
+
+-- | Parse d_assigned_change(Time, Player, OldRole, NewRole)
+parseAssignedChange :: String -> Maybe Atom
+parseAssignedChange s =
+  let pattern = "d_assigned_change("
+  in if take (length pattern) s == pattern
+     then
+       let rest = drop (length pattern) (take (length s - 1) s)
+       in case parseTimeAndRest rest of
+            Just { time, rest: rest1 } ->
+              case splitAtFirstComma rest1 of
+                Just { before: player, after: rest2 } ->
+                  case splitAtFirstComma rest2 of
+                    Just { before: oldRole, after: newRole } ->
+                      Just $ AssignedChange time (trim player) (trim oldRole) (trim newRole)
+                    Nothing -> Nothing
+                Nothing -> Nothing
             Nothing -> Nothing
      else Nothing
 
@@ -789,8 +818,10 @@ extractTimelineWithSources parsedAtoms =
     deathEvents = mapMaybe toDeathEvent parsedAtoms
     -- Game over events
     gameOverEvents = mapMaybe toGameOverEvent parsedAtoms
+    -- Character assignment change events (starpass, Scarlet Woman, etc.)
+    characterAssignmentEvents = mapMaybe toCharacterAssignmentEvent parsedAtoms
   in
-    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents <> gameOverEvents)
+    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents <> gameOverEvents <> characterAssignmentEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
       Just $ RoleAction { time, role, eventType: "d_st_tells", player, message, sourceAtom: original }
@@ -821,6 +852,11 @@ extractTimelineWithSources parsedAtoms =
     toGameOverEvent { atom: GameOver time winner, original } =
       Just $ GameOverEvent { time, winner, sourceAtom: original }
     toGameOverEvent _ = Nothing
+
+    -- Convert AssignedChange to CharacterAssignment event
+    toCharacterAssignmentEvent { atom: AssignedChange time player oldRole newRole, original } =
+      Just $ CharacterAssignment { time, player, oldRole, newRole, sourceAtom: original }
+    toCharacterAssignmentEvent _ = Nothing
 
     -- Filter TokenPlaced events to only keep the earliest occurrence of each token+player
     filterNewTokenPlacements :: Array TimelineEvent -> Array TimelineEvent
@@ -875,6 +911,18 @@ extractTimelineWithSources parsedAtoms =
       Death d, GameOverEvent g -> compareTimePoints d.time g.time
       GameOverEvent g, Execution e -> compare g.time (Day e.day "exec")
       Execution e, GameOverEvent g -> compare (Day e.day "exec") g.time
+      -- CharacterAssignment comparisons
+      CharacterAssignment c1, CharacterAssignment c2 -> compareTimePoints c1.time c2.time
+      CharacterAssignment c, RoleAction r -> compareTimePoints c.time r.time
+      RoleAction r, CharacterAssignment c -> compareTimePoints r.time c.time
+      CharacterAssignment c, TokenPlaced t -> compareTimePoints c.time t.time
+      TokenPlaced t, CharacterAssignment c -> compareTimePoints t.time c.time
+      CharacterAssignment c, Death d -> compareTimePoints c.time d.time
+      Death d, CharacterAssignment c -> compareTimePoints d.time c.time
+      CharacterAssignment c, Execution e -> compare c.time (Day e.day "exec")
+      Execution e, CharacterAssignment c -> compare (Day e.day "exec") c.time
+      CharacterAssignment c, GameOverEvent g -> compareTimePoints c.time g.time
+      GameOverEvent g, CharacterAssignment c -> compareTimePoints g.time c.time
 
 -- | Get state at a specific time point
 getStateAtTime :: Array Atom -> TimePoint -> GameState
@@ -893,6 +941,7 @@ atomToPredicateName = case _ of
   DeathAnnounced _ _     -> { name: "d_death_announced", arity: 2 }
   GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
   GameOver _ _           -> { name: "d_game_over", arity: 2 }
+  AssignedChange _ _ _ _ -> { name: "d_assigned_change", arity: 4 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }
