@@ -601,3 +601,55 @@ d_died(P, T) :- died(P, T).
 % This is what appears in the timeline as the "public" death event.
 d_death_announced(P, dawn(N)) :- died(P, night(N, _, _)).
 d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
+
+% ===========================================================================
+% Role Change Timeline Events
+% ===========================================================================
+% When a player's role changes mid-game (e.g., Scarlet Woman becomes demon,
+% Imp starpass), the storyteller must tell them about their new role.
+%
+% Role changes can happen at different phases:
+%   - During day (e.g., SW becomes demon when demon is executed)
+%   - During night (e.g., starpass when Imp kills itself)
+%
+% The ST tells the player at dawn following the change:
+%   - Day N changes → told at dawn(N+1) (after night N+1)
+%   - Night N changes → told at dawn(N) (immediately after that night)
+%
+% Timeline sequence: night(N) → dawn(N) → day(N) → night(N+1) → dawn(N+1)
+%
+% st_tells_role_change/3 is the event of ST telling the player:
+%   st_tells_role_change(Player, ToldRole, Time)
+%   where ToldRole is what the player is told (usually their actual new role,
+%   but could differ if they're drunk/poisoned/etc.)
+% ===========================================================================
+
+% Role changes during day phase (e.g., SW becomes demon at execution)
+% Format: role_changed_at_day(Player, OldRole, NewRole, DayNumber)
+% Player is told at dawn(DayNumber + 1)
+role_changed_at_day(P, OldRole, imp, N) :-
+    sw_becomes_demon(P, N),
+    assigned(0, P, OldRole).
+
+st_tells_role_change(P, NewRole, dawn(N+1)) :-
+    role_changed_at_day(P, _, NewRole, N),
+    day_number(N+1).
+
+% Role changes during night phase (e.g., starpass)
+% Format: role_changed_at_night(Player, OldRole, NewRole, NightNumber)
+% Player is told at dawn(NightNumber) - the dawn immediately following
+role_changed_at_night(P, OldRole, imp, N) :-
+    starpass_target(P, N),
+    assigned(0, P, OldRole).
+
+st_tells_role_change(P, NewRole, dawn(N)) :-
+    role_changed_at_night(P, _, NewRole, N),
+    day_number(N).
+
+% Generic role_changed/4 for convenience (either day or night changes)
+role_changed(P, OldRole, NewRole, N) :- role_changed_at_day(P, OldRole, NewRole, N).
+role_changed(P, OldRole, NewRole, N) :- role_changed_at_night(P, OldRole, NewRole, N).
+
+% d_st_tells_role_change/3 - Timeline event for role change notification
+% This is the event of the ST telling a player about their new role.
+d_st_tells_role_change(P, R, T) :- st_tells_role_change(P, R, T).
