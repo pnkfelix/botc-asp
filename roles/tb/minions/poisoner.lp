@@ -42,6 +42,14 @@ token_removed(poi_poisoned, P, night(N, 0, 0)) :-
     reminder_on(poi_poisoned, P, day(N-1, exec)),
     assigned(0, _, poisoner).
 
+% Remove poison token when poisoner is reassigned to a different role
+% (e.g., via starpass, pit-hag, etc.)
+token_removed(poi_poisoned, Target, night(N, 0, 0)) :-
+    night_number(N), N > 1,
+    reminder_on(poi_poisoned, Target, day(N-1, exec)),
+    assigned(0, Poisoner, poisoner),
+    poi_reassigned(Poisoner, N).
+
 :- reminder_on(poi_poisoned, P, T), token_removed(poi_poisoned, P, T).
 
 causes_impairment(poi_poisoned).
