@@ -579,6 +579,7 @@ renderReminderDebugPanel :: forall cs m.
   , reminders :: Array { token :: String, player :: String, placedAt :: ASP.TimePoint }
   , time :: ASP.TimePoint
   , bagTokens :: Array String
+  , bluffTokens :: Array String
   , assignedNotInBag :: Array String
   } ->
   H.ComponentHTML Action cs m
