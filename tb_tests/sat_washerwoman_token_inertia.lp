@@ -16,8 +16,8 @@
 
 #include "base.lp".
 
-#const night_count = 2.
-#const day_count = 1.
+% Request modeling of night 2 (night 1 is always included)
+needs_night(2).
 
 assigned(0, amanda, poisoner).
 assigned(0, rob, washerwoman).
