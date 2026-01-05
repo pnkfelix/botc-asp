@@ -612,9 +612,9 @@ d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
 %   - During day (e.g., SW becomes demon when demon is executed)
 %   - During night (e.g., starpass when Imp kills itself)
 %
-% The ST tells the player at dawn following the change:
-%   - Day N changes → told at dawn(N+1) (after night N+1)
-%   - Night N changes → told at dawn(N) (immediately after that night)
+% The ST tells the player immediately after the transformation:
+%   - Day N changes (e.g., SW at execution) → told at day(N, exec)
+%   - Night N changes (e.g., starpass) → told at dawn(N)
 %
 % Timeline sequence: night(N) → dawn(N) → day(N) → night(N+1) → dawn(N+1)
 %
@@ -626,18 +626,17 @@ d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
 
 % Role changes during day phase (e.g., SW becomes demon at execution)
 % Format: role_changed_at_day(Player, OldRole, NewRole, DayNumber)
-% Player is told at dawn(DayNumber + 1)
+% Player is told immediately at day(N, exec)
 role_changed_at_day(P, OldRole, imp, N) :-
     sw_becomes_demon(P, N),
     assigned(0, P, OldRole).
 
-st_tells_role_change(P, NewRole, dawn(N+1)) :-
-    role_changed_at_day(P, _, NewRole, N),
-    day_number(N+1).
+st_tells_role_change(P, NewRole, day(N, exec)) :-
+    role_changed_at_day(P, _, NewRole, N).
 
 % Role changes during night phase (e.g., starpass)
 % Format: role_changed_at_night(Player, OldRole, NewRole, NightNumber)
-% Player is told at dawn(NightNumber) - the dawn immediately following
+% Player is told at dawn(NightNumber) - immediately after that night
 role_changed_at_night(P, OldRole, imp, N) :-
     starpass_target(P, N),
     assigned(0, P, OldRole).

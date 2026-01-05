@@ -37,6 +37,7 @@ data Atom
   | GhostVoteUsed String TimePoint      -- ghost_vote_used(player, time) - player has used their ghost vote
   | GameOver TimePoint String           -- d_game_over(time, winner) - game ends at time, winner is "good" or "evil"
   | AssignedChange TimePoint String String String  -- d_assigned_change(time, player, oldRole, newRole) - role transfer
+  | StTellsRoleChange String String TimePoint  -- d_st_tells_role_change(player, role, time) - ST tells player their new role
   | Time TimePoint                      -- time(timepoint)
   | ActingRole TimePoint String         -- acting_role(time, role)
   | Chair String Int                    -- game_chair(player, position)
@@ -79,6 +80,7 @@ atomCategory = case _ of
   DeathAnnounced _ _    -> EventPredicate
   GameOver _ _          -> EventPredicate
   AssignedChange _ _ _ _ -> EventPredicate
+  StTellsRoleChange _ _ _ -> EventPredicate
   -- State predicates: ongoing state, not events
   -- Note: reminder_on(token,player,time) represents accumulated state
   -- ("reminder is on player at time"), not the action of placing it.
@@ -201,6 +203,12 @@ data TimelineEvent
       , newRole :: String
       , sourceAtom :: String
       }
+  | RoleChangeNotification
+      { time :: TimePoint
+      , player :: String
+      , newRole :: String
+      , sourceAtom :: String
+      }
 
 derive instance eqTimelineEvent :: Eq TimelineEvent
 
@@ -231,6 +239,7 @@ parseAtom atomStr =
       parseGhostVoteUsed trimmed <|>
       parseGameOver trimmed <|>
       parseAssignedChange trimmed <|>
+      parseStTellsRoleChange trimmed <|>
       parseTimeAtom trimmed <|>
       parseActingRole trimmed <|>
       parseChair trimmed <|>
@@ -406,6 +415,22 @@ parseAssignedChange s =
                     Just { before: oldRole, after: newRole } ->
                       Just $ AssignedChange time (trim player) (trim oldRole) (trim newRole)
                     Nothing -> Nothing
+                Nothing -> Nothing
+            Nothing -> Nothing
+     else Nothing
+
+-- | Parse d_st_tells_role_change(Player, Role, Time)
+parseStTellsRoleChange :: String -> Maybe Atom
+parseStTellsRoleChange s =
+  let pattern = "d_st_tells_role_change("
+  in if take (length pattern) s == pattern
+     then
+       let rest = drop (length pattern) (take (length s - 1) s)
+       in case splitAtFirstComma rest of
+            Just { before: player, after: rest1 } ->
+              case splitAtFirstComma rest1 of
+                Just { before: role, after: timeStr } ->
+                  Just $ StTellsRoleChange (trim player) (trim role) (parseTime (trim timeStr))
                 Nothing -> Nothing
             Nothing -> Nothing
      else Nothing
@@ -820,8 +845,10 @@ extractTimelineWithSources parsedAtoms =
     gameOverEvents = mapMaybe toGameOverEvent parsedAtoms
     -- Character assignment change events (starpass, Scarlet Woman, etc.)
     characterAssignmentEvents = mapMaybe toCharacterAssignmentEvent parsedAtoms
+    -- Role change notification events (ST tells player their new role)
+    roleChangeNotificationEvents = mapMaybe toRoleChangeNotificationEvent parsedAtoms
   in
-    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents <> gameOverEvents <> characterAssignmentEvents)
+    sortBy compareEvents (stTellsEvents <> playerChoosesEvents <> tokenPlacedEvents <> executionEvents <> deathEvents <> gameOverEvents <> characterAssignmentEvents <> roleChangeNotificationEvents)
   where
     toStTellsEvent { atom: StTells role player message time, original } =
       Just $ RoleAction { time, role, eventType: "d_st_tells", player, message, sourceAtom: original }
@@ -857,6 +884,11 @@ extractTimelineWithSources parsedAtoms =
     toCharacterAssignmentEvent { atom: AssignedChange time player oldRole newRole, original } =
       Just $ CharacterAssignment { time, player, oldRole, newRole, sourceAtom: original }
     toCharacterAssignmentEvent _ = Nothing
+
+    -- Convert StTellsRoleChange to RoleChangeNotification event
+    toRoleChangeNotificationEvent { atom: StTellsRoleChange player newRole time, original } =
+      Just $ RoleChangeNotification { time, player, newRole, sourceAtom: original }
+    toRoleChangeNotificationEvent _ = Nothing
 
     -- Filter TokenPlaced events to only keep the earliest occurrence of each token+player
     filterNewTokenPlacements :: Array TimelineEvent -> Array TimelineEvent
@@ -923,6 +955,20 @@ extractTimelineWithSources parsedAtoms =
       Execution e, CharacterAssignment c -> compare (Day e.day "exec") c.time
       CharacterAssignment c, GameOverEvent g -> compareTimePoints c.time g.time
       GameOverEvent g, CharacterAssignment c -> compareTimePoints g.time c.time
+      -- RoleChangeNotification comparisons
+      RoleChangeNotification r1, RoleChangeNotification r2 -> compareTimePoints r1.time r2.time
+      RoleChangeNotification r, RoleAction ra -> compareTimePoints r.time ra.time
+      RoleAction ra, RoleChangeNotification r -> compareTimePoints ra.time r.time
+      RoleChangeNotification r, TokenPlaced t -> compareTimePoints r.time t.time
+      TokenPlaced t, RoleChangeNotification r -> compareTimePoints t.time r.time
+      RoleChangeNotification r, Death d -> compareTimePoints r.time d.time
+      Death d, RoleChangeNotification r -> compareTimePoints d.time r.time
+      RoleChangeNotification r, Execution e -> compare r.time (Day e.day "exec")
+      Execution e, RoleChangeNotification r -> compare (Day e.day "exec") r.time
+      RoleChangeNotification r, GameOverEvent g -> compareTimePoints r.time g.time
+      GameOverEvent g, RoleChangeNotification r -> compareTimePoints g.time r.time
+      RoleChangeNotification r, CharacterAssignment c -> compareTimePoints r.time c.time
+      CharacterAssignment c, RoleChangeNotification r -> compareTimePoints c.time r.time
 
 -- | Get state at a specific time point
 getStateAtTime :: Array Atom -> TimePoint -> GameState
@@ -942,6 +988,7 @@ atomToPredicateName = case _ of
   GhostVoteUsed _ _      -> { name: "ghost_vote_used", arity: 2 }
   GameOver _ _           -> { name: "d_game_over", arity: 2 }
   AssignedChange _ _ _ _ -> { name: "d_assigned_change", arity: 4 }
+  StTellsRoleChange _ _ _ -> { name: "d_st_tells_role_change", arity: 3 }
   Time _                 -> { name: "time", arity: 1 }
   ActingRole _ _         -> { name: "acting_role", arity: 2 }
   Chair _ _              -> { name: "game_chair", arity: 2 }
