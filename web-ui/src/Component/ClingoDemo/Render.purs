@@ -160,43 +160,6 @@ render state =
         Nothing ->
           HH.text ""
 
-    -- Single file editor with file tabs
-    , HH.div
-        [ HP.style "margin: 20px 0;" ]
-        [ -- File tabs (show root files + current file if in a subdirectory)
-          HH.div
-            [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;" ]
-            (map (renderFileTab state.currentFile) (getVisibleTabs state.currentFile))
-        , -- Editor container with syntax highlighting overlay
-          HH.div
-            [ HP.style "position: relative;" ]
-            [ -- Syntax highlight overlay (behind textarea)
-              HH.pre
-                [ HP.id "editor-highlight-overlay"
-                , HP.style $ "position: absolute; top: 0; left: 0; right: 0; bottom: 0; "
-                    <> "margin: 0; padding: 10px; border: 1px solid transparent; "
-                    <> "font-family: monospace; font-size: 12px; line-height: inherit; "
-                    <> "overflow: hidden; pointer-events: none; white-space: pre-wrap; "
-                    <> "word-wrap: break-word; color: #333; background: white; "
-                    <> "border-radius: 4px;"
-                ]
-                [ HH.text "" ]  -- Content set via JS
-            , -- Editor textarea (transparent text, on top)
-              HH.textarea
-                [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
-                    <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
-                    <> "resize: vertical; overflow: auto; position: relative; "
-                    <> "background: transparent; color: transparent; caret-color: black; "
-                    <> "-webkit-text-fill-color: transparent;"
-                , HP.id "editor-textarea"
-                , HP.value currentContent
-                , HE.onValueInput SetFileContent
-                , HE.onClick \_ -> TextareaClicked
-                , HP.disabled state.isLoading
-                ]
-            ]
-        ]
-
     -- Game configuration controls: player count slider, script dropdown
     , let
         currentPlayerCount = Early.extractPlayerCount state.files
@@ -283,6 +246,43 @@ render state =
 
     -- Grimoire section (always visible - uses early parsing or answer set)
     , renderGrimoireSection state
+
+    -- File editor with file tabs (below grimoire)
+    , HH.div
+        [ HP.style "margin: 20px 0;" ]
+        [ -- File tabs (show root files + current file if in a subdirectory)
+          HH.div
+            [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;" ]
+            (map (renderFileTab state.currentFile) (getVisibleTabs state.currentFile))
+        , -- Editor container with syntax highlighting overlay
+          HH.div
+            [ HP.style "position: relative;" ]
+            [ -- Syntax highlight overlay (behind textarea)
+              HH.pre
+                [ HP.id "editor-highlight-overlay"
+                , HP.style $ "position: absolute; top: 0; left: 0; right: 0; bottom: 0; "
+                    <> "margin: 0; padding: 10px; border: 1px solid transparent; "
+                    <> "font-family: monospace; font-size: 12px; line-height: inherit; "
+                    <> "overflow: hidden; pointer-events: none; white-space: pre-wrap; "
+                    <> "word-wrap: break-word; color: #333; background: white; "
+                    <> "border-radius: 4px;"
+                ]
+                [ HH.text "" ]  -- Content set via JS
+            , -- Editor textarea (transparent text, on top)
+              HH.textarea
+                [ HP.style $ "width: 100%; height: 400px; font-family: monospace; font-size: 12px; "
+                    <> "padding: 10px; border: 1px solid #ccc; border-radius: 4px; "
+                    <> "resize: vertical; overflow: auto; position: relative; "
+                    <> "background: transparent; color: transparent; caret-color: black; "
+                    <> "-webkit-text-fill-color: transparent;"
+                , HP.id "editor-textarea"
+                , HP.value currentContent
+                , HE.onValueInput SetFileContent
+                , HE.onClick \_ -> TextareaClicked
+                , HP.disabled state.isLoading
+                ]
+            ]
+        ]
 
     -- Results display (status and answer set output)
     , renderResult state
