@@ -88,38 +88,42 @@ updatePlayerCount newCount content =
            then "#const player_count = " <> show newCount <> "."
            else line
 
--- | Valid script identifiers
-validScripts :: Array String
-validScripts = ["tb", "bmr", "snv", "carousel"]
+-- | Get available scripts by scanning .lp files for @script-id/@script-name metadata
+-- | Returns array of { id, name } for scripts that have proper metadata headers
+getAvailableScripts :: Map.Map String String -> Array { id :: String, name :: String }
+getAvailableScripts = Early.extractAllScripts
 
--- | Check if a script identifier is valid
-isValidScript :: String -> Boolean
-isValidScript scriptId = elem scriptId validScripts
+-- | Check if a script identifier is valid (exists in the available scripts)
+isValidScript :: Map.Map String String -> String -> Boolean
+isValidScript files scriptId =
+  let scripts = getAvailableScripts files
+  in elem scriptId (map _.id scripts)
 
 -- | Update script include in inst.lp content
 -- | Replaces the line '#include "SCRIPT.lp".' with the new script
-updateScript :: String -> String -> String
-updateScript newScript content =
-  if not (isValidScript newScript) then content
-  else
-    let
-      contentLines = split (Pattern "\n") content
-      updatedLines = map updateLine contentLines
-    in
-      intercalate "\n" updatedLines
+-- | Takes files map to get valid script IDs dynamically
+updateScript :: Map.Map String String -> String -> String -> String
+updateScript files newScript content =
+  let
+    availableScriptIds = map _.id (getAvailableScripts files)
+  in
+    if not (elem newScript availableScriptIds) then content
+    else
+      let
+        contentLines = split (Pattern "\n") content
+        updatedLines = map (updateLine availableScriptIds) contentLines
+      in
+        intercalate "\n" updatedLines
   where
-    updateLine line =
+    updateLine scriptIds line =
       let trimmed = trim line
-      in if isScriptInclude trimmed
+      in if isScriptInclude scriptIds trimmed
            then "#include \"" <> newScript <> ".lp\"."
            else line
-    -- Check if line is a script include (tb, bmr, snv, or carousel)
-    isScriptInclude str =
+    -- Check if line is a script include (matches any known script ID)
+    isScriptInclude scriptIds str =
       String.take 10 str == "#include \"" &&
-      (String.contains (Pattern "\"tb.lp\"") str ||
-       String.contains (Pattern "\"bmr.lp\"") str ||
-       String.contains (Pattern "\"snv.lp\"") str ||
-       String.contains (Pattern "\"carousel.lp\"") str)
+      (foldl (\acc sid -> acc || String.contains (Pattern ("\"" <> sid <> ".lp\"")) str) false scriptIds)
 
 -- | Strip ASP comments from a string (lines starting with %)
 -- | Also strips empty lines and trims whitespace

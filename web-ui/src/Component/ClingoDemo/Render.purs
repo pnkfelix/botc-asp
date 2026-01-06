@@ -10,7 +10,7 @@ import Data.Array (filter, length, mapWithIndex, null, slice, sort)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set as Set
 import Effect.Aff.Class (class MonadAff)
 import FilterExpression as FE
@@ -19,7 +19,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Component.ClingoDemo.Types (Action(..), State, Slots, ResultDisplay(..), TimingEntry, _timelineGrimoire, answerSetPageSize)
-import Component.ClingoDemo.Utils (availableFiles, getDirectories, getParentDir, getFileName, isInDirectory, isRootFile, getVisibleTabs, getCurrentFileContent, getSources, getGrimoireAtoms, getGrimoireInput, getFileDescription)
+import Component.ClingoDemo.Utils (availableFiles, getDirectories, getParentDir, getFileName, isInDirectory, isRootFile, getVisibleTabs, getCurrentFileContent, getSources, getGrimoireAtoms, getGrimoireInput, getFileDescription, getAvailableScripts)
 import Component.TimelineGrimoire as TG
 import EarlyParser as Early
 
@@ -194,6 +194,50 @@ render state =
                 , HE.onClick \_ -> TextareaClicked
                 , HP.disabled state.isLoading
                 ]
+            ]
+        ]
+
+    -- Game configuration controls: player count slider, script dropdown
+    , let
+        currentPlayerCount = Early.extractPlayerCount state.files
+        currentScript = Early.parseScript (fromMaybe "" $ Map.lookup "inst.lp" state.files)
+        availableScripts = getAvailableScripts state.files
+      in
+      HH.div
+        [ HP.style "margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 20px;" ]
+        [ -- Player count slider
+          HH.label
+            [ HP.style "display: flex; align-items: center; gap: 10px;" ]
+            [ HH.span
+                [ HP.style "font-weight: bold; min-width: 100px;" ]
+                [ HH.text $ "Players: " <> show (fromMaybe 8 currentPlayerCount) ]
+            , HH.input
+                [ HP.style "width: 150px; cursor: pointer;"
+                , HP.type_ HP.InputRange
+                , HP.attr (HH.AttrName "min") "5"
+                , HP.attr (HH.AttrName "max") "15"
+                , HP.value $ show (fromMaybe 8 currentPlayerCount)
+                , HE.onValueInput \v -> SetPlayerCount (fromMaybe 8 $ Int.fromString v)
+                , HP.disabled state.isLoading
+                ]
+            ]
+        -- Script dropdown (populated from @script-id/@script-name metadata in .lp files)
+        , HH.label
+            [ HP.style "display: flex; align-items: center; gap: 10px;" ]
+            [ HH.span
+                [ HP.style "font-weight: bold;" ]
+                [ HH.text "Script:" ]
+            , HH.select
+                [ HP.style "padding: 8px 12px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: white;"
+                , HE.onValueChange SetScript
+                , HP.disabled state.isLoading
+                ]
+                (map (\s -> HH.option
+                    [ HP.value s.id
+                    , HP.selected (currentScript == Just s.id)
+                    ]
+                    [ HH.text s.name ]
+                ) availableScripts)
             ]
         ]
 

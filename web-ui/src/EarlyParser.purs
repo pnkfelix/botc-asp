@@ -6,6 +6,9 @@ module EarlyParser
   , extractPlayerCount
   , parsePlayerCount
   , parseScript
+  , ScriptInfo
+  , extractScriptMetadata
+  , extractAllScripts
   ) where
 
 import Prelude
@@ -247,3 +250,64 @@ parseScriptLine r line =
         Just (Just scriptId) -> Just scriptId
         _ -> Nothing
     Nothing -> Nothing
+
+-- | Script metadata extracted from comment headers
+type ScriptInfo = { id :: String, name :: String }
+
+-- | Extract script metadata from file content
+-- | Looks for % @script-id: and % @script-name: comment lines
+extractScriptMetadata :: String -> Maybe ScriptInfo
+extractScriptMetadata content =
+  let
+    contentLines = split (Pattern "\n") content
+    -- Parse @script-id and @script-name from first few lines
+    scriptIdRegex = hush $ regex """^%\s*@script-id:\s*(.+)$""" noFlags
+    scriptNameRegex = hush $ regex """^%\s*@script-name:\s*(.+)$""" noFlags
+    maybeId = case scriptIdRegex of
+      Just r -> findFirstMetadata r contentLines
+      Nothing -> Nothing
+    maybeName = case scriptNameRegex of
+      Just r -> findFirstMetadata r contentLines
+      Nothing -> Nothing
+  in
+    case maybeId, maybeName of
+      Just id, Just name -> Just { id: trim id, name: trim name }
+      _, _ -> Nothing
+
+-- | Find first matching metadata line and extract the value
+findFirstMetadata :: Regex -> Array String -> Maybe String
+findFirstMetadata r lines =
+  head $ mapMaybe (parseMetadataLine r) lines
+
+-- | Parse a single line for metadata value
+parseMetadataLine :: Regex -> String -> Maybe String
+parseMetadataLine r line =
+  case match r (trim line) of
+    Just groups ->
+      case NEA.index groups 1 of
+        Just (Just value) -> Just value
+        _ -> Nothing
+    Nothing -> Nothing
+
+-- | Extract all script info from a Map of files
+-- | Scans all .lp files at root level for @script-id/@script-name metadata
+extractAllScripts :: Map String String -> Array ScriptInfo
+extractAllScripts files =
+  let
+    -- Get all file paths
+    paths = fromFoldable $ Map.keys files
+    -- Filter to root-level .lp files (no "/" in path, ends with .lp)
+    rootLpFiles = filter isRootLpFile paths
+    -- Extract metadata from each file
+    scripts = mapMaybe (\path ->
+      case Map.lookup path files of
+        Just content -> extractScriptMetadata content
+        Nothing -> Nothing
+    ) rootLpFiles
+  in
+    scripts
+
+-- | Check if a path is a root-level .lp file
+isRootLpFile :: String -> Boolean
+isRootLpFile path =
+  not (S.contains (Pattern "/") path) && S.contains (Pattern ".lp") path

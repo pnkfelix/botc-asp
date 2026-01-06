@@ -93,6 +93,8 @@ data Action
   | ToggleDirectory String      -- Expand/collapse a directory in tree view
   | SetModelLimit String
   | SetOutputFilter String      -- Update output filter expression
+  | SetPlayerCount Int          -- Update player count via slider (updates inst.lp and URL)
+  | SetScript String            -- Update script via dropdown (updates inst.lp and URL)
   | RunClingo
   | CancelSolve
   | SelectModel Int             -- Select which model to display in Timeline/Grimoire
