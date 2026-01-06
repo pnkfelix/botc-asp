@@ -12,15 +12,74 @@ other_night_substep(godfather, 3, st_places(gf_dead)).
     assigned(0, _, godfather).
 
 % First night: Godfather learns which outsiders are in play
-% Count of outsiders in play
-gf_outsider_count(C) :-
-    C = #count { P : assigned(0, P, R), outsider(R) }.
+% Detect which outsider roles are actually assigned
+gf_sees_outsider(R) :- assigned(0, _, R), outsider(R).
 
-% ST tells Godfather the outsiders (as a count for simplicity)
-st_tells_core(godfather, GF, count(C), night(1, RoleOrd, 1)) :-
+% Count of outsiders in play
+gf_outsider_count(C) :- C = #count { R : gf_sees_outsider(R) }.
+
+% Alphabetical ordering for outsiders (covers TB and BMR outsiders)
+% This determines the sort order for the list shown to Godfather
+outsider_alpha_order(barber, 1).
+outsider_alpha_order(butler, 2).
+outsider_alpha_order(drunk, 3).
+outsider_alpha_order(goon, 4).
+outsider_alpha_order(klutz, 5).
+outsider_alpha_order(lunatic, 6).
+outsider_alpha_order(moonchild, 7).
+outsider_alpha_order(mutant, 8).
+outsider_alpha_order(recluse, 9).
+outsider_alpha_order(saint, 10).
+outsider_alpha_order(sweetheart, 11).
+outsider_alpha_order(tinker, 12).
+
+% Get the Nth outsider in sorted order (if it exists)
+% N is the position in the sorted list of outsiders that are in play
+gf_sorted_outsider(N, R) :-
+    gf_sees_outsider(R),
+    outsider_alpha_order(R, Ord),
+    N = #count { R2 : gf_sees_outsider(R2), outsider_alpha_order(R2, O2), O2 <= Ord }.
+
+% ST tells Godfather the list of outsiders in play (sorted alphabetically)
+% 0 outsiders:
+st_tells_core(godfather, GF, outsiders(none), night(1, RoleOrd, 1)) :-
     first_night_role_order(godfather, RoleOrd),
     assigned(0, GF, godfather),
-    gf_outsider_count(C).
+    gf_outsider_count(0).
+
+% 1 outsider:
+st_tells_core(godfather, GF, outsiders(R1), night(1, RoleOrd, 1)) :-
+    first_night_role_order(godfather, RoleOrd),
+    assigned(0, GF, godfather),
+    gf_outsider_count(1),
+    gf_sorted_outsider(1, R1).
+
+% 2 outsiders:
+st_tells_core(godfather, GF, outsiders(R1, R2), night(1, RoleOrd, 1)) :-
+    first_night_role_order(godfather, RoleOrd),
+    assigned(0, GF, godfather),
+    gf_outsider_count(2),
+    gf_sorted_outsider(1, R1),
+    gf_sorted_outsider(2, R2).
+
+% 3 outsiders:
+st_tells_core(godfather, GF, outsiders(R1, R2, R3), night(1, RoleOrd, 1)) :-
+    first_night_role_order(godfather, RoleOrd),
+    assigned(0, GF, godfather),
+    gf_outsider_count(3),
+    gf_sorted_outsider(1, R1),
+    gf_sorted_outsider(2, R2),
+    gf_sorted_outsider(3, R3).
+
+% 4 outsiders:
+st_tells_core(godfather, GF, outsiders(R1, R2, R3, R4), night(1, RoleOrd, 1)) :-
+    first_night_role_order(godfather, RoleOrd),
+    assigned(0, GF, godfather),
+    gf_outsider_count(4),
+    gf_sorted_outsider(1, R1),
+    gf_sorted_outsider(2, R2),
+    gf_sorted_outsider(3, R3),
+    gf_sorted_outsider(4, R4).
 
 % Check if an outsider died today
 outsider_died_today(N) :-
