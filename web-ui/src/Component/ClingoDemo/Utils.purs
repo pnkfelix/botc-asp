@@ -4,7 +4,7 @@ module Component.ClingoDemo.Utils where
 
 import Prelude
 
-import Data.Array (filter, fromFoldable, index, length, map, nub, slice, snoc)
+import Data.Array (filter, fromFoldable, index, length, nub, slice, snoc)
 import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
 import Data.Map as Map
