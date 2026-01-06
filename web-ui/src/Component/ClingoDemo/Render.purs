@@ -19,7 +19,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Component.ClingoDemo.Types (Action(..), State, Slots, ResultDisplay(..), TimingEntry, _timelineGrimoire, answerSetPageSize)
-import Component.ClingoDemo.Utils (availableFiles, getDirectories, getParentDir, getFileName, isInDirectory, isRootFile, getVisibleTabs, getCurrentFileContent, getSources, getGrimoireAtoms, getGrimoireInput, getFileDescription, scriptDisplayNames)
+import Component.ClingoDemo.Utils (availableFiles, getDirectories, getParentDir, getFileName, isInDirectory, isRootFile, getVisibleTabs, getCurrentFileContent, getSources, getGrimoireAtoms, getGrimoireInput, getFileDescription, getAvailableScripts)
 import Component.TimelineGrimoire as TG
 import EarlyParser as Early
 
@@ -201,6 +201,7 @@ render state =
     , let
         currentPlayerCount = Early.extractPlayerCount state.files
         currentScript = Early.parseScript (fromMaybe "" $ Map.lookup "inst.lp" state.files)
+        availableScripts = getAvailableScripts state.files
       in
       HH.div
         [ HP.style "margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 8px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 20px;" ]
@@ -220,7 +221,7 @@ render state =
                 , HP.disabled state.isLoading
                 ]
             ]
-        -- Script dropdown
+        -- Script dropdown (populated from @script-id/@script-name metadata in .lp files)
         , HH.label
             [ HP.style "display: flex; align-items: center; gap: 10px;" ]
             [ HH.span
@@ -236,7 +237,7 @@ render state =
                     , HP.selected (currentScript == Just s.id)
                     ]
                     [ HH.text s.name ]
-                ) scriptDisplayNames)
+                ) availableScripts)
             ]
         ]
 

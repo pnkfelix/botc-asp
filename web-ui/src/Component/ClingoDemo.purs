@@ -54,23 +54,18 @@ handleAction = case _ of
     maybePlayerCount <- liftEffect $ UP.getUrlParam "player_count"
     maybeScript <- liftEffect $ UP.getUrlParam "script"
     -- Apply URL parameter updates to inst.lp
-    let updateFromParams :: String -> String
-        updateFromParams content =
-          let
-            -- Apply player_count update if present
-            withPlayerCount = case maybePlayerCount >>= Int.fromString of
-              Just n -> updatePlayerCount n content
-              Nothing -> content
-            -- Apply script update if present and valid
-            withScript = case maybeScript of
-              Just scriptId | isValidScript scriptId -> updateScript scriptId withPlayerCount
-              _ -> withPlayerCount
-          in withScript
     H.modify_ \s ->
       let
         instContent = fromMaybe "" $ Map.lookup "inst.lp" s.files
-        updatedContent = updateFromParams instContent
-        updatedFiles = Map.insert "inst.lp" updatedContent s.files
+        -- Apply player_count update if present
+        withPlayerCount = case maybePlayerCount >>= Int.fromString of
+          Just n -> updatePlayerCount n instContent
+          Nothing -> instContent
+        -- Apply script update if present and valid (uses files for dynamic script list)
+        withScript = case maybeScript of
+          Just scriptId | isValidScript s.files scriptId -> updateScript s.files scriptId withPlayerCount
+          _ -> withPlayerCount
+        updatedFiles = Map.insert "inst.lp" withScript s.files
       in s { files = updatedFiles, isInitialized = true }
     -- Initialize syntax highlighting for the initial file
     state <- H.get
@@ -129,12 +124,12 @@ handleAction = case _ of
       liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" updatedContent
 
   SetScript scriptId -> do
-    -- Only proceed if the script is valid
-    when (isValidScript scriptId) do
+    -- Only proceed if the script is valid (checked against dynamic script list)
+    state <- H.get
+    when (isValidScript state.files scriptId) do
       -- Update inst.lp with the new script include
-      state <- H.get
       let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-      let updatedContent = updateScript scriptId instContent
+      let updatedContent = updateScript state.files scriptId instContent
       -- Update the virtual filesystem
       H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
       -- Update the URL parameter
