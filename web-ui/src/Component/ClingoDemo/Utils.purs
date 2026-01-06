@@ -92,6 +92,16 @@ updatePlayerCount newCount content =
 validScripts :: Array String
 validScripts = ["tb", "bmr", "snv", "carousel"]
 
+-- | Script display names for the dropdown
+-- | Returns a tuple of (scriptId, displayName)
+scriptDisplayNames :: Array { id :: String, name :: String }
+scriptDisplayNames =
+  [ { id: "tb", name: "Trouble Brewing" }
+  , { id: "bmr", name: "Bad Moon Rising" }
+  , { id: "snv", name: "Sects and Violets" }
+  , { id: "carousel", name: "Carousel" }
+  ]
+
 -- | Check if a script identifier is valid
 isValidScript :: String -> Boolean
 isValidScript scriptId = elem scriptId validScripts

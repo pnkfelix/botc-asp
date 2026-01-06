@@ -114,6 +114,36 @@ handleAction = case _ of
   SetOutputFilter filterExpr ->
     H.modify_ \s -> s { outputFilter = filterExpr }
 
+  SetPlayerCount count -> do
+    -- Update inst.lp with the new player count
+    state <- H.get
+    let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+    let updatedContent = updatePlayerCount count instContent
+    -- Update the virtual filesystem
+    H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
+    -- Update the URL parameter
+    liftEffect $ UP.setUrlParam "player_count" (show count)
+    -- Update syntax highlighting if inst.lp is currently displayed
+    state' <- H.get
+    when (state'.currentFile == "inst.lp") do
+      liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" updatedContent
+
+  SetScript scriptId -> do
+    -- Only proceed if the script is valid
+    when (isValidScript scriptId) do
+      -- Update inst.lp with the new script include
+      state <- H.get
+      let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+      let updatedContent = updateScript scriptId instContent
+      -- Update the virtual filesystem
+      H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
+      -- Update the URL parameter
+      liftEffect $ UP.setUrlParam "script" scriptId
+      -- Update syntax highlighting if inst.lp is currently displayed
+      state' <- H.get
+      when (state'.currentFile == "inst.lp") do
+        liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" updatedContent
+
   RunClingo -> do
     -- Keep previous result visible during loading (preserves TimelineGrimoire state)
     H.modify_ \s -> s { isLoading = true, selectedModelIndex = 0, answerSetPage = 0 }
