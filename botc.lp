@@ -328,11 +328,6 @@ alignment(P, evil, T) :- actual_category(P, evil), time(T), not alignment_change
 % When alignment is changed by an effect, use the new alignment
 alignment(P, A, T) :- alignment_changed(P, A, T).
 
-% Define alignment_changed domain for proper grounding (but never true unless a role adds it)
-% This ensures the NAF in the base rules works even when no alignment-changing roles exist
-alignment_changed(P, good, T) :- player(P), time(T), #false.
-alignment_changed(P, evil, T) :- player(P), time(T), #false.
-
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
