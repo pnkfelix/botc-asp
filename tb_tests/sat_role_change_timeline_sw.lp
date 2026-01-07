@@ -26,8 +26,9 @@ executed(courtney, 1).
 % Assert: SW trigger should fire (demon executed with 5 alive at day start)
 :- not sw_becomes_demon(steph, 1).
 
-% Assert: steph should be assigned imp role at day 1
-:- not assigned(1, steph, imp).
+% Assert: steph should be assigned imp role at start of night 2 (after SW triggered on day 1)
+% With the new semantics, assigned(N, P, R) means "at start of night N, P has role R"
+:- not assigned(2, steph, imp).
 
 % Assert: role_changed_at_day should track this
 :- not role_changed_at_day(steph, scarlet_woman, imp, 1).

@@ -29,13 +29,16 @@ barber_died(Barber, N) :- barber_died_today(Barber, N).
     alive(Demon, night(N, 0, 0)).
 
 % If the demon chooses to swap, the two players exchange characters
-assigned(N, P1, R2) :-
+% Role change is effective at dawn - use fine-grained predicate
+role_assignment_changes_to(dawn(N), P1, R2) :-
     barber_swap(_, P1, P2, N),
-    assigned(0, P2, R2).
+    assigned(0, P2, R2),
+    day_number(N).
 
-assigned(N, P2, R1) :-
+role_assignment_changes_to(dawn(N), P2, R1) :-
     barber_swap(_, P1, P2, N),
-    assigned(0, P1, R1).
+    assigned(0, P1, R1),
+    day_number(N).
 
 % Convert to player_chooses for compatibility
 player_chooses(barber, Demon, point(P1), night(N, RoleOrd, 2)) :-

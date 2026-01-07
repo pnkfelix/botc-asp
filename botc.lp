@@ -317,13 +317,11 @@ actual_category(P, evil) :- assigned(0, P, R), demon(R).
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
 % Mid-game role changes: register based on currently assigned role
-% If assigned a demon role at day N, register as demon for all times after day N
+% Use the fine-grained predicate to track current role at each time point
 registers_as(P, demon, T) :-
-    assigned(N, P, R), demon(R), N > 0,
-    time(T), T = night(N2, _, _), N2 > N.
-registers_as(P, demon, T) :-
-    assigned(N, P, R), demon(R), N > 0,
-    time(T), T = day(N2, _), N2 > N.
+    character_assignment_state_at_time(T, P, R),
+    demon(R),
+    not assigned(0, P, R).  % Only for mid-game changes (not initial demon)
 
 % If a player may mis-register, ST chooses for each category they may misregister as
 { registers_as(P, C, T) } :- may_misregister_as(P, C), time(T).
@@ -392,8 +390,10 @@ distrib(R) :- assigned(0, _, R).
 % Assertion predicates: allow instances to require certain predicates hold
 % assert_distrib(R) requires that role R must be distributed (assigned to some player)
 :- assert_distrib(R), not distrib(R).
-% assert_assigned(T, P, R) requires that player P is assigned role R at time T
-:- assert_assigned(T, P, R), not assigned(T, P, R).
+% assert_assigned(N, P, R) requires that player P is assigned role R
+%   - assert_assigned(0, P, R): initial assignment (P starts as role R)
+%   - assert_assigned(N, P, R) for N >= 1: at start of night N, P has role R
+:- assert_assigned(N, P, R), not assigned(N, P, R).
 % assert_reminder_on(Token, P, T) requires that reminder Token is on player P at time T
 :- assert_reminder_on(Token, P, T), not reminder_on(Token, P, T).
 % assert_received(P, R) requires that player P received token R
@@ -457,6 +457,46 @@ thinks_it_is(R, Y) :- mistaken_identity(R, minion), minion(Y).
 :- adjusted_outsider(N), #count { R : assigned(0, _, R), outsider(R) } != N.
 :- adjusted_minion(N), #count { R : assigned(0, _, R), minion(R) } != N.
 :- adjusted_demon(N), #count { R : assigned(0, _, R), demon(R) } != N.
+
+% ===========================================================================
+% Fine-Grained Role Assignment Tracking
+% ===========================================================================
+%
+% character_assignment_state_at_time(T, P, R) - the internal/fine-grained predicate
+% that tracks what role a player has at each specific time point T.
+%
+% This predicate uses inertia: once a player has a role, they keep it until
+% a role change event occurs.
+%
+% Role changes are recorded via role_assignment_changes_to(T, P, R), which
+% indicates that player P's role becomes R at time T.
+%
+% The coarse-grained assigned(N, P, R) for N >= 1 is derived from this,
+% representing the player's role at the start of night N.
+%
+% assigned(0, P, R) remains the INPUT predicate for initial setup.
+% ===========================================================================
+
+% Initialize fine-grained state from initial assignments at night(1, 0, 0)
+character_assignment_state_at_time(night(1, 0, 0), P, R) :- assigned(0, P, R).
+
+% Inertia: role persists through time unless a role change occurs at the next time
+character_assignment_state_at_time(T2, P, R) :-
+    character_assignment_state_at_time(T1, P, R),
+    next(T1, T2),
+    not role_assignment_changed_at(P, T2).
+
+% Update role when a role change event occurs
+character_assignment_state_at_time(T, P, R) :-
+    role_assignment_changes_to(T, P, R).
+
+% Helper: track that a role change occurred for a player at a time
+role_assignment_changed_at(P, T) :- role_assignment_changes_to(T, P, _).
+
+% Derive coarse-grained assigned(N, P, R) for N >= 1: role at start of night N
+assigned(N, P, R) :-
+    night_number(N), N >= 1,
+    character_assignment_state_at_time(night(N, 0, 0), P, R).
 
 % ===========================================================================
 % Day Phase - Simplified
@@ -622,24 +662,31 @@ d_death_announced(P, day(N, exec)) :- died(P, day(N, exec)).
 %   st_tells_role_change(Player, ToldRole, Time)
 %   where ToldRole is what the player is told (usually their actual new role,
 %   but could differ if they're drunk/poisoned/etc.)
+%
+% Role changes are now tracked via the fine-grained predicate:
+%   role_assignment_changes_to(T, P, R) - player P becomes role R at time T
+%
+% The helper predicates role_changed_at_day and role_changed_at_night
+% are derived from role_assignment_changes_to for backward compatibility.
 % ===========================================================================
 
 % Role changes during day phase (e.g., SW becomes demon at execution)
-% Format: role_changed_at_day(Player, OldRole, NewRole, DayNumber)
-% Player is told immediately at day(N, exec)
-role_changed_at_day(P, OldRole, imp, N) :-
-    sw_becomes_demon(P, N),
-    assigned(0, P, OldRole).
+% Derived from fine-grained role_assignment_changes_to
+role_changed_at_day(P, OldRole, NewRole, N) :-
+    role_assignment_changes_to(day(N, exec), P, NewRole),
+    assigned(0, P, OldRole),
+    OldRole != NewRole.
 
 st_tells_role_change(P, NewRole, day(N, exec)) :-
     role_changed_at_day(P, _, NewRole, N).
 
-% Role changes during night phase (e.g., starpass)
-% Format: role_changed_at_night(Player, OldRole, NewRole, NightNumber)
-% Player is told at dawn(NightNumber) - immediately after that night
-role_changed_at_night(P, OldRole, imp, N) :-
-    starpass_target(P, N),
-    assigned(0, P, OldRole).
+% Role changes during night phase (e.g., starpass, barber swap, pit-hag)
+% These are effective at dawn(N)
+% Derived from fine-grained role_assignment_changes_to
+role_changed_at_night(P, OldRole, NewRole, N) :-
+    role_assignment_changes_to(dawn(N), P, NewRole),
+    assigned(0, P, OldRole),
+    OldRole != NewRole.
 
 st_tells_role_change(P, NewRole, dawn(N)) :-
     role_changed_at_night(P, _, NewRole, N),
@@ -656,20 +703,9 @@ d_st_tells_role_change(P, R, T) :- st_tells_role_change(P, R, T).
 % d_assigned_change/4 - Player's character assignment changes mid-game
 % This is the event of a role transfer (starpass, Scarlet Woman becoming demon, etc.)
 % Format: d_assigned_change(Time, Player, OldRole, NewRole)
-% For night events (starpass), this fires at dawn when the change becomes effective.
-% For day events (Scarlet Woman), this fires at the execution time.
+% Derived directly from role_assignment_changes_to
 
-% Scarlet Woman case: role change happens at execution time
-d_assigned_change(day(N, exec), Player, OldRole, NewRole) :-
-    sw_becomes_demon(Player, N),    % Scarlet Woman triggered on day N
-    assigned(N, Player, NewRole),   % Mid-game assignment
-    assigned(0, Player, OldRole),   % Original role
-    OldRole != NewRole.             % Actually changed
-
-% Night events (starpass): role change effective at dawn
-d_assigned_change(dawn(N), Player, OldRole, NewRole) :-
-    assigned(N, Player, NewRole),   % Mid-game assignment at night N
-    N > 0,                          % Not initial assignment
-    assigned(0, Player, OldRole),   % Original role
-    OldRole != NewRole,             % Actually changed
-    not sw_becomes_demon(Player, N). % Not a Scarlet Woman case
+d_assigned_change(T, Player, OldRole, NewRole) :-
+    role_assignment_changes_to(T, Player, NewRole),
+    assigned(0, Player, OldRole),
+    OldRole != NewRole.
