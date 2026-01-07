@@ -681,16 +681,28 @@ st_tells_role_change(P, NewRole, day(N, exec)) :-
     role_changed_at_day(P, _, NewRole, N).
 
 % Role changes during night phase (e.g., starpass, barber swap, pit-hag)
-% These are effective at dawn(N)
+% Matches role changes at dawn(N) OR during night(N, _, _)
 % Derived from fine-grained role_assignment_changes_to
 role_changed_at_night(P, OldRole, NewRole, N) :-
     role_assignment_changes_to(dawn(N), P, NewRole),
     assigned(0, P, OldRole),
     OldRole != NewRole.
 
+role_changed_at_night(P, OldRole, NewRole, N) :-
+    role_assignment_changes_to(T, P, NewRole),
+    T = night(N, _, _),
+    assigned(0, P, OldRole),
+    OldRole != NewRole.
+
+% Night role changes: players are told at dawn (for backward compatibility)
 st_tells_role_change(P, NewRole, dawn(N)) :-
     role_changed_at_night(P, _, NewRole, N),
     day_number(N).
+
+% Players are ALSO told about role changes immediately when they happen
+% This creates notifications at the actual time of change
+st_tells_role_change(P, NewRole, T) :-
+    role_assignment_changes_to(T, P, NewRole).
 
 % Generic role_changed/4 for convenience (either day or night changes)
 role_changed(P, OldRole, NewRole, N) :- role_changed_at_day(P, OldRole, NewRole, N).

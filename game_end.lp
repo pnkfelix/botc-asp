@@ -4,8 +4,8 @@
 % The game ends when either Good or Evil wins.
 %
 % Good wins when:
-%   - The Demon dies and no one becomes the new Demon
-%     (no Scarlet Woman trigger, no starpass)
+%   - All players with demon roles are dead
+%     (handles execution, starpass demon dying, multiple demon deaths, etc.)
 %
 % Evil wins when:
 %   - Only 2 players remain alive and the Demon is one of them
@@ -14,20 +14,31 @@
 % ===========================================================================
 
 % ---------------------------------------------------------------------------
-% Good Wins: Demon dies unreplaced
+% Fine-Grained Demon Role Tracking
+% ---------------------------------------------------------------------------
+% Use character_assignment_state_at_time from PR #192 to track who has
+% a demon role at each time point.
+
+% has_demon_role(P, T): Player P has a demon role at time T
+has_demon_role(P, T) :-
+    character_assignment_state_at_time(T, P, R),
+    demon(R).
+
+% any_alive_demon(T): There exists an alive player with a demon role at time T
+any_alive_demon(T) :-
+    has_demon_role(P, T),
+    alive(P, T).
+
+% ---------------------------------------------------------------------------
+% Good Wins: All demons are dead
 % ---------------------------------------------------------------------------
 
-% The demon dies unreplaced when executed and no one becomes the new demon
-% Note: starpass only triggers from self-kill at night, not from execution
-% Must check current_demon, not original assignment, to handle SW becoming demon
-demon_dies_unreplaced(N) :-
-    day_number(N),
-    executed(P, N),
-    current_demon(P, N),
-    not sw_becomes_demon(_, N).
-
-% Good wins at the moment the demon is executed without replacement
-good_wins(day(N, exec)) :- demon_dies_unreplaced(N).
+% Good wins at the moment a demon dies AND no alive demons remain.
+% This handles all cases: execution, night kills, self-kills, etc.
+good_wins(T) :-
+    died(P, T),
+    has_demon_role(P, T),
+    not any_alive_demon(T).
 
 % ---------------------------------------------------------------------------
 % Evil Wins: Two or fewer players alive
@@ -38,12 +49,11 @@ alive_at_day_start(N, C) :-
     day_number(N),
     C = #count { P : alive(P, day(N, 0)) }.
 
-% Evil wins at start of day if 2 or fewer alive and demon is among them
+% Evil wins at start of day if 2 or fewer alive and a demon is among them
 evil_wins(day(N, 0)) :-
     day_number(N),
     alive_at_day_start(N, C), C <= 2,
-    alive(D, day(N, 0)),
-    current_demon(D, N).
+    any_alive_demon(day(N, 0)).
 
 % ---------------------------------------------------------------------------
 % Game Over: Derived from win conditions
@@ -71,6 +81,17 @@ game_over(T) :- good_wins(day(N, exec)), time(T), T = night(N2, R, S), N2 > N.
 game_over(T) :- good_wins(day(N, exec)), time(T), T = dawn(N2), N2 > N.
 game_over(T) :- good_wins(day(N, exec)), time(T), T = day(N2, P), N2 > N.
 
+% Good wins at night(N, R, S): game ends at that point, affects all times after
+% Rest of same night (later substeps)
+game_over(T) :- good_wins(T1), T1 = night(N, R1, S1), time(T), T = night(N, R2, S2), (R1, S1) < (R2, S2).
+% Dawn and day of same round
+game_over(dawn(N)) :- good_wins(T1), T1 = night(N, _, _), day_number(N).
+game_over(day(N, P)) :- good_wins(T1), T1 = night(N, _, _), day_time(day(N, P)).
+% All later rounds
+game_over(T) :- good_wins(T1), T1 = night(N, _, _), time(T), T = night(N2, R, S), N2 > N.
+game_over(T) :- good_wins(T1), T1 = night(N, _, _), time(T), T = dawn(N2), N2 > N.
+game_over(T) :- good_wins(T1), T1 = night(N, _, _), time(T), T = day(N2, P), N2 > N.
+
 % ---------------------------------------------------------------------------
 % Game Over Event (delta predicate for timeline rendering)
 % ---------------------------------------------------------------------------
@@ -85,7 +106,7 @@ d_game_over(T, evil) :- evil_wins(T).
 % ---------------------------------------------------------------------------
 
 % Who won and when
-winner(good, T) :- good_wins(T), not evil_wins(T2) : T2 = day(N, 0), good_wins(day(N, exec)).
+winner(good, T) :- good_wins(T).
 winner(evil, T) :- evil_wins(T).
 
 % Game is active (not yet over) at time T
