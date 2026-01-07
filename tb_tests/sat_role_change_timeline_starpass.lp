@@ -1,6 +1,7 @@
-% Test: Imp starpass and minion is told at dawn(N)
+% Test: Imp starpass and minion is told immediately
 % When the Imp kills itself and starpass occurs,
 % there should be a timeline event for ST telling the new demon about the role change.
+% The notification happens immediately at the time of the role change.
 
 % Include files directly (not base.lp) so we can set player_count first
 #const player_count = 5.
@@ -41,9 +42,9 @@ player_chooses(imp, courtney, point(courtney), night(2, 4, 2)).
 % Assert: generic role_changed should also work
 :- not role_changed(steph, poisoner, imp, 2).
 
-% Assert: ST should tell steph about role change at dawn(2)
-% (immediately after night 2, before day 2)
-:- not st_tells_role_change(steph, imp, dawn(2)).
+% Assert: ST should tell steph about role change immediately at night(2, 4, 3)
+% (the same time as the starpass)
+:- not st_tells_role_change(steph, imp, night(2, 4, 3)).
 
 % Assert: timeline event should be generated
-:- not d_st_tells_role_change(steph, imp, dawn(2)).
+:- not d_st_tells_role_change(steph, imp, night(2, 4, 3)).

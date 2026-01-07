@@ -694,9 +694,9 @@ role_changed_at_night(P, OldRole, NewRole, N) :-
     assigned(0, P, OldRole),
     OldRole != NewRole.
 
-st_tells_role_change(P, NewRole, dawn(N)) :-
-    role_changed_at_night(P, _, NewRole, N),
-    day_number(N).
+% Players are told about role changes immediately when they happen
+st_tells_role_change(P, NewRole, T) :-
+    role_assignment_changes_to(T, P, NewRole).
 
 % Generic role_changed/4 for convenience (either day or night changes)
 role_changed(P, OldRole, NewRole, N) :- role_changed_at_day(P, OldRole, NewRole, N).
