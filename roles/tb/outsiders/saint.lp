@@ -1,25 +1,19 @@
 % Saint
 % "If you are executed, your team loses."
 %
-% The Saint is an Outsider. If executed while their ability is functioning,
-% whatever team the Saint is on loses:
-% - Good Saint executed → Evil wins
-% - Evil Saint executed → Good wins (e.g., if Mezepheles turned them evil)
+% The Saint is an Outsider (good team). If the Saint is executed while their
+% ability is functioning, evil wins immediately.
 %
 % Note: If the Saint is drunk or poisoned when executed, their ability doesn't
 % trigger and the game continues normally.
+%
+% TODO: When alignment-changing roles (Mezepheles, etc.) are implemented,
+% this will need to check actual alignment at time of execution, not just
+% initial role category.
 
 % Evil wins if a Good Saint is executed and their ability is functioning
 evil_wins(day(N, exec)) :-
     executed(P, N),
     assigned(0, P, saint),
-    alignment(P, good, day(N, exec)),
-    functioning(P, day(N, exec)).
-
-% Good wins if an Evil Saint is executed and their ability is functioning
-% (e.g., Saint turned evil by Mezepheles)
-good_wins(day(N, exec)) :-
-    executed(P, N),
-    assigned(0, P, saint),
-    alignment(P, evil, day(N, exec)),
+    actual_category(P, good),
     functioning(P, day(N, exec)).
