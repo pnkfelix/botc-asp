@@ -94,10 +94,12 @@ eligible_for_starpass(Minion, N) :-
     imp_starpass_triggered(_, N),
     eligible_for_starpass(_, N).
 
-% Role change is effective at dawn - use fine-grained predicate
-role_assignment_changes_to(dawn(N), Minion, imp) :-
+% Role change happens at the same time as imp death (night N, substep 3)
+% This ensures there's never a moment without a demon during starpass,
+% which is important for the victory condition check.
+role_assignment_changes_to(night(N, RoleOrd, 3), Minion, imp) :-
     starpass_target(Minion, N),
-    day_number(N).
+    other_night_role_order(imp, RoleOrd).
 
 replaced_as_demon(P, NextN) :-
     imp_starpass_triggered(P, TriggerNight),
