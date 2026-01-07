@@ -676,7 +676,16 @@ buildGameState atoms targetTime =
     targetTimeInt = timePointToAssignedTime targetTime
 
     -- For each player, find the most recent assignment at or before targetTime
-    assignments = getEffectiveAssignments allAssignments targetTimeInt
+    baseAssignments = getEffectiveAssignments allAssignments targetTimeInt
+
+    -- Get role changes (d_assigned_change) that occurred at or before targetTime
+    -- These override the coarse-grained assignments from assigned/3
+    allRoleChanges = mapMaybe getAssignedChange atoms
+    roleChangesAtOrBefore = filter (\rc -> rc.time == targetTime || compareTimePoints rc.time targetTime == LT) allRoleChanges
+
+    -- Apply role changes on top of base assignments
+    -- For each player, if there's a role change at or before targetTime, use the new role
+    assignments = applyRoleChanges baseAssignments roleChangesAtOrBefore
 
     -- Get received tokens
     tokens = mapMaybe getReceived atoms
@@ -755,6 +764,28 @@ buildGameState atoms targetTime =
               sorted = sortBy (comparing _.time) validAssigns
           in last sorted # map \a -> { key: p, value: a.role }
       in mapMaybe effectiveForPlayer players
+
+    -- Extract AssignedChange atoms (d_assigned_change events)
+    getAssignedChange (AssignedChange time player _oldRole newRole) =
+      Just { time, player, newRole }
+    getAssignedChange _ = Nothing
+
+    -- Apply role changes on top of base assignments
+    -- For each player with a role change, override their assignment with the new role
+    applyRoleChanges :: Array { key :: String, value :: String } -> Array { time :: TimePoint, player :: String, newRole :: String } -> Array { key :: String, value :: String }
+    applyRoleChanges base changes =
+      let
+        -- For each player, find their most recent role change (if any)
+        getMostRecentChange p =
+          let playerChanges = filter (\c -> c.player == p) changes
+              sorted = sortBy (comparing _.time) playerChanges
+          in last sorted
+        -- Update each base assignment with most recent role change
+        updateAssignment assign =
+          case getMostRecentChange assign.key of
+            Just change -> { key: assign.key, value: change.newRole }
+            Nothing -> assign
+      in map updateAssignment base
 
     getReceived (Received player token) = Just { key: player, value: token }
     getReceived _ = Nothing
