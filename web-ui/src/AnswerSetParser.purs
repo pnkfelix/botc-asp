@@ -18,7 +18,7 @@ module AnswerSetParser
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, sortBy, nub, head, last, findIndex, index)
+import Data.Array (filter, mapMaybe, sortBy, nub, head, last, findIndex, index, null)
 import Data.Foldable (elem, all, foldl)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, indexOf, lastIndexOf, length, drop, take)
@@ -44,6 +44,7 @@ data Atom
   | Executed String Int                 -- d_executed(player, day)
   | Bag String                          -- bag(role) - role is in the physical bag
   | Bluff String                        -- bluff(role) - role shown to demon as bluff
+  | CharacterAssignmentAtTime TimePoint String String  -- character_assignment_state_at_time(time, player, role)
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -87,6 +88,7 @@ atomCategory = case _ of
   -- The timeline display has separate logic to show only first placement.
   ReminderOn _ _ _      -> StatePredicate
   GhostVoteUsed _ _     -> StatePredicate
+  CharacterAssignmentAtTime _ _ _ -> StatePredicate  -- Role at specific time point
   -- Structural predicates: game setup and timeline markers
   Assigned _ _ _        -> StructuralPredicate
   Received _ _          -> StructuralPredicate
@@ -245,7 +247,8 @@ parseAtom atomStr =
       parseChair trimmed <|>
       parseExecuted trimmed <|>
       parseBag trimmed <|>
-      parseBluff trimmed
+      parseBluff trimmed <|>
+      parseCharacterAssignmentAtTime trimmed
 
 -- | Parse assigned(T, Player, Role)
 parseAssigned :: String -> Maybe Atom
@@ -499,6 +502,22 @@ parseBluff s = do
   let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bluff(" and ")"
   Just $ Bluff (trim rest)
 
+-- | Parse character_assignment_state_at_time(Time, Player, Role)
+parseCharacterAssignmentAtTime :: String -> Maybe Atom
+parseCharacterAssignmentAtTime s =
+  let pattern = "character_assignment_state_at_time("
+  in if take (length pattern) s == pattern
+     then
+       let rest = drop (length pattern) (take (length s - 1) s)
+       in case parseTimeAndRest rest of
+            Just { time, rest: rest1 } ->
+              case splitAtFirstComma rest1 of
+                Just { before: player, after: role } ->
+                  Just $ CharacterAssignmentAtTime time (trim player) (trim role)
+                Nothing -> Nothing
+            Nothing -> Nothing
+     else Nothing
+
 -- | Parse a time string like "night(1,2,3)", "dawn(1)", or "day(1,0)"
 parseTime :: String -> TimePoint
 parseTime s =
@@ -669,14 +688,17 @@ buildGameState atoms targetTime =
     -- Get chairs
     chairs = mapMaybe getChair atoms
 
-    -- Get all assignments (initial and mid-game role changes)
-    allAssignments = mapMaybe getAllAssignments atoms
+    -- Get fine-grained assignments at exact target time (preferred, clingo as source of truth)
+    fineGrainedAssignments = mapMaybe (getFineGrainedAssignment targetTime) atoms
 
-    -- Convert target time to integer for comparison with assigned(N, ...)
+    -- Fall back to coarse-grained assignments if fine-grained not available
+    -- (for backward compatibility with older answer sets)
+    allCoarseAssignments = mapMaybe getAllAssignments atoms
     targetTimeInt = timePointToAssignedTime targetTime
+    coarseAssignments = getEffectiveAssignments allCoarseAssignments targetTimeInt
 
-    -- For each player, find the most recent assignment at or before targetTime
-    assignments = getEffectiveAssignments allAssignments targetTimeInt
+    -- Use fine-grained if available, otherwise fall back to coarse-grained
+    assignments = if null fineGrainedAssignments then coarseAssignments else fineGrainedAssignments
 
     -- Get received tokens
     tokens = mapMaybe getReceived atoms
@@ -739,7 +761,12 @@ buildGameState atoms targetTime =
     getChair (Chair name pos) = Just { name, pos }
     getChair _ = Nothing
 
-    -- Get all assignments (not just time 0)
+    -- Get fine-grained assignment at exact target time
+    getFineGrainedAssignment t (CharacterAssignmentAtTime time player role) =
+      if time == t then Just { key: player, value: role } else Nothing
+    getFineGrainedAssignment _ _ = Nothing
+
+    -- Get all coarse-grained assignments (not just time 0)
     getAllAssignments (Assigned t player role) = Just { time: t, player, role }
     getAllAssignments _ = Nothing
 
@@ -995,6 +1022,7 @@ atomToPredicateName = case _ of
   Executed _ _           -> { name: "d_executed", arity: 2 }
   Bag _                  -> { name: "bag", arity: 1 }
   Bluff _                -> { name: "bluff", arity: 1 }
+  CharacterAssignmentAtTime _ _ _ -> { name: "character_assignment_state_at_time", arity: 3 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =
