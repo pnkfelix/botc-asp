@@ -313,6 +313,25 @@ actual_category(P, good) :- assigned(0, P, R), outsider(R).
 actual_category(P, evil) :- assigned(0, P, R), minion(R).
 actual_category(P, evil) :- assigned(0, P, R), demon(R).
 
+% ---------------------------------------------------------------------------
+% True alignment at time T
+% ---------------------------------------------------------------------------
+% alignment(P, A, T) tracks a player's TRUE team alignment at time T.
+% This is different from registers_as, which can be manipulated by Spy/Recluse.
+% True alignment only changes through specific effects like Mezepheles or Goon.
+%
+% Base case: alignment comes from initial role assignment
+% Override: roles like Mezepheles/Goon add alignment_changed/3 facts
+alignment(P, good, T) :- actual_category(P, good), time(T), not alignment_changed(P, evil, T).
+alignment(P, evil, T) :- actual_category(P, evil), time(T), not alignment_changed(P, good, T).
+
+% When alignment is changed by an effect, use the new alignment
+alignment(P, A, T) :- alignment_changed(P, A, T).
+
+% Placeholder to avoid unsafe variable warnings when no alignment changes exist
+% Roles that change alignment (Mezepheles, Goon, etc.) will add their own rules
+alignment_changed(noone, good, night(0,0,0)) :- #false.
+
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
