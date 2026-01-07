@@ -2,7 +2,7 @@
 %
 % Scenario:
 % - Day 1: The demon is executed
-% - No Scarlet Woman trigger (only 5 players, threshold is 5)
+% - No Scarlet Woman trigger (threshold is 5, we have 5 alive at exec)
 % - Result: Good wins because the demon is dead
 %
 % This tests the basic victory condition.
@@ -11,12 +11,16 @@
 
 needs_night(2).
 
-% 5 players for a valid game
+% 8 players - use the default player_count from base.lp
+% TB distribution for 8: 5 townsfolk, 1 outsider, 1 minion, 1 demon
 assigned(0, amanda, empath).
 assigned(0, rob, washerwoman).
-assigned(0, sarah, chef).
-assigned(0, felix, poisoner).    % Minion
-assigned(0, steph, imp).         % Demon
+assigned(0, taylor, chef).
+assigned(0, courtney, investigator).
+assigned(0, neha, slayer).
+assigned(0, pratik, butler).       % Outsider
+assigned(0, felix, poisoner).      % Minion
+assigned(0, steph, imp).           % Demon
 
 % Day 1: Execute the demon
 executed(steph, 1).

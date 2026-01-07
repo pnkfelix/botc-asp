@@ -13,12 +13,16 @@
 
 needs_night(3).
 
-% 5 players for a valid game
+% 8 players - use the default player_count from base.lp
+% TB distribution for 8: 5 townsfolk, 1 outsider, 1 minion, 1 demon
 assigned(0, amanda, empath).
 assigned(0, rob, washerwoman).
-assigned(0, sarah, chef).
-assigned(0, felix, poisoner).    % Minion - will receive starpass
-assigned(0, steph, imp).         % Original demon
+assigned(0, taylor, chef).
+assigned(0, courtney, investigator).
+assigned(0, neha, slayer).
+assigned(0, pratik, butler).       % Outsider
+assigned(0, felix, poisoner).      % Minion - will receive starpass
+assigned(0, steph, imp).           % Original demon
 
 % Night 1: No kills (first night)
 
