@@ -29,7 +29,7 @@ assigned(0, taylor, chef).
 assigned(0, sam, saint).
 
 % Saint must not be poisoned (so their ability is functioning)
-:- poisoned(sam, _).
+:- reminder_on(poi_poisoned, sam, _).
 
 % Day 1: Execute the Saint
 executed(sam, 1).

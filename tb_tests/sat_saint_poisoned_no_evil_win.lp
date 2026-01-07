@@ -31,11 +31,12 @@ assigned(0, taylor, chef).
 assigned(0, sam, saint).
 
 % Night 1: Poisoner poisons the Saint
-player_chooses(poisoner, amanda, point(sam), night(1, 1, 1)).
+% Poisoner is role order 1, player_chooses is substep 2
+player_chooses(poisoner, amanda, point(sam), night(1, 1, 2)).
 
-% Verify Saint is poisoned during day 1
-:- not poisoned(sam, day(1, 0)).
-:- not poisoned(sam, day(1, exec)).
+% Verify Saint has poison token during day 1
+:- not reminder_on(poi_poisoned, sam, day(1, 0)).
+:- not reminder_on(poi_poisoned, sam, day(1, exec)).
 
 % Day 1: Execute the Saint (while poisoned)
 executed(sam, 1).
