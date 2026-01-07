@@ -328,9 +328,9 @@ alignment(P, evil, T) :- actual_category(P, evil), time(T), not alignment_change
 % When alignment is changed by an effect, use the new alignment
 alignment(P, A, T) :- alignment_changed(P, A, T).
 
-% Placeholder to avoid unsafe variable warnings when no alignment changes exist
-% Roles that change alignment (Mezepheles, Goon, etc.) will add their own rules
-alignment_changed(noone, good, night(0,0,0)) :- #false.
+% Note: alignment_changed/3 is defined by roles that change alignment
+% (e.g., Mezepheles, Goon). When no such roles are present, the predicate
+% is simply undefined, and the negation-as-failure in the base rules works correctly.
 
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
