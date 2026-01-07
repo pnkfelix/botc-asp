@@ -8,7 +8,7 @@
 #include "../tb.lp".
 #include "../players.lp".
 
-needs_night(2).
+needs_night(3).  % Need night 3 to check assigned(3, steph, imp)
 
 % Setup: 5 players with passive roles to minimize solver complexity
 % Distribution for 5 players: 3 townsfolk, 0 outsiders, 1 minion, 1 demon
@@ -31,8 +31,9 @@ player_chooses(imp, courtney, point(courtney), night(2, 4, 2)).
 % Assert: steph should become the starpass target
 :- not starpass_target(steph, 2).
 
-% Assert: steph should be assigned imp role at time 2
-:- not assigned(2, steph, imp).
+% Assert: steph should be assigned imp role at start of night 3 (after starpass at night 2)
+% With the new semantics, assigned(N, P, R) means "at start of night N, P has role R"
+:- not assigned(3, steph, imp).
 
 % Assert: role_changed_at_night should track this
 :- not role_changed_at_night(steph, poisoner, imp, 2).

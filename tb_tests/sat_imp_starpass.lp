@@ -1,7 +1,7 @@
 % Test: Imp kills itself (starpass) and a minion becomes the new Imp
 #include "base.lp".
 
-needs_night(2).
+needs_night(3).  % Need night 3 to check assigned(3, felix, imp)
 
 assigned(0, amanda, empath).
 assigned(0, rob, washerwoman).
@@ -28,6 +28,7 @@ player_chooses(imp, steph, point(steph), night(2, 4, 2)).
 % Assert: felix (the only minion) should become the starpass target
 :- not starpass_target(felix, 2).
 
-% Assert: felix should be assigned imp role at time 2
-:- not assigned(2, felix, imp).
+% Assert: felix should be assigned imp role at start of night 3 (after starpass at night 2)
+% With the new semantics, assigned(N, P, R) means "at start of night N, P has role R"
+:- not assigned(3, felix, imp).
 

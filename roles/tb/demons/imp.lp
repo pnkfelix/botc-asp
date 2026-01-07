@@ -94,7 +94,10 @@ eligible_for_starpass(Minion, N) :-
     imp_starpass_triggered(_, N),
     eligible_for_starpass(_, N).
 
-assigned(N, Minion, imp) :- starpass_target(Minion, N).
+% Role change is effective at dawn - use fine-grained predicate
+role_assignment_changes_to(dawn(N), Minion, imp) :-
+    starpass_target(Minion, N),
+    day_number(N).
 
 replaced_as_demon(P, NextN) :-
     imp_starpass_triggered(P, TriggerNight),

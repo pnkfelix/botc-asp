@@ -11,4 +11,5 @@ sw_becomes_demon(SW, N) :-
     alive_count(N, C), C >= 5,
     alive(SW, day(N, 0)).
 
-assigned(N, SW, imp) :- sw_becomes_demon(SW, N).
+% Role change happens at execution time - use fine-grained predicate
+role_assignment_changes_to(day(N, exec), SW, imp) :- sw_becomes_demon(SW, N).

@@ -29,8 +29,10 @@ pit_hag_changed(P, Role, N) :-
     pit_hag_chooses(PitHag, P, Role, night(N, RoleOrd, 2)),
     functioning(PitHag, night(N, RoleOrd, 3)).
 
-assigned(N, P, Role) :-
-    pit_hag_changed(P, Role, N).
+% Role change is effective at dawn - use fine-grained predicate
+role_assignment_changes_to(dawn(N), P, Role) :-
+    pit_hag_changed(P, Role, N),
+    day_number(N).
 
 % Track if a demon was created this night
 pit_hag_created_demon(N) :-
