@@ -37,7 +37,7 @@ alignment_changed(sam, evil, T) :- time(T), T = day(_, _).
 alignment_changed(sam, evil, T) :- time(T), T = night(N, _, _), N > 1.
 
 % Saint must not be poisoned (so their ability is functioning)
-:- poisoned(sam, _).
+:- reminder_on(poi_poisoned, sam, _).
 
 % Day 1: Execute the Saint (who is now evil)
 executed(sam, 1).
