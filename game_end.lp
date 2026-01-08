@@ -49,11 +49,23 @@ alive_at_day_start(N, C) :-
     day_number(N),
     C = #count { P : alive(P, day(N, 0)) }.
 
+% Count of alive players at execution time (after execution death is applied)
+alive_at_exec(N, C) :-
+    day_number(N),
+    C = #count { P : alive(P, day(N, exec)) }.
+
 % Evil wins at start of day if 2 or fewer alive and a demon is among them
 evil_wins(day(N, 0)) :-
     day_number(N),
     alive_at_day_start(N, C), C <= 2,
     any_alive_demon(day(N, 0)).
+
+% Evil wins at execution if 2 or fewer alive after execution and a demon is among them
+% This covers the case where executing a non-demon brings player count to 2
+evil_wins(day(N, exec)) :-
+    day_number(N),
+    alive_at_exec(N, C), C <= 2,
+    any_alive_demon(day(N, exec)).
 
 % ---------------------------------------------------------------------------
 % Game Over: Derived from win conditions
