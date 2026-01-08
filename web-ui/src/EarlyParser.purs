@@ -11,11 +11,12 @@ module EarlyParser
   , ScriptInfo
   , extractScriptMetadata
   , extractAllScripts
+  , getValidPlayerNames
   ) where
 
 import Prelude
 
-import Data.Array (filter, mapMaybe, fromFoldable, head)
+import Data.Array (filter, mapMaybe, fromFoldable, head, take)
 import Data.Array.NonEmpty as NEA
 import Data.Int as Int
 import Data.Map (Map)
@@ -363,3 +364,17 @@ extractAllScripts files =
 isRootLpFile :: String -> Boolean
 isRootLpFile path =
   not (S.contains (Pattern "/") path) && S.contains (Pattern ".lp") path
+
+-- | Get valid player names based on player_count
+-- | Returns array of player names for chairs 0 to (player_count - 1)
+-- | Player ordering from players.lp: amanda(0), rob(1), taylor(2), courtney(3),
+-- | steph(4), felix(5), neha(6), pratik(7), kunjal(8), cyrielle(9), logan(10),
+-- | lou(11), kate(12), ivan(13), ricky(14), kyla(15)
+getValidPlayerNames :: Int -> Array String
+getValidPlayerNames count =
+  let
+    -- All player names in chair order (hardcoded for now, matches players.lp)
+    allPlayers = ["amanda", "rob", "taylor", "courtney", "steph", "felix", "neha", "pratik",
+                  "kunjal", "cyrielle", "logan", "lou", "kate", "ivan", "ricky", "kyla"]
+  in
+    take count allPlayers

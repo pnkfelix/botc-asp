@@ -20,7 +20,7 @@ import Effect.Aff (Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import EarlyParser (parseMinNights, parsePlayerCount, parseScript)
+import EarlyParser (parseMinNights, parsePlayerCount, parseScript, getValidPlayerNames)
 import Halogen as H
 import TextareaUtils as TU
 import TokenConstraints as TC
@@ -29,7 +29,7 @@ import Web.UIEvent.MouseEvent (toEvent)
 
 -- Re-export types and render function for backwards compatibility
 import Component.ClingoDemo.Types (Action(..), ResultDisplay(..), Slots, State, TimingEntry, UndoEntry, answerSetPageSize)
-import Component.ClingoDemo.Utils (availableFiles, commentOutConstraint, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updateMinNights, updatePlayerCount, updateScript)
+import Component.ClingoDemo.Utils (autoCommentContradictoryAssertions, availableFiles, commentOutConstraint, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, getScriptRoles, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updateMinNights, updatePlayerCount, updateScript)
 import Component.ClingoDemo.Render (render)
 
 -- | The Halogen component
@@ -121,7 +121,14 @@ handleAction = case _ of
     -- Update inst.lp with the new player count
     state <- H.get
     let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-    let updatedContent = updatePlayerCount count instContent
+    let withPlayerCount = updatePlayerCount count instContent
+    -- Get valid players, roles, and max night for auto-commenting
+    let validPlayers = getValidPlayerNames count
+    let scriptRoles = getScriptRoles state.files
+    let validRoles = scriptRoles.townsfolk <> scriptRoles.outsiders <> scriptRoles.minions <> scriptRoles.demons
+    let maxNight = fromMaybe 1 $ parseMinNights withPlayerCount
+    -- Auto-comment contradictory assertions
+    let updatedContent = autoCommentContradictoryAssertions withPlayerCount validPlayers validRoles maxNight
     -- Update the virtual filesystem
     H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
     -- Update the URL parameter
@@ -135,7 +142,14 @@ handleAction = case _ of
     -- Update inst.lp with the new min nights value
     state <- H.get
     let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-    let updatedContent = updateMinNights nights instContent
+    let withMinNights = updateMinNights nights instContent
+    -- Get valid players, roles for auto-commenting
+    let playerCount = fromMaybe 8 $ parsePlayerCount withMinNights
+    let validPlayers = getValidPlayerNames playerCount
+    let scriptRoles = getScriptRoles state.files
+    let validRoles = scriptRoles.townsfolk <> scriptRoles.outsiders <> scriptRoles.minions <> scriptRoles.demons
+    -- Auto-comment contradictory assertions (using new nights value)
+    let updatedContent = autoCommentContradictoryAssertions withMinNights validPlayers validRoles nights
     -- Update the virtual filesystem
     H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
     -- Update the URL parameter
@@ -151,7 +165,17 @@ handleAction = case _ of
     when (isValidScript state.files scriptId) do
       -- Update inst.lp with the new script include
       let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
-      let updatedContent = updateScript state.files scriptId instContent
+      let withScript = updateScript state.files scriptId instContent
+      -- Get valid players, roles, and max night for auto-commenting
+      -- Need to update files temporarily to get roles from new script
+      let updatedFiles = Map.insert "inst.lp" withScript state.files
+      let playerCount = fromMaybe 8 $ parsePlayerCount withScript
+      let validPlayers = getValidPlayerNames playerCount
+      let scriptRoles = getScriptRoles updatedFiles
+      let validRoles = scriptRoles.townsfolk <> scriptRoles.outsiders <> scriptRoles.minions <> scriptRoles.demons
+      let maxNight = fromMaybe 1 $ parseMinNights withScript
+      -- Auto-comment contradictory assertions
+      let updatedContent = autoCommentContradictoryAssertions withScript validPlayers validRoles maxNight
       -- Update the virtual filesystem
       H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
       -- Update the URL parameter

@@ -4,13 +4,14 @@ module Component.ClingoDemo.Utils where
 
 import Prelude
 
-import Data.Array (filter, fromFoldable, index, length, nub, slice, snoc)
+import Data.Array (filter, fromFoldable, index, length, nub, slice, snoc, takeWhile)
 import Data.Foldable (elem, foldl, intercalate)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split, trim, contains, indexOf)
 import Data.String as String
+import Data.String.CodeUnits (toCharArray, fromCharArray)
 import EmbeddedPrograms as EP
 import AnswerSetParser as AnswerSet
 import Clingo as Clingo
@@ -509,3 +510,226 @@ commentOutIfExact patternStr line =
     if trimmedLine == trimmedPattern && firstChar /= "%"
       then "% " <> line <> "  % moved to bluffs"
       else line
+
+-- | Auto-comment contradictory assertions in inst.lp content
+-- | Checks assertions against valid players, roles, and night numbers
+-- | Parameters:
+-- |   content: inst.lp content to process
+-- |   validPlayers: array of valid player names (based on player_count)
+-- |   validRoles: array of all valid roles (from current script)
+-- |   maxNight: maximum valid night number (from needs_night)
+-- | Returns modified content with contradictory assertions commented out
+autoCommentContradictoryAssertions :: String -> Array String -> Array String -> Int -> String
+autoCommentContradictoryAssertions content validPlayers validRoles maxNight =
+  let
+    contentLines = String.split (String.Pattern "\n") content
+    modifiedLines = map (processAssertionLine validPlayers validRoles maxNight) contentLines
+  in
+    intercalate "\n" modifiedLines
+
+-- | Process a single line, commenting out if it's a contradictory assertion
+processAssertionLine :: Array String -> Array String -> Int -> String -> String
+processAssertionLine validPlayers validRoles maxNight line =
+  let
+    trimmedLine = trim line
+    isCommented = String.take 1 trimmedLine == "%"
+  in
+    -- Skip if already commented
+    if isCommented then line
+    else case checkAssertion validPlayers validRoles maxNight trimmedLine of
+      Just reason -> "% " <> line <> "  % auto-commented: " <> reason
+      Nothing -> line
+
+-- | Check if a line is a contradictory assertion
+-- | Returns Just reason if contradictory, Nothing if valid or not an assertion
+checkAssertion :: Array String -> Array String -> Int -> String -> Maybe String
+checkAssertion validPlayers validRoles maxNight line =
+  -- Check various assertion patterns
+  checkAssertDistrib validRoles line
+  <|> checkAssertReceived validPlayers validRoles line
+  <|> checkReceivedFact validPlayers line
+  <|> checkAssertDrawn validRoles line
+  <|> checkAssertBluff validRoles line
+  <|> checkAssertAssigned validPlayers validRoles maxNight line
+  <|> checkAssertReminderOn validPlayers maxNight line
+  where
+    -- Alternative operator for Maybe
+    (<|>) :: Maybe String -> Maybe String -> Maybe String
+    (<|>) (Just x) _ = Just x
+    (<|>) Nothing y = y
+
+-- | Check assert_distrib(Role) - Role must be on current script
+checkAssertDistrib :: Array String -> String -> Maybe String
+checkAssertDistrib validRoles line =
+  case extractSingleArg "assert_distrib" line of
+    Just role ->
+      if not (elem role validRoles)
+        then Just $ "role '" <> role <> "' not on current script"
+        else Nothing
+    Nothing -> Nothing
+
+-- | Check assert_received(Player, Role) - Player and Role must be valid
+checkAssertReceived :: Array String -> Array String -> String -> Maybe String
+checkAssertReceived validPlayers validRoles line =
+  case extractTwoArgs "assert_received" line of
+    Just { arg1: player, arg2: role } ->
+      if not (elem player validPlayers)
+        then Just $ "player '" <> player <> "' outside player_count"
+        else if not (elem role validRoles)
+          then Just $ "role '" <> role <> "' not on current script"
+          else Nothing
+    Nothing -> Nothing
+
+-- | Check received(Player, Role) fact - Player must be valid
+checkReceivedFact :: Array String -> String -> Maybe String
+checkReceivedFact validPlayers line =
+  -- Only match received/2, not assert_received
+  if contains (Pattern "assert_received") line
+    then Nothing
+    else case extractTwoArgs "received" line of
+      Just { arg1: player, arg2: _ } ->
+        if not (elem player validPlayers)
+          then Just $ "player '" <> player <> "' outside player_count"
+          else Nothing
+      Nothing -> Nothing
+
+-- | Check assert_drawn(Role) - Role must be on current script
+checkAssertDrawn :: Array String -> String -> Maybe String
+checkAssertDrawn validRoles line =
+  case extractSingleArg "assert_drawn" line of
+    Just role ->
+      if not (elem role validRoles)
+        then Just $ "role '" <> role <> "' not on current script"
+        else Nothing
+    Nothing -> Nothing
+
+-- | Check assert_bluff(Role) - Role must be on current script
+checkAssertBluff :: Array String -> String -> Maybe String
+checkAssertBluff validRoles line =
+  case extractSingleArg "assert_bluff" line of
+    Just role ->
+      if not (elem role validRoles)
+        then Just $ "role '" <> role <> "' not on current script"
+        else Nothing
+    Nothing -> Nothing
+
+-- | Check assert_assigned(N, Player, Role) - N must be <= maxNight, Player and Role valid
+checkAssertAssigned :: Array String -> Array String -> Int -> String -> Maybe String
+checkAssertAssigned validPlayers validRoles maxNight line =
+  case extractThreeArgs "assert_assigned" line of
+    Just { arg1: nStr, arg2: player, arg3: role } ->
+      case Int.fromString nStr of
+        Just n ->
+          if n > maxNight
+            then Just $ "night " <> show n <> " exceeds needs_night(" <> show maxNight <> ")"
+            else if not (elem player validPlayers)
+              then Just $ "player '" <> player <> "' outside player_count"
+              else if not (elem role validRoles)
+                then Just $ "role '" <> role <> "' not on current script"
+                else Nothing
+        Nothing -> Nothing  -- N is not a number, skip
+    Nothing -> Nothing
+
+-- | Check assert_reminder_on(Token, Player, Time) - Player must be valid, time must be valid
+-- | Time format: night(N, R, S) or day(N, P) or dawn(N)
+checkAssertReminderOn :: Array String -> Int -> String -> Maybe String
+checkAssertReminderOn validPlayers maxNight line =
+  -- Pattern: assert_reminder_on(token, player, time).
+  if not (contains (Pattern "assert_reminder_on(") line) then Nothing
+  else
+    -- Extract player (second argument)
+    let
+      -- Simple extraction: find content between first comma and second comma
+      afterOpen = String.drop (String.length "assert_reminder_on(") (trim line)
+      parts = String.split (String.Pattern ", ") afterOpen
+    in case index parts 1 of
+      Just player ->
+        if not (elem player validPlayers)
+          then Just $ "player '" <> player <> "' outside player_count"
+          else
+            -- Check if time references a night > maxNight
+            checkTimeInLine maxNight line
+      Nothing -> Nothing
+
+-- | Check if a time expression in a line exceeds maxNight
+checkTimeInLine :: Int -> String -> Maybe String
+checkTimeInLine maxNight line =
+  -- Look for night(N, ...), day(N, ...), or dawn(N) patterns
+  let
+    -- Extract night number from patterns like night(3, 0, 0) or day(2, 0)
+    nightPattern = extractNightNumber "night(" line
+    dayPattern = extractNightNumber "day(" line
+    dawnPattern = extractNightNumber "dawn(" line
+  in case nightPattern <|> dayPattern <|> dawnPattern of
+    Just n ->
+      if n > maxNight
+        then Just $ "time references night " <> show n <> " which exceeds needs_night(" <> show maxNight <> ")"
+        else Nothing
+    Nothing -> Nothing
+  where
+    (<|>) :: Maybe Int -> Maybe Int -> Maybe Int
+    (<|>) (Just x) _ = Just x
+    (<|>) Nothing y = y
+
+-- | Extract night number from a time pattern in a line
+extractNightNumber :: String -> String -> Maybe Int
+extractNightNumber prefix line =
+  case indexOf (Pattern prefix) line of
+    Just idx ->
+      let
+        afterPrefix = String.drop (idx + String.length prefix) line
+        -- Get the number before the first comma or closing paren
+        numStr = stringTakeWhile (\c -> c /= ',' && c /= ')') afterPrefix
+      in Int.fromString (trim numStr)
+    Nothing -> Nothing
+
+-- | Extract a single argument from a predicate like pred(arg).
+extractSingleArg :: String -> String -> Maybe String
+extractSingleArg predName line =
+  let
+    pat = predName <> "("
+  in
+    if not (contains (Pattern pat) line) then Nothing
+    else
+      let
+        afterOpen = String.drop (String.length pat) (trim line)
+        -- Find the closing paren
+        beforeClose = stringTakeWhile (_ /= ')') afterOpen
+      in if beforeClose == "" then Nothing else Just (trim beforeClose)
+
+-- | Extract two arguments from a predicate like pred(arg1, arg2).
+extractTwoArgs :: String -> String -> Maybe { arg1 :: String, arg2 :: String }
+extractTwoArgs predName line =
+  let
+    pat = predName <> "("
+  in
+    if not (contains (Pattern pat) line) then Nothing
+    else
+      let
+        afterOpen = String.drop (String.length pat) (trim line)
+        beforeClose = stringTakeWhile (_ /= ')') afterOpen
+        parts = String.split (String.Pattern ",") beforeClose
+      in case index parts 0, index parts 1 of
+        Just arg1, Just arg2 -> Just { arg1: trim arg1, arg2: trim arg2 }
+        _, _ -> Nothing
+
+-- | Extract three arguments from a predicate like pred(arg1, arg2, arg3).
+extractThreeArgs :: String -> String -> Maybe { arg1 :: String, arg2 :: String, arg3 :: String }
+extractThreeArgs predName line =
+  let
+    pat = predName <> "("
+  in
+    if not (contains (Pattern pat) line) then Nothing
+    else
+      let
+        afterOpen = String.drop (String.length pat) (trim line)
+        beforeClose = stringTakeWhile (_ /= ')') afterOpen
+        parts = String.split (String.Pattern ",") beforeClose
+      in case index parts 0, index parts 1, index parts 2 of
+        Just arg1, Just arg2, Just arg3 -> Just { arg1: trim arg1, arg2: trim arg2, arg3: trim arg3 }
+        _, _, _ -> Nothing
+
+-- | Helper: takeWhile for strings (converts to char array internally)
+stringTakeWhile :: (Char -> Boolean) -> String -> String
+stringTakeWhile predicate str =
+  fromCharArray (takeWhile predicate (toCharArray str))
