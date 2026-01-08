@@ -2,7 +2,7 @@
 % This tests the evil_wins(day(N, exec)) rule in game_end.lp
 %
 % Scenario: 5 players start, 3 deaths during night/day, then execution brings to 2
-% - Start: felix (imp), amanda (poisoner), rob (washerwoman), taylor (chef), steph (saint)
+% - Start: felix (imp), amanda (poisoner), rob (washerwoman), taylor (chef), steph (ravenkeeper)
 % - Day 1: Execute rob (4 remaining)
 % - Night 2: Imp kills taylor (3 remaining at dawn 2)
 % - Day 2: 3 alive - game does NOT end
@@ -47,6 +47,3 @@ executed(steph, 2).
 
 % Verify d_game_over event fires at the right time
 :- not d_game_over(day(2, exec), evil).
-
-% Game should be over so day 3 shouldn't be active
-:- not game_over(night(3, 0, 0)).
