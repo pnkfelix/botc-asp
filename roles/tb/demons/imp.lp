@@ -20,11 +20,12 @@ other_night_substep(imp, 3, st_places(imp_dead)).
    night_number(N), N > 1,
    not any_minion_alive(night(N, 0, 0)).
 
+% Check if any player who is CURRENTLY a minion is alive
+% (not just initially assigned as minion - role may have changed via SW, etc.)
 any_minion_alive(T) :-
-    assigned(0, P, R),
+    character_assignment_state_at_time(T, P, R),
     minion(R),
-    alive(P, T),
-    time(T).
+    alive(P, T).
 
 current_demon(P, N) :-
     night_number(N),

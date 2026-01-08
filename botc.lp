@@ -44,6 +44,15 @@ time(night(N, RoleOrd, S)) :-
     received(Player, Role),
     alive(Player, night(N, 0, 0)).
 
+% Also generate time points for players who CURRENTLY have a role (via role change)
+% This handles cases like Scarlet Woman becoming Imp after original Imp is executed
+time(night(N, RoleOrd, S)) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    character_assignment_state_at_time(night(N, 0, 0), Player, Role),
+    alive(Player, night(N, 0, 0)).
+
 % Which role is acting at a given time point
 % Includes both assigned roles and roles players think they are (received tokens)
 acting_role(night(1, RoleOrd, S), Role) :-
@@ -70,6 +79,14 @@ acting_role(night(N, RoleOrd, S), Role) :-
     other_night_role_order(Role, RoleOrd),
     other_night_substep(Role, S, _),
     received(Player, Role),
+    alive(Player, night(N, 0, 0)).
+
+% Also generate acting_role for players who CURRENTLY have a role (via role change)
+acting_role(night(N, RoleOrd, S), Role) :-
+    night_number(N), N > 1,
+    other_night_role_order(Role, RoleOrd),
+    other_night_substep(Role, S, _),
+    character_assignment_state_at_time(night(N, 0, 0), Player, Role),
     alive(Player, night(N, 0, 0)).
 
 % Ordering: next(T1, T2) means T2 immediately follows T1
