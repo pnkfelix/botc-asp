@@ -311,6 +311,7 @@ renderBagPanel :: forall cs m.
   , bagTokens :: Array String
   , bluffTokens :: Array String
   , assignedNotInBag :: Array String
+  , impairmentTokens :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderBagPanel state gameState =
@@ -582,6 +583,7 @@ renderReminderDebugPanel :: forall cs m.
   , bagTokens :: Array String
   , bluffTokens :: Array String
   , assignedNotInBag :: Array String
+  , impairmentTokens :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderReminderDebugPanel state gameState =
