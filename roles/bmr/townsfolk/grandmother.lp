@@ -51,5 +51,5 @@ died_from_demon(P, T) :- shabaloth_kill_succeeds(P, T).
 died_from_demon(P, T) :- po_kill_succeeds(P, T).
 
 % Grandmother death is announced at the same time as grandchild
-dead(GM, T) :- grandmother_dies_from_grandchild(GM, T).
+dead_at_time(GM, T) :- grandmother_dies_from_grandchild(GM, T).
 died(GM, T) :- grandmother_dies_from_grandchild(GM, T), final_night_time(N, T), alive(GM, night(N, 0, 0)).

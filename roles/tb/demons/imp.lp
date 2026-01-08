@@ -67,7 +67,7 @@ imp_kill_succeeds(P, T) :-
     reminder_on(imp_dead, P, T),
     not protected_from_demon(P, T).
 
-dead(P, T) :- imp_kill_succeeds(P, T).
+dead_at_time(P, T) :- imp_kill_succeeds(P, T).
 
 died(P, T) :-
     final_night_time(N, T),

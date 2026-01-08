@@ -34,5 +34,5 @@ reminder_on(gossip_dead, P, night(N+1, RoleOrd, 1)) :-
     gossip_kills(P, N).
 
 % Gossip kill causes death
-dead(P, T) :- reminder_on(gossip_dead, P, T).
+dead_at_time(P, T) :- reminder_on(gossip_dead, P, T).
 died(P, T) :- gossip_kills(P, N), final_night_time(N+1, T), alive(P, night(N+1, 0, 0)).

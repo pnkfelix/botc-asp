@@ -43,7 +43,7 @@ snv_demon_killed(FG, T) :-
     T = night(N, RoleOrd, 3),
     other_night_role_order(fang_gu, RoleOrd).
 
-dead(FG, T) :-
+dead_at_time(FG, T) :-
     fang_gu_jumped(FG, _, N),
     T = night(N, RoleOrd, 3),
     other_night_role_order(fang_gu, RoleOrd).
@@ -99,7 +99,7 @@ fang_gu_kill_succeeds(P, T) :-
     not protected_from_demon(P, T),
     not fang_gu_jumped(P, _, _).
 
-dead(P, T) :- fang_gu_kill_succeeds(P, T).
+dead_at_time(P, T) :- fang_gu_kill_succeeds(P, T).
 
 died(P, T) :-
     final_night_time(N, T),

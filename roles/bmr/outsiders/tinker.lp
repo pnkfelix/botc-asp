@@ -16,7 +16,7 @@ reminder_on(tinker_dead, Tinker, night(N, RoleOrd, 1)) :-
     tinker_dies(Tinker, N).
 
 % Tinker death
-dead(P, T) :- reminder_on(tinker_dead, P, T).
+dead_at_time(P, T) :- reminder_on(tinker_dead, P, T).
 died(P, T) :- tinker_dies(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % Tinker can also die during the day (ST choice)

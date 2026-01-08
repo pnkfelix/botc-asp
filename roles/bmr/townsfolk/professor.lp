@@ -12,7 +12,7 @@ professor_used_ability(Professor, N) :-
     professor_chose(Professor, _, N).
 
 % Professor may choose a dead player (once per game, on nights after the first)
-{ professor_chose(Professor, P, N) : player(P), dead(P, night(N, 0, 0)) } <= 1 :-
+{ professor_chose(Professor, P, N) : player(P), dead_at_time(P, night(N, 0, 0)) } <= 1 :-
     night_number(N), N > 1,
     other_night_role_order(professor, RoleOrd),
     assigned(0, Professor, professor),
@@ -67,4 +67,4 @@ alive(P, T) :-
 
 % Remove death state after resurrection
 % The player is no longer dead after being resurrected
-:- dead(P, T), resurrected(P, N), time(T), T = night(M, R, S), M > N.
+:- dead_at_time(P, T), resurrected(P, N), time(T), T = night(M, R, S), M > N.

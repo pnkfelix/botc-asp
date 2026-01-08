@@ -46,5 +46,5 @@ reminder_on(gambler_dead, Gambler, night(N, RoleOrd, 4)) :-
     gambler_dies(Gambler, N).
 
 % Gambler death
-dead(P, T) :- reminder_on(gambler_dead, P, T).
+dead_at_time(P, T) :- reminder_on(gambler_dead, P, T).
 died(P, T) :- gambler_dies(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).

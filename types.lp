@@ -15,6 +15,8 @@
 :- alive(P, _), not player(P).
 :- functioning(P, _), not player(P).
 :- impaired(P, _), not player(P).
+:- dead_at_time(P, _), not player(P).
+:- publicly_dead_at_time(P, _), not player(P).
 
 % --- Role name validation ---
 :- assigned(0, _, R), not role(R).
@@ -31,3 +33,5 @@
 :- alive(_, T), not time(T).
 :- died(_, T), not time(T).
 :- functioning(_, T), not time(T).
+:- dead_at_time(_, T), not time(T).
+:- publicly_dead_at_time(_, T), not time(T).

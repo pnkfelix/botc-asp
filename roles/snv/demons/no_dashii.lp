@@ -28,7 +28,7 @@ no_dashii_kill_succeeds(P, T) :-
     reminder_on(no_dashii_dead, P, T),
     not protected_from_demon(P, T).
 
-dead(P, T) :- no_dashii_kill_succeeds(P, T).
+dead_at_time(P, T) :- no_dashii_kill_succeeds(P, T).
 
 died(P, T) :-
     final_night_time(N, T),

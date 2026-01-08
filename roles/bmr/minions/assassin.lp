@@ -43,7 +43,7 @@ reminder_on(assassin_dead, P, night(N, RoleOrd, 3)) :-
 
 % Assassin kill is absolute - ignores all protection
 % This is a special death that bypasses protected_from_demon, Sailor, etc.
-dead(P, T) :- reminder_on(assassin_dead, P, T).
+dead_at_time(P, T) :- reminder_on(assassin_dead, P, T).
 died(P, T) :- assassin_kills(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % Override Sailor protection for Assassin

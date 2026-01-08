@@ -114,5 +114,5 @@ reminder_on(gf_dead, P, night(N, RoleOrd, 3)) :-
     godfather_kills(P, N).
 
 % Godfather kill is not protected by normal means (same as demon kill)
-dead(P, T) :- reminder_on(gf_dead, P, T), not protected_from_demon(P, T).
+dead_at_time(P, T) :- reminder_on(gf_dead, P, T), not protected_from_demon(P, T).
 died(P, T) :- godfather_kills(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)), not protected_from_demon(P, T).

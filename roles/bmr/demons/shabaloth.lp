@@ -48,7 +48,7 @@ shabaloth_kill_succeeds(P, T) :-
 
 reminder_on(shabaloth_dead, P, T) :- shabaloth_kill_succeeds(P, T).
 
-dead(P, T) :- shabaloth_kill_succeeds(P, T).
+dead_at_time(P, T) :- shabaloth_kill_succeeds(P, T).
 died(P, T) :- shabaloth_kill_succeeds(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % === Regurgitation ===

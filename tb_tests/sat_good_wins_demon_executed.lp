@@ -29,7 +29,7 @@ executed(steph, 1).
 :- not has_demon_role(steph, day(1, exec)).
 
 % Assert: steph should be dead at day(1, exec) time
-:- not dead(steph, day(1, exec)).
+:- not dead_at_time(steph, day(1, exec)).
 
 % Assert: There should be no alive demon at day(1, exec)
 :- any_alive_demon(day(1, exec)).
