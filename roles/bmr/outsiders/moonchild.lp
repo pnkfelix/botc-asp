@@ -53,5 +53,5 @@ reminder_on(moonchild_dead, P, night(N+1, RoleOrd, 3)) :-
     moonchild_kills(P, N).
 
 % Moonchild's victim dies
-dead(P, T) :- reminder_on(moonchild_dead, P, T).
+dead_at_time(P, T) :- reminder_on(moonchild_dead, P, T).
 died(P, T) :- moonchild_kills(P, N), final_night_time(N+1, T), alive(P, night(N+1, 0, 0)).

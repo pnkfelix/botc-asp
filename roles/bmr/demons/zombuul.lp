@@ -48,7 +48,7 @@ zombuul_kill_succeeds(P, T) :-
 
 reminder_on(zombuul_dead, P, T) :- zombuul_kill_succeeds(P, T).
 
-dead(P, T) :- zombuul_kill_succeeds(P, T).
+dead_at_time(P, T) :- zombuul_kill_succeeds(P, T).
 died(P, T) :- zombuul_kill_succeeds(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % === Zombuul's "fake death" ability ===

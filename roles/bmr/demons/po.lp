@@ -73,5 +73,5 @@ po_kill_succeeds(P, T) :-
 
 reminder_on(po_dead, P, T) :- po_kill_succeeds(P, T).
 
-dead(P, T) :- po_kill_succeeds(P, T).
+dead_at_time(P, T) :- po_kill_succeeds(P, T).
 died(P, T) :- po_kill_succeeds(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).

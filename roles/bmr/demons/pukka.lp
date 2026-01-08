@@ -66,7 +66,7 @@ pukka_kill_succeeds(PrevTarget, T) :-
 
 reminder_on(pukka_dead, P, T) :- pukka_kill_succeeds(P, T).
 
-dead(P, T) :- pukka_kill_succeeds(P, T).
+dead_at_time(P, T) :- pukka_kill_succeeds(P, T).
 died(P, T) :- pukka_kill_succeeds(P, N), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % Remove old poison when person dies or new target is chosen

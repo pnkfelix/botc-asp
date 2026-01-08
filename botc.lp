@@ -130,18 +130,31 @@ chair_ordered(P1, P2, P1, P2) :- player(P1), player(P2), chair(P1, C1), chair(P2
 chair_ordered(P1, P2, P2, P1) :- player(P1), player(P2), chair(P1, C1), chair(P2, C2), C1 > C2.
 
 % ===========================================================================
-% Alive vs Publicly Alive
+% Alive/Dead State: ST Perspective vs Public Knowledge
 % ===========================================================================
-% alive(P, T) = true dead/alive state (what ST knows, used for game mechanics)
-% publicly_alive(P, T) = what players see (death shroud not yet placed)
+% There are two parallel tracks for death status:
 %
-% During the night, a player killed by the demon has imp_dead token.
-% They are dead (for ability purposes) but publicly_alive (shroud placed at dawn).
+% ST PERSPECTIVE (game mechanics):
+%   alive(P, T) = player is alive at time T (for ability purposes)
+%   dead_at_time(P, T) = player is dead at time T (for ability purposes)
+%
+% PUBLIC KNOWLEDGE (what players see):
+%   publicly_alive(P, T) = death shroud not yet placed
+%   publicly_dead_at_time(P, T) = death has been announced, shroud placed
+%
+% During the night, a player killed by the demon has a death token.
+% They are dead_at_time (for ability purposes) but not publicly_dead_at_time
+% until dawn when the shroud is placed and death is announced.
+%
+% Example: Imp kills Alice at night(2, 5, 3)
+%   - dead_at_time(alice, night(2, 5, 3)) is TRUE (she's dead for mechanics)
+%   - publicly_dead_at_time(alice, night(2, 5, 3)) is FALSE (not announced yet)
+%   - publicly_dead_at_time(alice, dawn(2)) is TRUE (announced at dawn)
 
 % A player is dead (from ST perspective) if they have a "dead tonight" token
 % Note: imp_dead specifically is handled in tb.lp to account for protection
 % Other death tokens could be added here as needed
-% dead(P, T) :- reminder_on(some_other_death_token, P, T).
+% dead_at_time(P, T) :- reminder_on(some_other_death_token, P, T).
 
 % publicly_alive = alive and not yet revealed as dead
 % (The public death shroud is placed at dawn, so during night they look alive)
@@ -167,7 +180,7 @@ living_neighbor_clockwise(P1, P2, T) :-
     player(P1), player(P2), P1 != P2,
     time(T),
     alive(P2, T),
-    not dead(P2, T),
+    not dead_at_time(P2, T),
     clockwise_distance(P1, P2, D),
     not closer_alive_clockwise(P1, P2, D, T).
 
@@ -177,7 +190,7 @@ closer_alive_clockwise(P1, P2, D, T) :-
     P1 != P2, P1 != P3, P2 != P3,
     time(T),
     alive(P3, T),
-    not dead(P3, T),
+    not dead_at_time(P3, T),
     clockwise_distance(P1, P2, D),
     clockwise_distance(P1, P3, D3),
     D3 < D.
@@ -512,15 +525,15 @@ day_number(N) :- night_number(N).
 alive(P, night(1, 0, 0)) :- player(P).
 
 % Alive status persists through night unless killed or dead
-alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1), not dead(P, T2).
+alive(P, T2) :- alive(P, T1), next(T1, T2), not died(P, T1), not dead_at_time(P, T2).
 
 % Alive at dawn = alive at end of preceding night (unless they died that night)
-% Note: dead(P, T) handles imp_dead token deaths during the night
+% Note: dead_at_time(P, T) handles imp_dead token deaths during the night
 % This is when deaths are publicly announced (shroud placed)
-alive(P, dawn(N)) :- alive(P, T), final_night_time(N, T), not died(P, T), not dead(P, T).
+alive(P, dawn(N)) :- alive(P, T), final_night_time(N, T), not died(P, T), not dead_at_time(P, T).
 
 % Alive at start of day = alive at dawn (unless something killed them at dawn)
-alive(P, day(N, 0)) :- alive(P, dawn(N)), not died(P, dawn(N)), not dead(P, dawn(N)).
+alive(P, day(N, 0)) :- alive(P, dawn(N)), not died(P, dawn(N)), not dead_at_time(P, dawn(N)).
 
 % Helper: find the final time point of a night
 final_night_time(N, T) :-
@@ -559,11 +572,30 @@ died_during_day(P, N) :- died(P, day(N, _)).
 % A player dies when executed
 died(P, day(N, exec)) :- executed(P, N).
 
-% A player is dead at the moment they die
-dead(P, T) :- died(P, T).
+% A player is dead at the moment they die (ST perspective - immediate)
+dead_at_time(P, T) :- died(P, T).
 
 % Once dead, stay dead (death persists through all subsequent time points)
-dead(P, T2) :- dead(P, T1), next(T1, T2).
+dead_at_time(P, T2) :- dead_at_time(P, T1), next(T1, T2).
+
+% ===========================================================================
+% Public Death Knowledge
+% ===========================================================================
+% publicly_dead_at_time(P, T) = what players know (death has been announced)
+%
+% Death announcements happen at specific times:
+%   - Execution deaths: announced immediately at day(N, exec)
+%   - Night deaths: announced at dawn(N)
+%
+% Before the announcement, a player might be dead (for game mechanics) but
+% not publicly known to be dead (shroud not yet placed).
+% ===========================================================================
+
+% A player becomes publicly dead when their death is announced
+publicly_dead_at_time(P, T) :- d_death_announced(P, T).
+
+% Once publicly dead, stay publicly dead
+publicly_dead_at_time(P, T2) :- publicly_dead_at_time(P, T1), next(T1, T2).
 
 % Validate: executed player must have been alive at start of day
 :- executed(P, N), not alive(P, day(N, 0)).

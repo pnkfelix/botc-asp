@@ -6,7 +6,7 @@ other_night_substep(oracle, 1, st_tells(oracle_info)).
 % Count dead evil players
 dead_evil_count(N, T) :-
     time(T),
-    N = #count { P : dead(P, T), registers_as(P, evil, T) }.
+    N = #count { P : dead_at_time(P, T), registers_as(P, evil, T) }.
 
 % Oracle learns the count when functioning (other nights only)
 st_tells_core(oracle, Oracle, count(N), T) :-
