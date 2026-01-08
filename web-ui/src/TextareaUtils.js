@@ -88,10 +88,23 @@ export const scrollToTextInChildImpl = (elementId) => (childIndex) => (searchTex
     '</span>' +
     escapeHtml(afterText);
 
-  // Scroll the highlight into view
+  // Scroll the highlight into view within the container (not the whole page)
   const highlight = document.getElementById('timeline-highlight');
   if (highlight) {
-    highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Calculate position relative to the scrollable container
+    const highlightRect = highlight.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    // Current scroll position plus the offset from container top to highlight
+    // Adjusted to center the highlight in the visible area
+    const highlightOffsetInContainer = highlightRect.top - containerRect.top + container.scrollTop;
+    const targetScroll = highlightOffsetInContainer - (container.clientHeight / 2) + (highlight.offsetHeight / 2);
+
+    // Smooth scroll within the container only
+    container.scrollTo({
+      top: Math.max(0, targetScroll),
+      behavior: 'smooth'
+    });
 
     // Remove highlight after a delay
     setTimeout(() => {
@@ -157,11 +170,6 @@ export const scrollToTextImpl = (elementId) => (searchText) => () => {
     }
   }
 
-  // Scroll to put the line roughly in the middle
-  const containerHeight = container.clientHeight;
-  const targetScroll = (linesBefore * lineHeight) - (containerHeight / 2);
-  container.scrollTop = Math.max(0, targetScroll);
-
   // Use CSS highlight approach - update the code element with a marked span
   codeElement.innerHTML =
     escapeHtml(beforeText) +
@@ -170,10 +178,23 @@ export const scrollToTextImpl = (elementId) => (searchText) => () => {
     '</span>' +
     escapeHtml(afterText);
 
-  // Scroll the highlight into view (more precise)
+  // Scroll the highlight into view within the container (not the whole page)
   const highlight = document.getElementById('timeline-highlight');
   if (highlight) {
-    highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Calculate position relative to the scrollable container
+    const highlightRect = highlight.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    // Current scroll position plus the offset from container top to highlight
+    // Adjusted to center the highlight in the visible area
+    const highlightOffsetInContainer = highlightRect.top - containerRect.top + container.scrollTop;
+    const targetScroll = highlightOffsetInContainer - (container.clientHeight / 2) + (highlight.offsetHeight / 2);
+
+    // Smooth scroll within the container only
+    container.scrollTo({
+      top: Math.max(0, targetScroll),
+      behavior: 'smooth'
+    });
 
     // Remove highlight after a delay
     setTimeout(() => {
