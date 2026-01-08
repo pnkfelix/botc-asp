@@ -1042,6 +1042,7 @@ atomToPredicateName = case _ of
   Bag _                  -> { name: "bag", arity: 1 }
   Bluff _                -> { name: "bluff", arity: 1 }
   CharacterAssignmentAtTime _ _ _ -> { name: "character_assignment_state_at_time", arity: 3 }
+  CausesImpairment _     -> { name: "causes_impairment", arity: 1 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =
