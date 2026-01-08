@@ -639,6 +639,14 @@ renderReminderDebugPanel state gameState =
                       (map (\r -> HH.li_ [ HH.text $ r.token <> " on " <> r.player <> " (placed @ " <> formatTimePoint r.placedAt <> ")" ]) gameState.reminders)
                 ]
             , HH.div
+                [ HP.style "margin-bottom: 8px; padding: 8px; background: #ffe0e0; border-radius: 4px;" ]
+                [ HH.strong_ [ HH.text $ "Impairment tokens (" <> show (Array.length gameState.impairmentTokens) <> "):" ]
+                , if Array.null gameState.impairmentTokens
+                    then HH.div [ HP.style "color: #a94442; font-style: italic;" ] [ HH.text "None found - causes_impairment/1 not in answer set?" ]
+                    else HH.ul [ HP.style "margin: 4px 0; padding-left: 20px;" ]
+                      (map (\t -> HH.li_ [ HH.text t ]) gameState.impairmentTokens)
+                ]
+            , HH.div
                 [ HP.style "padding: 8px; background: #fff; border-radius: 4px; max-height: 200px; overflow-y: auto;" ]
                 [ HH.strong_ [ HH.text $ "All ReminderOn atoms parsed (" <> show (Array.length allReminderAtoms) <> "):" ]
                 , if Array.null allReminderAtoms
