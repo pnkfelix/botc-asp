@@ -81,6 +81,11 @@ game_over(T) :- good_wins(day(N, exec)), time(T), T = night(N2, R, S), N2 > N.
 game_over(T) :- good_wins(day(N, exec)), time(T), T = dawn(N2), N2 > N.
 game_over(T) :- good_wins(day(N, exec)), time(T), T = day(N2, P), N2 > N.
 
+% Evil wins at day(N, exec) (e.g., Saint execution): game ends at execution, affects all times after day N
+game_over(T) :- evil_wins(day(N, exec)), time(T), T = night(N2, R, S), N2 > N.
+game_over(T) :- evil_wins(day(N, exec)), time(T), T = dawn(N2), N2 > N.
+game_over(T) :- evil_wins(day(N, exec)), time(T), T = day(N2, P), N2 > N.
+
 % Good wins at night(N, R, S): game ends at that point, affects all times after
 % Rest of same night (later substeps)
 game_over(T) :- good_wins(T1), T1 = night(N, R1, S1), time(T), T = night(N, R2, S2), (R1, S1) < (R2, S2).
