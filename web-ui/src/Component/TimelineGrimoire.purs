@@ -749,7 +749,10 @@ renderEvent event =
         , HE.onClick \_ -> ClickTimelineEvent event
         , HP.title "Click to highlight this atom in the answer set"
         ]
-        [ HH.text $ r.player <> " died" ]
+        [ HH.text $ r.player <> case r.time of
+            ASP.Dawn _ -> " died in the night"
+            _ -> " died"
+        ]
     ASP.GameOverEvent r ->
       HH.div
         [ HP.style $ "font-size: 14px; margin: 8px 0; font-weight: bold; cursor: pointer; "
