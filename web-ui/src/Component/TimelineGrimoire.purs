@@ -311,6 +311,7 @@ renderBagPanel :: forall cs m.
   , bagTokens :: Array String
   , bluffTokens :: Array String
   , assignedNotInBag :: Array String
+  , impairmentTokens :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderBagPanel state gameState =
@@ -582,6 +583,7 @@ renderReminderDebugPanel :: forall cs m.
   , bagTokens :: Array String
   , bluffTokens :: Array String
   , assignedNotInBag :: Array String
+  , impairmentTokens :: Array String
   } ->
   H.ComponentHTML Action cs m
 renderReminderDebugPanel state gameState =
@@ -1160,7 +1162,7 @@ renderHtmlGrimoire state =
               <> "gap: 8px; min-height: 200px;"
           ]
           ( if playerCount > 0
-              then renderHollowGrid gameState.reminders state.selectedTime gameState.players playerPositions cols rows
+              then renderHollowGrid gameState.reminders gameState.impairmentTokens state.selectedTime gameState.players playerPositions cols rows
               else [ HH.div
                        [ HP.style "grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;" ]
                        [ HH.text "No player data - add #show chair/2." ]
@@ -1191,12 +1193,15 @@ renderHtmlGrimoire state =
 -- | Render a single player card in HTML grid view
 renderHtmlPlayer :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
+  Array String ->  -- impairment tokens (drunk/poison effect tokens)
   Maybe ASP.TimePoint ->  -- selected time for data attributes
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   H.ComponentHTML Action cs m
-renderHtmlPlayer reminders selectedTime player =
+renderHtmlPlayer reminders impairmentTokens selectedTime player =
   let
     playerReminders = filter (\r -> r.player == player.name) reminders
+    -- Check if this player has any impairment tokens on them
+    isImpaired = Array.any (\r -> elem r.token impairmentTokens) playerReminders
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
     roleColor = getRoleColor player.role
     timeStr = case selectedTime of
@@ -1257,6 +1262,8 @@ renderHtmlPlayer reminders selectedTime player =
               <> "cursor: grab; touch-action: none; user-select: none; "
               <> "padding: 4px 8px; border-radius: 4px; "
               <> "background: rgba(0,0,0,0.2); display: inline-block;"
+              -- Wavy underline for impaired players (drunk/poisoned)
+              <> (if isImpaired then " text-decoration: underline wavy red;" else "")
           -- Data attributes for JS role drag handler
           -- Use player.token (received) not player.role (assigned) so Drunk's token is draggable
           , HP.attr (HH.AttrName "data-role-token") player.token
@@ -1695,13 +1702,14 @@ assignPerimeterPositions playerCount cols rows =
 -- | Render the hollow grid with players on perimeter and empty center
 renderHollowGrid :: forall cs m.
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
+  Array String ->  -- impairment tokens (drunk/poison effect tokens)
   Maybe ASP.TimePoint ->  -- selected time for data attributes
   Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   Array { row :: Int, col :: Int } ->
   Int ->  -- cols
   Int ->  -- rows
   Array (H.ComponentHTML Action cs m)
-renderHollowGrid reminders selectedTime players positions cols rows =
+renderHollowGrid reminders impairmentTokens selectedTime players positions cols rows =
   let
     -- Create a lookup from position to player
     positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
@@ -1713,7 +1721,7 @@ renderHollowGrid reminders selectedTime players positions cols rows =
     -- For each cell, either render a player or empty/center cell
     renderCell cell =
       case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
-        Just { player } -> renderHtmlPlayer reminders selectedTime player
+        Just { player } -> renderHtmlPlayer reminders impairmentTokens selectedTime player
         Nothing ->
           -- Empty center cell or edge position with no player
           if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1

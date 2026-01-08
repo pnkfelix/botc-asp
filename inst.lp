@@ -40,6 +40,7 @@ needs_night(3).
 %#show time/1.
 %#show next/2.
 %#show impaired/2.
+#show causes_impairment/1.  % Tokens that cause drunk/poison effects
 #show registers_as/3.
 
 % For grimoire rendering (player state and positions)

@@ -45,6 +45,7 @@ data Atom
   | Bag String                          -- bag(role) - role is in the physical bag
   | Bluff String                        -- bluff(role) - role shown to demon as bluff
   | CharacterAssignmentAtTime TimePoint String String  -- character_assignment_state_at_time(time, player, role)
+  | CausesImpairment String             -- causes_impairment(token) - token causes drunk/poison effect
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -97,6 +98,7 @@ atomCategory = case _ of
   ActingRole _ _        -> StructuralPredicate
   Bag _                 -> StructuralPredicate
   Bluff _               -> StructuralPredicate
+  CausesImpairment _    -> StructuralPredicate
   -- Unknown
   UnknownAtom _         -> OtherPredicate
 
@@ -222,6 +224,7 @@ type GameState =
   , bagTokens :: Array String  -- roles in the physical bag
   , bluffTokens :: Array String  -- roles shown to demon as bluffs
   , assignedNotInBag :: Array String  -- roles assigned to players but not received (e.g., Drunk)
+  , impairmentTokens :: Array String  -- tokens that cause drunk/poison effects
   }
 
 -- | Parse a single atom string into structured data
@@ -248,7 +251,8 @@ parseAtom atomStr =
       parseExecuted trimmed <|>
       parseBag trimmed <|>
       parseBluff trimmed <|>
-      parseCharacterAssignmentAtTime trimmed
+      parseCharacterAssignmentAtTime trimmed <|>
+      parseCausesImpairment trimmed
 
 -- | Parse assigned(T, Player, Role)
 parseAssigned :: String -> Maybe Atom
@@ -502,6 +506,14 @@ parseBluff s = do
   let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "bluff(" and ")"
   Just $ Bluff (trim rest)
 
+-- | Parse causes_impairment(Token)
+parseCausesImpairment :: String -> Maybe Atom
+parseCausesImpairment s = do
+  let pattern = "causes_impairment("
+  _ <- if take (length pattern) s == pattern then Just unit else Nothing
+  let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "causes_impairment(" and ")"
+  Just $ CausesImpairment (trim rest)
+
 -- | Parse character_assignment_state_at_time(Time, Player, Role)
 parseCharacterAssignmentAtTime :: String -> Maybe Atom
 parseCharacterAssignmentAtTime s =
@@ -743,6 +755,9 @@ buildGameState atoms targetTime =
         then Just p.role
         else Nothing
     ) sortedPlayers
+
+    -- Get tokens that cause impairment (drunk/poison effects)
+    impairmentTokens = mapMaybe getImpairmentToken atoms
   in
     { players: sortedPlayers
     , reminders: remindersAtTime
@@ -750,6 +765,7 @@ buildGameState atoms targetTime =
     , bagTokens
     , bluffTokens
     , assignedNotInBag
+    , impairmentTokens
     }
   where
     getBagToken (Bag role) = Just role
@@ -757,6 +773,9 @@ buildGameState atoms targetTime =
 
     getBluffToken (Bluff role) = Just role
     getBluffToken _ = Nothing
+
+    getImpairmentToken (CausesImpairment token) = Just token
+    getImpairmentToken _ = Nothing
 
     getChair (Chair name pos) = Just { name, pos }
     getChair _ = Nothing
@@ -1023,6 +1042,7 @@ atomToPredicateName = case _ of
   Bag _                  -> { name: "bag", arity: 1 }
   Bluff _                -> { name: "bluff", arity: 1 }
   CharacterAssignmentAtTime _ _ _ -> { name: "character_assignment_state_at_time", arity: 3 }
+  CausesImpairment _     -> { name: "causes_impairment", arity: 1 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =
