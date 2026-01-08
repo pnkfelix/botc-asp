@@ -94,6 +94,7 @@ data Action
   | SetModelLimit String
   | SetOutputFilter String      -- Update output filter expression
   | SetPlayerCount Int          -- Update player count via slider (updates inst.lp and URL)
+  | SetMinNights Int            -- Update min nights via slider (updates inst.lp and URL)
   | SetScript String            -- Update script via dropdown (updates inst.lp and URL)
   | RunClingo
   | CancelSolve

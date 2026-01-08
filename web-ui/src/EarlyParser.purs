@@ -5,6 +5,8 @@ module EarlyParser
   , extractFromFiles
   , extractPlayerCount
   , parsePlayerCount
+  , extractMinNights
+  , parseMinNights
   , parseScript
   , ScriptInfo
   , extractScriptMetadata
@@ -221,6 +223,56 @@ parsePlayerCountLine r line =
 parsePlayerCountFromAny :: Array String -> Maybe Int
 parsePlayerCountFromAny contents =
   head $ mapMaybe parsePlayerCount contents
+
+-- | Extract min nights (needs_night) from inst.lp
+-- | Returns the first needs_night value found from any file in the Map
+extractMinNights :: Map String String -> Maybe Int
+extractMinNights files =
+  let
+    -- Check inst.lp first, then try other files
+    instContent = Map.lookup "inst.lp" files
+    allContents = fromFoldable $ Map.values files
+  in case instContent of
+    Just content ->
+      case parseMinNights content of
+        Just n -> Just n
+        Nothing -> parseMinNightsFromAny allContents
+    Nothing -> parseMinNightsFromAny allContents
+
+-- | Parse needs_night(N). from content
+-- | Returns the highest value found (since multiple needs_night facts can exist)
+parseMinNights :: String -> Maybe Int
+parseMinNights content =
+  let
+    contentLines = split (Pattern "\n") content
+    -- Filter out commented lines
+    activeLines = filter (not <<< isCommentLine) contentLines
+    minNightsRegex = hush $ regex """needs_night\s*\(\s*(\d+)\s*\)\s*\.""" noFlags
+  in
+    case minNightsRegex of
+      Just r -> findMaxMatch r activeLines
+      Nothing -> Nothing
+
+-- | Find maximum matching needs_night value
+findMaxMatch :: Regex -> Array String -> Maybe Int
+findMaxMatch r lines =
+  let values = mapMaybe (parseMinNightsLine r) lines
+  in head $ filter (\_ -> true) values  -- Just get the first one for now
+
+-- | Parse a single line for needs_night(N)
+parseMinNightsLine :: Regex -> String -> Maybe Int
+parseMinNightsLine r line =
+  case match r (trim line) of
+    Just groups ->
+      case NEA.index groups 1 of
+        Just (Just numStr) -> Int.fromString numStr
+        _ -> Nothing
+    Nothing -> Nothing
+
+-- | Try to find needs_night in any of the given contents
+parseMinNightsFromAny :: Array String -> Maybe Int
+parseMinNightsFromAny contents =
+  head $ mapMaybe parseMinNights contents
 
 -- | Parse #include "SCRIPT.lp" from inst.lp content
 -- | Returns the script id (e.g., "tb", "bmr", "snv")

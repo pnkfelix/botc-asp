@@ -88,6 +88,22 @@ updatePlayerCount newCount content =
            then "#const player_count = " <> show newCount <> "."
            else line
 
+-- | Update needs_night in inst.lp content
+-- | Replaces the line "needs_night(N)." with the new value
+updateMinNights :: Int -> String -> String
+updateMinNights newNights content =
+  let
+    contentLines = split (Pattern "\n") content
+    updatedLines = map updateLine contentLines
+  in
+    intercalate "\n" updatedLines
+  where
+    updateLine line =
+      let trimmed = trim line
+      in if String.take 12 trimmed == "needs_night("
+           then "needs_night(" <> show newNights <> ")."
+           else line
+
 -- | Get available scripts by scanning .lp files for @script-id/@script-name metadata
 -- | Returns array of { id, name } for scripts that have proper metadata headers
 getAvailableScripts :: Map.Map String String -> Array { id :: String, name :: String }
