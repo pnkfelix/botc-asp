@@ -544,19 +544,24 @@ processAssertionLine validPlayers validRoles maxNight line =
 -- | Returns Just reason if contradictory, Nothing if valid or not an assertion
 checkAssertion :: Array String -> Array String -> Int -> String -> Maybe String
 checkAssertion validPlayers validRoles maxNight line =
-  -- Check various assertion patterns
-  checkAssertDistrib validRoles line
-  <|> checkAssertReceived validPlayers validRoles line
-  <|> checkReceivedFact validPlayers line
-  <|> checkAssertDrawn validRoles line
-  <|> checkAssertBluff validRoles line
-  <|> checkAssertAssigned validPlayers validRoles maxNight line
-  <|> checkAssertReminderOn validPlayers maxNight line
+  -- Check various assertion patterns, returning the first match
+  firstJustOf
+    [ checkAssertDistrib validRoles line
+    , checkAssertReceived validPlayers validRoles line
+    , checkReceivedFact validPlayers line
+    , checkAssertDrawn validRoles line
+    , checkAssertBluff validRoles line
+    , checkAssertAssigned validPlayers validRoles maxNight line
+    , checkAssertReminderOn validPlayers maxNight line
+    ]
+
+-- | Return the first Just value from an array of Maybes, or Nothing if all are Nothing
+firstJustOf :: forall a. Array (Maybe a) -> Maybe a
+firstJustOf maybes = foldl altMaybe Nothing maybes
   where
-    -- Alternative operator for Maybe
-    (<|>) :: Maybe String -> Maybe String -> Maybe String
-    (<|>) (Just x) _ = Just x
-    (<|>) Nothing y = y
+    altMaybe :: Maybe a -> Maybe a -> Maybe a
+    altMaybe (Just x) _ = Just x
+    altMaybe Nothing y = y
 
 -- | Check assert_distrib(Role) - Role must be on current script
 checkAssertDistrib :: Array String -> String -> Maybe String
@@ -660,16 +665,12 @@ checkTimeInLine maxNight line =
     nightPattern = extractNightNumber "night(" line
     dayPattern = extractNightNumber "day(" line
     dawnPattern = extractNightNumber "dawn(" line
-  in case nightPattern <|> dayPattern <|> dawnPattern of
+  in case firstJustOf [nightPattern, dayPattern, dawnPattern] of
     Just n ->
       if n > maxNight
         then Just $ "time references night " <> show n <> " which exceeds needs_night(" <> show maxNight <> ")"
         else Nothing
     Nothing -> Nothing
-  where
-    (<|>) :: Maybe Int -> Maybe Int -> Maybe Int
-    (<|>) (Just x) _ = Just x
-    (<|>) Nothing y = y
 
 -- | Extract night number from a time pattern in a line
 extractNightNumber :: String -> String -> Maybe Int
