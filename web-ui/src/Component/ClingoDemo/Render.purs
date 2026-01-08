@@ -160,9 +160,10 @@ render state =
         Nothing ->
           HH.text ""
 
-    -- Game configuration controls: player count slider, script dropdown
+    -- Game configuration controls: player count slider, min nights slider, script dropdown
     , let
         currentPlayerCount = Early.extractPlayerCount state.files
+        currentMinNights = Early.extractMinNights state.files
         currentScript = Early.parseScript (fromMaybe "" $ Map.lookup "inst.lp" state.files)
         availableScripts = getAvailableScripts state.files
       in
@@ -181,6 +182,22 @@ render state =
                 , HP.attr (HH.AttrName "max") "15"
                 , HP.value $ show (fromMaybe 8 currentPlayerCount)
                 , HE.onValueInput \v -> SetPlayerCount (fromMaybe 8 $ Int.fromString v)
+                , HP.disabled state.isLoading
+                ]
+            ]
+        -- Min nights slider
+        , HH.label
+            [ HP.style "display: flex; align-items: center; gap: 10px;" ]
+            [ HH.span
+                [ HP.style "font-weight: bold; min-width: 100px;" ]
+                [ HH.text $ "Min Nights: " <> show (fromMaybe 3 currentMinNights) ]
+            , HH.input
+                [ HP.style "width: 150px; cursor: pointer;"
+                , HP.type_ HP.InputRange
+                , HP.attr (HH.AttrName "min") "1"
+                , HP.attr (HH.AttrName "max") "10"
+                , HP.value $ show (fromMaybe 3 currentMinNights)
+                , HE.onValueInput \v -> SetMinNights (fromMaybe 3 $ Int.fromString v)
                 , HP.disabled state.isLoading
                 ]
             ]

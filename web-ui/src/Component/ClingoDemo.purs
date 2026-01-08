@@ -20,7 +20,7 @@ import Effect.Aff (Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import EarlyParser (parsePlayerCount, parseScript)
+import EarlyParser (parseMinNights, parsePlayerCount, parseScript)
 import Halogen as H
 import TextareaUtils as TU
 import TokenConstraints as TC
@@ -29,7 +29,7 @@ import Web.UIEvent.MouseEvent (toEvent)
 
 -- Re-export types and render function for backwards compatibility
 import Component.ClingoDemo.Types (Action(..), ResultDisplay(..), Slots, State, TimingEntry, UndoEntry, answerSetPageSize)
-import Component.ClingoDemo.Utils (availableFiles, commentOutConstraint, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updatePlayerCount, updateScript)
+import Component.ClingoDemo.Utils (availableFiles, commentOutConstraint, computeFileDiff, extractWitnesses, formatTimePointForASP, getCurrentFileContent, getParentDir, initialState, isValidScript, modifyInstLpForReminder, modifyInstLpForRole, resolveIncludePath, updateMinNights, updatePlayerCount, updateScript)
 import Component.ClingoDemo.Render (render)
 
 -- | The Halogen component
@@ -52,6 +52,7 @@ handleAction = case _ of
     H.liftAff $ Clingo.init "./clingo.wasm"
     -- Check for URL parameters and update inst.lp if present
     maybePlayerCount <- liftEffect $ UP.getUrlParam "player_count"
+    maybeMinNights <- liftEffect $ UP.getUrlParam "min_nights"
     maybeScript <- liftEffect $ UP.getUrlParam "script"
     -- Apply URL parameter updates to inst.lp
     H.modify_ \s ->
@@ -61,10 +62,14 @@ handleAction = case _ of
         withPlayerCount = case maybePlayerCount >>= Int.fromString of
           Just n -> updatePlayerCount n instContent
           Nothing -> instContent
+        -- Apply min_nights update if present
+        withMinNights = case maybeMinNights >>= Int.fromString of
+          Just n -> updateMinNights n withPlayerCount
+          Nothing -> withPlayerCount
         -- Apply script update if present and valid (uses files for dynamic script list)
         withScript = case maybeScript of
-          Just scriptId | isValidScript s.files scriptId -> updateScript s.files scriptId withPlayerCount
-          _ -> withPlayerCount
+          Just scriptId | isValidScript s.files scriptId -> updateScript s.files scriptId withMinNights
+          _ -> withMinNights
         updatedFiles = Map.insert "inst.lp" withScript s.files
       in s { files = updatedFiles, isInitialized = true }
     -- Initialize syntax highlighting for the initial file
@@ -82,10 +87,13 @@ handleAction = case _ of
   SetFileContent content -> do
     state <- H.get
     H.modify_ \s -> s { files = Map.insert s.currentFile content s.files }
-    -- If editing inst.lp, sync player_count and script to URL for persistence across reloads
+    -- If editing inst.lp, sync player_count, min_nights, and script to URL for persistence across reloads
     when (state.currentFile == "inst.lp") do
       case parsePlayerCount content of
         Just n -> liftEffect $ UP.setUrlParam "player_count" (show n)
+        Nothing -> pure unit
+      case parseMinNights content of
+        Just n -> liftEffect $ UP.setUrlParam "min_nights" (show n)
         Nothing -> pure unit
       case parseScript content of
         Just scriptId -> liftEffect $ UP.setUrlParam "script" scriptId
@@ -118,6 +126,20 @@ handleAction = case _ of
     H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
     -- Update the URL parameter
     liftEffect $ UP.setUrlParam "player_count" (show count)
+    -- Update syntax highlighting if inst.lp is currently displayed
+    state' <- H.get
+    when (state'.currentFile == "inst.lp") do
+      liftEffect $ TU.updateHighlightOverlay "editor-textarea" "editor-highlight-overlay" updatedContent
+
+  SetMinNights nights -> do
+    -- Update inst.lp with the new min nights value
+    state <- H.get
+    let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+    let updatedContent = updateMinNights nights instContent
+    -- Update the virtual filesystem
+    H.modify_ \s -> s { files = Map.insert "inst.lp" updatedContent s.files }
+    -- Update the URL parameter
+    liftEffect $ UP.setUrlParam "min_nights" (show nights)
     -- Update syntax highlighting if inst.lp is currently displayed
     state' <- H.get
     when (state'.currentFile == "inst.lp") do
