@@ -363,7 +363,7 @@ renderBagPanel state gameState =
                     [ HH.text "Drag 3 good roles here" ]
                   else HH.div
                     [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
-                    (map (renderBluffToken timeStr) gameState.bluffTokens)
+                    (map (renderBluffToken state.scriptRoles timeStr) gameState.bluffTokens)
               ]
           ]
     -- Bag content (hidden when collapsed)
@@ -382,7 +382,7 @@ renderBagPanel state gameState =
                 [ HH.text "Bag empty" ]
               else HH.div
                 [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
-                (map (renderBagToken timeStr) gameState.bagTokens)
+                (map (renderBagToken state.scriptRoles timeStr) gameState.bagTokens)
           ]
     -- Assigned but not in bag section (e.g., Drunk)
     , if state.bagCollapsed || null gameState.assignedNotInBag
@@ -398,7 +398,7 @@ renderBagPanel state gameState =
               ]
               [ HH.div
                   [ HP.style "display: flex; flex-wrap: wrap; gap: 6px;" ]
-                  (map (renderAssignedNotInBagToken timeStr) gameState.assignedNotInBag)
+                  (map (renderAssignedNotInBagToken state.scriptRoles timeStr) gameState.assignedNotInBag)
               ]
           ]
     ]
@@ -406,12 +406,13 @@ renderBagPanel state gameState =
 -- | Render a token for an assigned-but-not-in-bag role (like Drunk)
 -- | These are displayed with a dashed border to distinguish from bag tokens
 renderAssignedNotInBagToken :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   String ->  -- time string
   String ->  -- role name
   H.ComponentHTML Action cs m
-renderAssignedNotInBagToken timeStr role =
+renderAssignedNotInBagToken roles timeStr role =
   let
-    roleColor = getRoleColor role
+    roleColor = getRoleColor roles role
   in
   HH.div
     [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
@@ -431,12 +432,13 @@ renderAssignedNotInBagToken timeStr role =
 
 -- | Render a single token in the bag (just the role circle, draggable)
 renderBagToken :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   String ->  -- time string
   String ->  -- role name
   H.ComponentHTML Action cs m
-renderBagToken timeStr role =
+renderBagToken roles timeStr role =
   let
-    roleColor = getRoleColor role
+    roleColor = getRoleColor roles role
   in
   HH.div
     [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
@@ -457,12 +459,13 @@ renderBagToken timeStr role =
 
 -- | Render a single token in the bluffs section (draggable)
 renderBluffToken :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   String ->  -- time string
   String ->  -- role name
   H.ComponentHTML Action cs m
-renderBluffToken timeStr role =
+renderBluffToken roles timeStr role =
   let
-    roleColor = getRoleColor role
+    roleColor = getRoleColor roles role
   in
   HH.div
     [ HP.style $ "width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; "
@@ -521,19 +524,19 @@ renderScriptPanel state =
               <> "background: white; padding: 8px 8px 8px 20px;"  -- Extra left padding for scroll touch area
           ]
           [ -- Townsfolk section
-            renderScriptSection "Townsfolk" state.scriptRoles.townsfolk timeStr
+            renderScriptSection state.scriptRoles "Townsfolk" state.scriptRoles.townsfolk timeStr
           -- Outsiders section
-          , renderScriptSection "Outsiders" state.scriptRoles.outsiders timeStr
+          , renderScriptSection state.scriptRoles "Outsiders" state.scriptRoles.outsiders timeStr
           -- Minions section
-          , renderScriptSection "Minions" state.scriptRoles.minions timeStr
+          , renderScriptSection state.scriptRoles "Minions" state.scriptRoles.minions timeStr
           -- Demons section
-          , renderScriptSection "Demons" state.scriptRoles.demons timeStr
+          , renderScriptSection state.scriptRoles "Demons" state.scriptRoles.demons timeStr
           ]
     ]
 
 -- | Render a section of the script (category header + role tokens)
-renderScriptSection :: forall cs m. String -> Array String -> String -> H.ComponentHTML Action cs m
-renderScriptSection categoryName roles timeStr =
+renderScriptSection :: forall cs m. ScriptRoles -> String -> Array String -> String -> H.ComponentHTML Action cs m
+renderScriptSection scriptRoles categoryName roles timeStr =
   HH.div
     [ HP.style "margin-bottom: 8px;" ]
     [ HH.div
@@ -541,14 +544,14 @@ renderScriptSection categoryName roles timeStr =
         [ HH.text categoryName ]
     , HH.div
         [ HP.style "display: flex; flex-direction: column; gap: 4px;" ]
-        (map (renderScriptRole timeStr) roles)
+        (map (renderScriptRole scriptRoles timeStr) roles)
     ]
 
 -- | Render a single role in the script (draggable)
-renderScriptRole :: forall cs m. String -> String -> H.ComponentHTML Action cs m
-renderScriptRole timeStr role =
+renderScriptRole :: forall cs m. ScriptRoles -> String -> String -> H.ComponentHTML Action cs m
+renderScriptRole scriptRoles timeStr role =
   let
-    roleColor = getRoleColor role
+    roleColor = getRoleColor scriptRoles role
   in
   HH.div
     [ HP.style $ "display: flex; align-items: center; gap: 6px; padding: 3px; "
@@ -842,7 +845,7 @@ renderGrimoire state =
             ]
             -- Draw players
             <> (if playerCount > 0
-                then mapWithIndex (renderPlayer centerX centerY radius playerCount gameState.reminders state.dragging) gameState.players
+                then mapWithIndex (renderPlayer state.scriptRoles centerX centerY radius playerCount gameState.reminders state.dragging) gameState.players
                 else [ SE.text
                          [ SA.x centerX
                          , SA.y centerY
@@ -852,7 +855,7 @@ renderGrimoire state =
                          [ HH.text "No player data - add #show chair/2." ]
                      ])
             -- Draw drag visual feedback
-            <> renderDragFeedback state.dragging centerX centerY radius playerCount gameState.players
+            <> renderDragFeedback state.scriptRoles state.dragging centerX centerY radius playerCount gameState.players
           )
       -- Legend
       , HH.div
@@ -913,6 +916,7 @@ calcPlayerPosition centerX centerY radius playerCount idx player =
 
 -- | Render a single player token
 renderPlayer :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Number ->  -- centerX
   Number ->  -- centerY
   Number ->  -- radius
@@ -922,7 +926,7 @@ renderPlayer :: forall cs m.
   Int ->     -- index
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   H.ComponentHTML Action cs m
-renderPlayer centerX centerY radius playerCount reminders dragState idx player =
+renderPlayer scriptRoles centerX centerY radius playerCount reminders dragState idx player =
   let
     -- Calculate position on circle (start from top, go clockwise)
     angle = (toNumber idx) * 2.0 * pi / (toNumber playerCount) - pi / 2.0
@@ -937,7 +941,7 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
 
     -- Colors
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
-    roleColor = getRoleColor player.token
+    roleColor = getRoleColor scriptRoles player.token
 
     -- Is this player the drop target?
     isDropTarget = case dragState of
@@ -1014,7 +1018,7 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
           ]
           [ HH.text $ formatRoleName player.token ]
       -- Reminder tokens positioned toward center
-      ] <> mapWithIndex (renderReminderToken angleToCenter (length playerReminders)) playerReminders
+      ] <> mapWithIndex (renderReminderToken scriptRoles angleToCenter (length playerReminders)) playerReminders
       )
 
 -- | Check if a reminder is currently being dragged
@@ -1025,12 +1029,13 @@ isDraggingReminder (Just ds) r =
 
 -- | Render a reminder token (draggable)
 renderReminderToken :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Number -> -- angle toward center
   Int ->    -- total reminders for this player
   Int ->    -- index (0 = oldest/closest to role token)
   { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   H.ComponentHTML Action cs m
-renderReminderToken angleToCenter _total idx reminder =
+renderReminderToken scriptRoles angleToCenter _total idx reminder =
   let
     -- Position reminder tokens along line toward center
     -- Start just inside the player token (radius 35) and go inward
@@ -1047,7 +1052,7 @@ renderReminderToken angleToCenter _total idx reminder =
           , SA.y (-10.0)
           , SA.width 20.0
           , SA.height 20.0
-          , SA.fill (Named (getReminderColor reminder.token))
+          , SA.fill (Named (getReminderColor scriptRoles reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
           , HP.style "cursor: grab;"
@@ -1057,7 +1062,7 @@ renderReminderToken angleToCenter _total idx reminder =
           [ SA.cx 0.0
           , SA.cy 0.0
           , SA.r 12.0
-          , SA.fill (Named (getReminderColor reminder.token))
+          , SA.fill (Named (getReminderColor scriptRoles reminder.token))
           , SA.stroke (Named "#fff")
           , SA.strokeWidth 1.0
           , HP.style "cursor: grab;"
@@ -1083,6 +1088,7 @@ renderReminderToken angleToCenter _total idx reminder =
 
 -- | Render visual feedback for dragging (dotted line + floating token)
 renderDragFeedback :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Maybe DragState ->
   Number ->  -- centerX
   Number ->  -- centerY
@@ -1090,8 +1096,8 @@ renderDragFeedback :: forall cs m.
   Int ->     -- playerCount
   Array { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   Array (H.ComponentHTML Action cs m)
-renderDragFeedback Nothing _ _ _ _ _ = []
-renderDragFeedback (Just ds) centerX centerY radius playerCount players =
+renderDragFeedback _ Nothing _ _ _ _ _ = []
+renderDragFeedback scriptRoles (Just ds) centerX centerY radius playerCount players =
   let
     -- Calculate start position (where the token was originally)
     sourcePlayerPos = findPlayerPosition ds.reminder.player centerX centerY radius playerCount players
@@ -1116,7 +1122,7 @@ renderDragFeedback (Just ds) centerX centerY radius playerCount players =
               [ SA.cx 0.0
               , SA.cy 0.0
               , SA.r 14.0
-              , SA.fill (Named (getReminderColor ds.reminder.token))
+              , SA.fill (Named (getReminderColor scriptRoles ds.reminder.token))
               , SA.stroke (Named "#FFD700")
               , SA.strokeWidth 2.0
               ]
@@ -1159,7 +1165,7 @@ renderHtmlGrimoire state =
               <> "gap: 8px; min-height: 200px;"
           ]
           ( if playerCount > 0
-              then renderHollowGrid gameState.reminders gameState.impairmentTokens state.selectedTime gameState.players playerPositions cols rows
+              then renderHollowGrid state.scriptRoles gameState.reminders gameState.impairmentTokens state.selectedTime gameState.players playerPositions cols rows
               else [ HH.div
                        [ HP.style "grid-column: 1 / -1; text-align: center; color: #999; padding: 40px;" ]
                        [ HH.text "No player data - add #show chair/2." ]
@@ -1189,18 +1195,19 @@ renderHtmlGrimoire state =
 
 -- | Render a single player card in HTML grid view
 renderHtmlPlayer :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   Array String ->  -- impairment tokens (drunk/poison effect tokens)
   Maybe ASP.TimePoint ->  -- selected time for data attributes
   { name :: String, chair :: Int, role :: String, token :: String, alive :: Boolean, ghostVoteUsed :: Boolean } ->
   H.ComponentHTML Action cs m
-renderHtmlPlayer reminders impairmentTokens selectedTime player =
+renderHtmlPlayer scriptRoles reminders impairmentTokens selectedTime player =
   let
     playerReminders = filter (\r -> r.player == player.name) reminders
     -- Check if this player has any impairment tokens on them
     isImpaired = Array.any (\r -> elem r.token impairmentTokens) playerReminders
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
-    roleColor = getRoleColor player.token
+    roleColor = getRoleColor scriptRoles player.token
     timeStr = case selectedTime of
       Just t -> formatTimePoint t
       Nothing -> ""
@@ -1266,7 +1273,7 @@ renderHtmlPlayer reminders impairmentTokens selectedTime player =
           , HP.attr (HH.AttrName "data-role-token") player.token
           , HP.attr (HH.AttrName "data-role-player") player.name
           , HP.attr (HH.AttrName "data-role-time") timeStr
-          , HP.attr (HH.AttrName "data-role-color") (getRoleColor player.token)
+          , HP.attr (HH.AttrName "data-role-color") (getRoleColor scriptRoles player.token)
           , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.token)
           ]
           [ HH.text $ formatRoleName player.token ]
@@ -1275,15 +1282,16 @@ renderHtmlPlayer reminders impairmentTokens selectedTime player =
           then HH.text ""
           else HH.div
             [ HP.style "display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 6px;" ]
-            (map (renderHtmlReminderToken selectedTime) playerReminders)
+            (map (renderHtmlReminderToken scriptRoles selectedTime) playerReminders)
       ])
 
 -- | Render a single reminder token in HTML view (draggable via JS pointer events)
 renderHtmlReminderToken :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Maybe ASP.TimePoint ->  -- selected time for data attribute
   { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   H.ComponentHTML Action cs m
-renderHtmlReminderToken selectedTime reminder =
+renderHtmlReminderToken scriptRoles selectedTime reminder =
   let
     timeStr = case selectedTime of
       Just t -> formatTimePoint t
@@ -1294,7 +1302,7 @@ renderHtmlReminderToken selectedTime reminder =
   in
     HH.div
       [ HP.style $ "width: 24px; height: 24px; border-radius: " <> borderRadius <> "; "
-          <> "background: " <> getReminderColor reminder.token <> "; "
+          <> "background: " <> getReminderColor scriptRoles reminder.token <> "; "
           <> "border: 1px solid white; display: flex; align-items: center; justify-content: center; "
           <> "cursor: grab; font-size: 7px; font-weight: bold; color: white; "
           <> "touch-action: none; user-select: none;"
@@ -1302,7 +1310,7 @@ renderHtmlReminderToken selectedTime reminder =
       , HP.attr (HH.AttrName "data-reminder-token") reminder.token
       , HP.attr (HH.AttrName "data-reminder-player") reminder.player
       , HP.attr (HH.AttrName "data-reminder-time") timeStr
-      , HP.attr (HH.AttrName "data-reminder-color") (getReminderColor reminder.token)
+      , HP.attr (HH.AttrName "data-reminder-color") (getReminderColor scriptRoles reminder.token)
       , HP.attr (HH.AttrName "data-reminder-abbrev") (abbreviateToken reminder.token)
       ]
     [ HH.text $ abbreviateToken reminder.token ]
@@ -1370,33 +1378,19 @@ hashToRgbColor isEvil h =
 -- Color is deterministically derived from role name hash
 -- Good (Townsfolk, Outsiders): shades of blue (high blue, varied green, low red)
 -- Evil (Minions, Demons): shades of red (high red, varied green, low blue)
-getRoleColor :: String -> String
-getRoleColor role =
+getRoleColor :: ScriptRoles -> String -> String
+getRoleColor roles role =
   let h = hashString role
-      isEvil = isMinion role || isDemon role
+      isEvil = isMinion roles role || isDemon roles role
   in hashToRgbColor isEvil h
 
--- | Check if a role is a minion (from any script)
--- Trouble Brewing: poisoner, spy, scarlet_woman, baron
--- Bad Moon Rising: godfather, devils_advocate, assassin, mastermind
--- Sects and Violets: evil_twin, witch, cerenovus, pit_hag
-isMinion :: String -> Boolean
-isMinion r = r `elem`
-  [ "poisoner", "spy", "scarlet_woman", "baron"  -- TB
-  , "godfather", "devils_advocate", "assassin", "mastermind"  -- BMR
-  , "evil_twin", "witch", "cerenovus", "pit_hag"  -- SNV
-  ]
+-- | Check if a role is a minion (uses ScriptRoles from ASP as source of truth)
+isMinion :: ScriptRoles -> String -> Boolean
+isMinion roles r = r `elem` roles.minions
 
--- | Check if a role is a demon (from any script)
--- Trouble Brewing: imp
--- Bad Moon Rising: zombuul, pukka, shabaloth, po
--- Sects and Violets: fang_gu, vigormortis, vortox, no_dashii
-isDemon :: String -> Boolean
-isDemon r = r `elem`
-  [ "imp"  -- TB
-  , "zombuul", "pukka", "shabaloth", "po"  -- BMR
-  , "fang_gu", "vigormortis", "vortox", "no_dashii"  -- SNV
-  ]
+-- | Check if a role is a demon (uses ScriptRoles from ASP as source of truth)
+isDemon :: ScriptRoles -> String -> Boolean
+isDemon roles r = r `elem` roles.demons
 
 -- | Check if a reminder token is a pseudo-reminder (not owned by any role)
 -- Pseudo reminders include execution day markers (ex_d1, ex_d2, etc.)
@@ -1427,8 +1421,8 @@ tokenToRole token
   | otherwise = "unknown"
 
 -- | Get color for reminder token (same color as the source role)
-getReminderColor :: String -> String
-getReminderColor token = getRoleColor (tokenToRole token)
+getReminderColor :: ScriptRoles -> String -> String
+getReminderColor roles token = getRoleColor roles (tokenToRole token)
 
 -- | Abbreviate token name for display
 abbreviateToken :: String -> String
@@ -1717,6 +1711,7 @@ assignPerimeterPositions playerCount cols rows =
 
 -- | Render the hollow grid with players on perimeter and empty center
 renderHollowGrid :: forall cs m.
+  ScriptRoles ->  -- script roles for alignment
   Array { token :: String, player :: String, placedAt :: ASP.TimePoint } ->
   Array String ->  -- impairment tokens (drunk/poison effect tokens)
   Maybe ASP.TimePoint ->  -- selected time for data attributes
@@ -1725,7 +1720,7 @@ renderHollowGrid :: forall cs m.
   Int ->  -- cols
   Int ->  -- rows
   Array (H.ComponentHTML Action cs m)
-renderHollowGrid reminders impairmentTokens selectedTime players positions cols rows =
+renderHollowGrid scriptRoles reminders impairmentTokens selectedTime players positions cols rows =
   let
     -- Create a lookup from position to player
     positionedPlayers = Array.zipWith (\pos player -> { pos, player }) positions players
@@ -1737,7 +1732,7 @@ renderHollowGrid reminders impairmentTokens selectedTime players positions cols 
     -- For each cell, either render a player or empty/center cell
     renderCell cell =
       case Array.find (\pp -> pp.pos.row == cell.row && pp.pos.col == cell.col) positionedPlayers of
-        Just { player } -> renderHtmlPlayer reminders impairmentTokens selectedTime player
+        Just { player } -> renderHtmlPlayer scriptRoles reminders impairmentTokens selectedTime player
         Nothing ->
           -- Empty center cell or edge position with no player
           if cell.row > 0 && cell.row < rows - 1 && cell.col > 0 && cell.col < cols - 1
