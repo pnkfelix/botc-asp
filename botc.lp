@@ -255,14 +255,9 @@ signal(point(R)) :- role(R).
 
 % st_tells_core(Role, Player, Message, T) - ST communicates Message to Player
 % as part of Role's ability at time T. This is the detailed/implementation form.
-
-% Constraint: st_tells_core for a role can only go to players who think they have
-% that role (i.e., received that role's token). This covers both:
-% 1. Players who actually have the role
-% 2. Players who think they have it (e.g., Drunk with chef token)
-% NOTE: This will need adjustment for Philosopher (gains another role's ability),
-% Pixie (gains ability after townsfolk dies), and Pit Hag (can change roles mid-game).
-:- st_tells_core(R, P, _, _), not received(P, R).
+% The Role identifies which ability triggered the communication.
+% The Player is whoever receives the message (usually the role holder, but not always -
+% e.g., Cerenovus tells the target what role to be mad as).
 
 % Constraint: a player can only receive one message from a role at a given time.
 % Roles that communicate multiple pieces of info (e.g., Washerwoman pointing to
