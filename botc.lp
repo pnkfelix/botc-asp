@@ -338,6 +338,16 @@ actual_category(P, good) :- assigned(0, P, R), outsider(R).
 actual_category(P, evil) :- assigned(0, P, R), minion(R).
 actual_category(P, evil) :- assigned(0, P, R), demon(R).
 
+% Track who the current demon is at each night
+% Base rule: initial demon assignment, unless replaced by role-change mechanics
+% Script-specific role changes (starpass, Pit Hag, Fang Gu jump, etc.) add
+% replaced_as_demon/2 rules or additional current_demon/2 rules.
+current_demon(P, N) :-
+    night_number(N),
+    assigned(0, P, R),
+    demon(R),
+    not replaced_as_demon(P, N).
+
 % Default: register as what you actually are (for players who can't mis-register)
 registers_as(P, C, T) :- actual_category(P, C), time(T), not may_mis_register(P).
 
