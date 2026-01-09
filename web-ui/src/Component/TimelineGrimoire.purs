@@ -736,7 +736,7 @@ renderEvent event =
             ]
             [ HH.text $ formatRoleName r.role ]
         , HH.text $ if r.eventType == "d_st_tells"
-            then "tells " <> r.player <> ": " <> r.message
+            then "ST tells " <> r.player <> ": " <> r.message
             else r.player <> " chooses: " <> r.message
         ]
     ASP.TokenPlaced r ->
