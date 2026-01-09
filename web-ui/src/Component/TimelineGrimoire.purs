@@ -937,7 +937,7 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
 
     -- Colors
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
-    roleColor = getRoleColor player.role
+    roleColor = getRoleColor player.token
 
     -- Is this player the drop target?
     isDropTarget = case dragState of
@@ -1004,7 +1004,7 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
           , SA.fontSize (FontSizeLength (Px 10.0))
           ]
           [ HH.text player.name ]
-      -- Role name
+      -- Role name (shows believed token - what player thinks they are)
       , SE.text
           [ SA.x 0.0
           , SA.y 5.0
@@ -1012,18 +1012,7 @@ renderPlayer centerX centerY radius playerCount reminders dragState idx player =
           , SA.fill (Named "white")
           , SA.fontSize (FontSizeLength (Px 8.0))
           ]
-          [ HH.text $ formatRoleName player.role ]
-      -- Token (what they think they are, if different)
-      , if player.token /= player.role
-          then SE.text
-            [ SA.x 0.0
-            , SA.y 16.0
-            , SA.textAnchor AnchorMiddle
-            , SA.fill (Named "#ffeb3b")
-            , SA.fontSize (FontSizeLength (Px 7.0))
-            ]
-            [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
-          else SE.g [] []
+          [ HH.text $ formatRoleName player.token ]
       -- Reminder tokens positioned toward center
       ] <> mapWithIndex (renderReminderToken angleToCenter (length playerReminders)) playerReminders
       )
@@ -1211,7 +1200,7 @@ renderHtmlPlayer reminders impairmentTokens selectedTime player =
     -- Check if this player has any impairment tokens on them
     isImpaired = Array.any (\r -> elem r.token impairmentTokens) playerReminders
     aliveColor = if player.alive then "#4CAF50" else "#9e9e9e"
-    roleColor = getRoleColor player.role
+    roleColor = getRoleColor player.token
     timeStr = case selectedTime of
       Just t -> formatTimePoint t
       Nothing -> ""
@@ -1280,13 +1269,7 @@ renderHtmlPlayer reminders impairmentTokens selectedTime player =
           , HP.attr (HH.AttrName "data-role-color") (getRoleColor player.token)
           , HP.attr (HH.AttrName "data-role-display") (formatRoleName player.token)
           ]
-          [ HH.text $ formatRoleName player.role ]
-      -- Token (if different from role, shows what they think they are)
-      , if player.token /= player.role
-          then HH.div
-            [ HP.style "color: #ffeb3b; font-size: 9px; margin-top: 2px;" ]
-            [ HH.text $ "(" <> formatRoleName player.token <> ")" ]
-          else HH.text ""
+          [ HH.text $ formatRoleName player.token ]
       -- Reminder tokens (draggable via JS pointer events)
       , if null playerReminders
           then HH.text ""
