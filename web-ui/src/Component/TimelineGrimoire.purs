@@ -1376,11 +1376,27 @@ getRoleColor role =
       isEvil = isMinion role || isDemon role
   in hashToRgbColor isEvil h
 
+-- | Check if a role is a minion (from any script)
+-- Trouble Brewing: poisoner, spy, scarlet_woman, baron
+-- Bad Moon Rising: godfather, devils_advocate, assassin, mastermind
+-- Sects and Violets: evil_twin, witch, cerenovus, pit_hag
 isMinion :: String -> Boolean
-isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
+isMinion r = r `elem`
+  [ "poisoner", "spy", "scarlet_woman", "baron"  -- TB
+  , "godfather", "devils_advocate", "assassin", "mastermind"  -- BMR
+  , "evil_twin", "witch", "cerenovus", "pit_hag"  -- SNV
+  ]
 
+-- | Check if a role is a demon (from any script)
+-- Trouble Brewing: imp
+-- Bad Moon Rising: zombuul, pukka, shabaloth, po
+-- Sects and Violets: fang_gu, vigormortis, vortox, no_dashii
 isDemon :: String -> Boolean
-isDemon r = r == "imp"
+isDemon r = r `elem`
+  [ "imp"  -- TB
+  , "zombuul", "pukka", "shabaloth", "po"  -- BMR
+  , "fang_gu", "vigormortis", "vortox", "no_dashii"  -- SNV
+  ]
 
 -- | Check if a reminder token is a pseudo-reminder (not owned by any role)
 -- Pseudo reminders include execution day markers (ex_d1, ex_d2, etc.)
