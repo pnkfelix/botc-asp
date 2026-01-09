@@ -1353,36 +1353,45 @@ hashString s =
       rawHash = foldl (\acc c -> (acc * 31 + c) `mod` 1000000) 0 codes
   in if rawHash < 0 then rawHash + 1000000 else rawHash
 
--- | Convert hash to HSL color string
--- isEvil: true for minions/demons (no blue), false for good (no red)
-hashToHslColor :: Boolean -> Int -> String
-hashToHslColor isEvil h =
-  let -- For good: hue 90-270 (green through blue, avoiding red/orange)
-      -- For evil: hue 0-60 or 300-360 (red/orange/yellow/magenta, avoiding blue)
-      hue = if isEvil
-              then
-                -- Evil: use 0-60 (red-yellow) or 300-360 (magenta-red)
-                -- Map to 120 degree range split across two zones
-                let hMod = h `mod` 120
-                in if hMod < 60 then hMod else hMod + 240  -- 0-60 or 300-360
-              else
-                -- Good: use 90-270 (green through blue through purple)
-                (h `mod` 180) + 90
-      -- Saturation 55-75% for vivid but not garish colors
-      sat = 55 + ((h / 7) `mod` 21)
-      -- Lightness 40-55% for good visibility on dark and light backgrounds
-      light = 40 + ((h / 13) `mod` 16)
-  in "hsl(" <> show hue <> ", " <> show sat <> "%, " <> show light <> "%)"
+-- | Convert hash to RGB color string
+-- Uses direct RGB control for better color consistency:
+-- Good characters: shades of blue (high blue, varied green, low red)
+-- Evil characters: shades of red (high red, varied green, low blue)
+hashToRgbColor :: Boolean -> Int -> String
+hashToRgbColor isEvil h =
+  let -- Use different bits of the hash for each variation
+      h1 = h `mod` 256
+      h2 = (h / 7) `mod` 256
+      h3 = (h / 13) `mod` 256
+  in if isEvil
+       then
+         -- Evil: shades of red
+         -- Red: medium to high (160-230)
+         -- Green: varied but capped low (40-120) for variety without going orange/yellow
+         -- Blue: low (40-100)
+         let r = 160 + (h1 `mod` 71)  -- 160-230
+             g = 40 + (h2 `mod` 81)   -- 40-120
+             b = 40 + (h3 `mod` 61)   -- 40-100
+         in "rgb(" <> show r <> ", " <> show g <> ", " <> show b <> ")"
+       else
+         -- Good: shades of blue
+         -- Red: low (40-100)
+         -- Green: varied but capped (80-170) for variety without going green/yellow
+         -- Blue: medium to high (160-230)
+         let r = 40 + (h1 `mod` 61)   -- 40-100
+             g = 80 + (h2 `mod` 91)   -- 80-170
+             b = 160 + (h3 `mod` 71)  -- 160-230
+         in "rgb(" <> show r <> ", " <> show g <> ", " <> show b <> ")"
 
 -- | Get unique color for each role
 -- Color is deterministically derived from role name hash
--- Good (Townsfolk, Outsiders): green/cyan/blue/purple tones (no red)
--- Evil (Minions, Demons): red/orange/yellow/magenta tones (no blue)
+-- Good (Townsfolk, Outsiders): shades of blue (high blue, varied green, low red)
+-- Evil (Minions, Demons): shades of red (high red, varied green, low blue)
 getRoleColor :: String -> String
 getRoleColor role =
   let h = hashString role
       isEvil = isMinion role || isDemon role
-  in hashToHslColor isEvil h
+  in hashToRgbColor isEvil h
 
 isMinion :: String -> Boolean
 isMinion r = r == "poisoner" || r == "spy" || r == "scarlet_woman" || r == "baron"
