@@ -1271,7 +1271,7 @@ renderHtmlPlayer reminders impairmentTokens selectedTime player =
               <> "padding: 4px 8px; border-radius: 4px; "
               <> "background: rgba(0,0,0,0.2); display: inline-block;"
               -- Wavy underline for impaired players (drunk/poisoned)
-              <> (if isImpaired then " text-decoration: underline wavy red;" else "")
+              <> (if isImpaired then " text-decoration-line: underline; text-decoration-style: wavy; text-decoration-color: red; border: 2px solid red;" else "")
           -- Data attributes for JS role drag handler
           -- Use player.token (received) not player.role (assigned) so Drunk's token is draggable
           , HP.attr (HH.AttrName "data-role-token") player.token
