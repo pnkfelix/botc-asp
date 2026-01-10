@@ -25,8 +25,11 @@ reminder_on(vortox_dead, Target, night(N, RoleOrd, 3)) :-
 % Register as demon kill token (generic handling in botc.lp)
 demon_kill_token(vortox_dead).
 
-snv_demon_killed(Target, T) :-
-    reminder_on(vortox_dead, Target, T).
+% snv_demon_killed only fires at the actual kill time, not every time token exists
+snv_demon_killed(Target, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(vortox, RoleOrd),
+    reminder_on(vortox_dead, Target, night(N, RoleOrd, 3)).
 
 % Vortox is in play
 vortox_in_play :-

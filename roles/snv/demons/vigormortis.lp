@@ -27,8 +27,11 @@ reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)) :-
 % Register as demon kill token (generic handling in botc.lp)
 demon_kill_token(vigor_dead).
 
-snv_demon_killed(Target, T) :-
-    reminder_on(vigor_dead, Target, T).
+% snv_demon_killed only fires at the actual kill time, not every time token exists
+snv_demon_killed(Target, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
+    other_night_role_order(vigormortis, RoleOrd),
+    reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)).
 
 % Local helper for minion tracking
 vigor_kill_succeeds(P, T) :-
