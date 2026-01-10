@@ -17,8 +17,9 @@ other_night_substep(no_dashii, 3, st_places(no_dashii_dead)).
 
 % Place the death token on the target
 reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)) :-
-    player_chooses(no_dashii, ND, point(Target), night(N, RoleOrd, 2)),
+    night_number(N), N > 1,
     other_night_role_order(no_dashii, RoleOrd),
+    player_chooses(no_dashii, ND, point(Target), night(N, RoleOrd, 2)),
     functioning(ND, night(N, RoleOrd, 3)).
 
 snv_demon_killed(Target, T) :-

@@ -19,8 +19,9 @@ other_night_substep(vigormortis, 3, st_places(vigor_dead)).
 
 % Place the death token on the target
 reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)) :-
-    player_chooses(vigormortis, Vigor, point(Target), night(N, RoleOrd, 2)),
+    night_number(N), N > 1,
     other_night_role_order(vigormortis, RoleOrd),
+    player_chooses(vigormortis, Vigor, point(Target), night(N, RoleOrd, 2)),
     functioning(Vigor, night(N, RoleOrd, 3)).
 
 snv_demon_killed(Target, T) :-

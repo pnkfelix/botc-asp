@@ -74,12 +74,14 @@ registers_as(Target, evil, T) :-
 
 % Normal kill (non-outsider or after first jump)
 fang_gu_normal_kill(FG, Target, N) :-
+    night_number(N), N > 1,
     player_chooses(fang_gu, FG, point(Target), night(N, RoleOrd, 2)),
     other_night_role_order(fang_gu, RoleOrd),
     functioning(FG, night(N, RoleOrd, 3)),
     not fang_gu_targets_outsider(FG, Target, N).
 
 reminder_on(fang_gu_dead, Target, night(N, RoleOrd, 3)) :-
+    night_number(N), N > 1,
     fang_gu_normal_kill(_, Target, N),
     other_night_role_order(fang_gu, RoleOrd).
 

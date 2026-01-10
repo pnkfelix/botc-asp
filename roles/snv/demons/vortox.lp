@@ -17,8 +17,9 @@ other_night_substep(vortox, 3, st_places(vortox_dead)).
 
 % Place the death token on the target
 reminder_on(vortox_dead, Target, night(N, RoleOrd, 3)) :-
-    player_chooses(vortox, Vortox, point(Target), night(N, RoleOrd, 2)),
+    night_number(N), N > 1,
     other_night_role_order(vortox, RoleOrd),
+    player_chooses(vortox, Vortox, point(Target), night(N, RoleOrd, 2)),
     functioning(Vortox, night(N, RoleOrd, 3)).
 
 snv_demon_killed(Target, T) :-
