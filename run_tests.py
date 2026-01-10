@@ -240,12 +240,22 @@ def run_tests(test_files: list[Path], save_timings: bool = True, show_history: b
         print(msg)
 
     # Print summary line of failed tests for easy copy/paste
+    # Separate outright failures (wrong result) from timeouts
     if fail_count > 0:
-        failed_names = [r[0] for r in results if not r[4]]
+        outright_failures = [r[0] for r in results if not r[4] and r[2] != "TIMEOUT"]
+        timeouts = [r[0] for r in results if not r[4] and r[2] == "TIMEOUT"]
+
+        parts = []
+        if outright_failures:
+            parts.append(f"Failed: {' '.join(outright_failures)}")
+        if timeouts:
+            parts.append(f"Timeouts: {' '.join(timeouts)}")
+
+        summary_line = " | ".join(parts)
         if use_rich:
-            console.print(f"\nFailed tests: {' '.join(failed_names)}")
+            console.print(f"\n{summary_line}")
         else:
-            print(f"\nFailed tests: {' '.join(failed_names)}")
+            print(f"\n{summary_line}")
 
     return fail_count
 
