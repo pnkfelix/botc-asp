@@ -22,7 +22,7 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
 
-TIMEOUT = 5
+DEFAULT_TIMEOUT = 5
 HOSTNAME = socket.gethostname()
 
 
@@ -91,7 +91,7 @@ def timing_summary(timings: list[float], current: float) -> tuple[str, bool]:
     return summary, is_outlier
 
 
-def run_clingo(test_file: Path) -> tuple[str | None, float]:
+def run_clingo(test_file: Path, timeout: int) -> tuple[str | None, float]:
     """Run clingo on a test file. Returns (result, elapsed_seconds)."""
     start = time.time()
     try:
@@ -99,7 +99,7 @@ def run_clingo(test_file: Path) -> tuple[str | None, float]:
             ["clingo", str(test_file), "1"],
             capture_output=True,
             text=True,
-            timeout=TIMEOUT
+            timeout=timeout
         )
         elapsed = time.time() - start
         output = result.stdout + result.stderr
@@ -110,7 +110,7 @@ def run_clingo(test_file: Path) -> tuple[str | None, float]:
         else:
             return None, elapsed
     except subprocess.TimeoutExpired:
-        return "TIMEOUT", TIMEOUT
+        return "TIMEOUT", timeout
     except FileNotFoundError:
         print("Error: clingo not found in PATH")
         sys.exit(1)
@@ -158,7 +158,7 @@ def build_table(results: list, current_test: str | None = None, current_idx: int
     return table
 
 
-def run_tests(test_files: list[Path], save_timings: bool = True, show_history: bool = True, use_rich: bool = True) -> int:
+def run_tests(test_files: list[Path], timeout: int = DEFAULT_TIMEOUT, save_timings: bool = True, show_history: bool = True, use_rich: bool = True) -> int:
     """Run tests with either rich or plain output."""
     results = []
     total = len(test_files)
@@ -207,7 +207,7 @@ def run_tests(test_files: list[Path], save_timings: bool = True, show_history: b
 
             # Run test
             expected = get_expected(test_file)
-            actual, elapsed = run_clingo(test_file)
+            actual, elapsed = run_clingo(test_file, timeout)
             passed = (expected == actual)
 
             # Calculate timing summary and optionally save new timing
@@ -274,6 +274,12 @@ def main():
         help="Don't save timing data (useful for in-development tests)"
     )
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"Timeout in seconds per test (default: {DEFAULT_TIMEOUT})"
+    )
+    parser.add_argument(
         "--format",
         choices=["rich", "plain"],
         default=None,
@@ -321,6 +327,7 @@ def main():
 
     fail_count = run_tests(
         test_files,
+        timeout=args.timeout,
         save_timings=not args.no_save_timing_data,
         show_history=not args.hide_timing_history,
         use_rich=use_rich
