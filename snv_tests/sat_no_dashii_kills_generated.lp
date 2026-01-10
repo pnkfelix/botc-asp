@@ -5,12 +5,15 @@
 
 needs_night(2).
 
-% Force specific role assignments
+% Force specific role assignments (5 townsfolk, 1 outsider, 1 minion, 1 demon)
 assert_received(amanda, clockmaker).
 assert_received(rob, dreamer).
 assert_received(taylor, oracle).
+assert_received(courtney, flowergirl).
 assert_received(steph, no_dashii).
 assert_received(felix, cerenovus).
+assert_received(neha, town_crier).
+assert_received(pratik, mutant).
 
 % Night 1: No one dies (first night has no demon kill)
 % Day 1: No execution
