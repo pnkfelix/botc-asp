@@ -31,10 +31,11 @@ sage_died_tonight(Sage, N) :-
     functioning(Sage, night(N, RoleOrd, 1)).
 
 % Constraint: one of the two shown must be the demon (when functioning)
+% Check who is currently a demon at the time Sage receives info
 :- sage_shown(Sage, P1, P2, T),
    functioning(Sage, T),
-   current_demon(Demon, N),
-   T = night(N, _, _),
+   character_assignment_state_at_time(T, Demon, R),
+   demon(R),
    P1 != Demon,
    P2 != Demon.
 

@@ -22,62 +22,69 @@ other_night_substep(snake_charmer, 3, st_places(snake_charmer_swap)).
     alive(SC, night(N, 0, 0)).
 
 % If the chosen player is the demon and snake charmer is functioning, they swap
-snake_charmer_swaps(SC, Demon, N) :-
+% Include DemonRole so we know what role the snake charmer becomes
+snake_charmer_swaps(SC, Demon, DemonRole, N) :-
     player_chooses(snake_charmer, SC, point(Demon), night(N, RoleOrd, 2)),
     first_night_role_order(snake_charmer, RoleOrd),
     N = 1,
-    current_demon(Demon, N),
+    character_assignment_state_at_time(night(N, 0, 0), Demon, DemonRole),
+    demon(DemonRole),
     functioning(SC, night(N, RoleOrd, 3)).
 
-snake_charmer_swaps(SC, Demon, N) :-
+snake_charmer_swaps(SC, Demon, DemonRole, N) :-
     player_chooses(snake_charmer, SC, point(Demon), night(N, RoleOrd, 2)),
     other_night_role_order(snake_charmer, RoleOrd),
     night_number(N), N > 1,
-    current_demon(Demon, N),
+    character_assignment_state_at_time(night(N, 0, 0), Demon, DemonRole),
+    demon(DemonRole),
     functioning(SC, night(N, RoleOrd, 3)).
 
 % After swap: Snake Charmer becomes the demon, former demon becomes snake charmer
-% The former demon is poisoned
-assigned(N, SC, DemonRole) :-
-    snake_charmer_swaps(SC, Demon, N),
-    assigned(0, Demon, DemonRole),
-    demon(DemonRole).
+% Use role_assignment_changes_to so character_assignment_state_at_time is updated
+role_assignment_changes_to(night(N, RoleOrd, 3), SC, DemonRole) :-
+    snake_charmer_swaps(SC, Demon, DemonRole, N),
+    first_night_role_order(snake_charmer, RoleOrd),
+    N = 1.
 
-assigned(N, Demon, snake_charmer) :-
-    snake_charmer_swaps(SC, Demon, N).
+role_assignment_changes_to(night(N, RoleOrd, 3), SC, DemonRole) :-
+    snake_charmer_swaps(SC, Demon, DemonRole, N),
+    other_night_role_order(snake_charmer, RoleOrd),
+    N > 1.
+
+role_assignment_changes_to(night(N, RoleOrd, 3), Demon, snake_charmer) :-
+    snake_charmer_swaps(SC, Demon, _, N),
+    first_night_role_order(snake_charmer, RoleOrd),
+    N = 1.
+
+role_assignment_changes_to(night(N, RoleOrd, 3), Demon, snake_charmer) :-
+    snake_charmer_swaps(SC, Demon, _, N),
+    other_night_role_order(snake_charmer, RoleOrd),
+    N > 1.
 
 % Former demon is poisoned after becoming snake charmer
 reminder_on(sc_poisoned, Demon, T) :-
-    snake_charmer_swaps(_, Demon, N),
+    snake_charmer_swaps(_, Demon, _, N),
     time(T), T = night(N2, _, _), N2 >= N.
 
 reminder_on(sc_poisoned, Demon, T) :-
-    snake_charmer_swaps(_, Demon, N),
+    snake_charmer_swaps(_, Demon, _, N),
     time(T), T = day(N2, _), N2 >= N.
 
 reminder_on(sc_poisoned, Demon, T) :-
-    snake_charmer_swaps(_, Demon, N),
+    snake_charmer_swaps(_, Demon, _, N),
     time(T), T = dawn(N2), N2 >= N.
 
 causes_impairment(sc_poisoned).
 
-% New demon (former snake charmer) becomes current demon
-replaced_as_demon(Demon, N+1) :-
-    snake_charmer_swaps(_, Demon, N).
-
-current_demon(SC, N2) :-
-    snake_charmer_swaps(SC, _, N),
-    night_number(N2), N2 > N.
-
 % The former snake charmer is now evil
 registers_as(SC, evil, T) :-
-    snake_charmer_swaps(SC, _, N),
+    snake_charmer_swaps(SC, _, _, N),
     time(T), T = night(N2, _, _), N2 >= N.
 
 registers_as(SC, evil, T) :-
-    snake_charmer_swaps(SC, _, N),
+    snake_charmer_swaps(SC, _, _, N),
     time(T), T = day(N2, _), N2 >= N.
 
 registers_as(SC, evil, T) :-
-    snake_charmer_swaps(SC, _, N),
+    snake_charmer_swaps(SC, _, _, N),
     time(T), T = dawn(N2), N2 >= N.

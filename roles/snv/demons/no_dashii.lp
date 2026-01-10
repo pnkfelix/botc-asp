@@ -6,13 +6,13 @@ other_night_substep(no_dashii, 2, player_chooses(kill_target)).
 other_night_substep(no_dashii, 3, st_places(no_dashii_dead)).
 
 % No Dashii chooses a target each night (nights after the first)
+% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
 { player_chooses(no_dashii, ND, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(no_dashii, RoleOrd),
-    current_demon(ND, N),
-    assigned(0, ND, no_dashii),
-    alive(ND, night(N, 0, 0)),
+    character_assignment_state_at_time(T, ND, no_dashii),
+    alive(ND, T),
     game_active(night(N, 0, 0)).
 
 % Place the death token on the target

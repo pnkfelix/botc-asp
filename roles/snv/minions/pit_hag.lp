@@ -47,16 +47,3 @@ pit_hag_arbitrary_deaths(N) :-
 % When arbitrary deaths are in effect, the normal demon kill is optional
 % This is modeled by allowing any death pattern (including none)
 % Note: This interacts with demon kill mechanics and may need refinement
-
-% If Pit-Hag creates a demon, that player becomes the current demon
-current_demon(P, N2) :-
-    pit_hag_changed(P, Role, N),
-    demon(Role),
-    night_number(N2), N2 > N.
-
-% The old demon is replaced if Pit-Hag created a new one
-% (This is for edge cases where a non-demon becomes demon)
-replaced_as_demon(OldDemon, N+1) :-
-    pit_hag_created_demon(N),
-    current_demon(OldDemon, N),
-    not pit_hag_changed(OldDemon, _, N).

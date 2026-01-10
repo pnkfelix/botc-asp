@@ -6,13 +6,13 @@ other_night_substep(vortox, 2, player_chooses(kill_target)).
 other_night_substep(vortox, 3, st_places(vortox_dead)).
 
 % Vortox chooses a target each night (nights after the first)
+% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
 { player_chooses(vortox, Vortox, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(vortox, RoleOrd),
-    current_demon(Vortox, N),
-    assigned(0, Vortox, vortox),
-    alive(Vortox, night(N, 0, 0)),
+    character_assignment_state_at_time(T, Vortox, vortox),
+    alive(Vortox, T),
     game_active(night(N, 0, 0)).
 
 % Place the death token on the target

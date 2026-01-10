@@ -5,13 +5,13 @@ other_night_substep(imp, 2, player_chooses(kill_target)).
 other_night_substep(imp, 3, st_places(imp_dead)).
 
 % Imp chooses a target each night (nights after the first)
-% Only if: game is still active at night start, and Imp is alive
+% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
 { player_chooses(imp, Imp, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
-    current_demon(Imp, N),
-    alive(Imp, night(N, 0, 0)),
+    character_assignment_state_at_time(T, Imp, imp),
+    alive(Imp, T),
     game_active(night(N, 0, 0)).
 
 % House rule: Imp cannot target itself if all minions are dead
@@ -26,24 +26,6 @@ any_minion_alive(T) :-
     character_assignment_state_at_time(T, P, R),
     minion(R),
     alive(P, T).
-
-current_demon(P, N) :-
-    night_number(N),
-    assigned(0, P, R),
-    demon(R),
-    not replaced_as_demon(P, N).
-
-replaced_as_demon(P, N) :-
-    assigned(0, P, R),
-    demon(R),
-    sw_becomes_demon(_, TriggerDay),
-    night_number(N),
-    N > TriggerDay.
-
-current_demon(SW, N) :-
-    sw_becomes_demon(SW, TriggerDay),
-    night_number(N),
-    N > TriggerDay.
 
 reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
@@ -79,9 +61,10 @@ died(P, T) :-
 
 imp_starpass_triggered(Imp, N) :-
     night_number(N), N > 1,
-    current_demon(Imp, N),
     other_night_role_order(imp, RoleOrd),
-    player_chooses(imp, Imp, point(Imp), night(N, RoleOrd, 2)),
+    T = night(N, RoleOrd, 2),
+    character_assignment_state_at_time(T, Imp, imp),
+    player_chooses(imp, Imp, point(Imp), T),
     imp_kill_succeeds(Imp, night(N, RoleOrd, 3)).
 
 eligible_for_starpass(Minion, N) :-
@@ -101,13 +84,3 @@ eligible_for_starpass(Minion, N) :-
 role_assignment_changes_to(night(N, RoleOrd, 3), Minion, imp) :-
     starpass_target(Minion, N),
     other_night_role_order(imp, RoleOrd).
-
-replaced_as_demon(P, NextN) :-
-    imp_starpass_triggered(P, TriggerNight),
-    night_number(NextN),
-    NextN > TriggerNight.
-
-current_demon(Minion, NextN) :-
-    starpass_target(Minion, TriggerNight),
-    night_number(NextN),
-    NextN > TriggerNight.
