@@ -64,10 +64,30 @@ nd_closer_townsfolk_clockwise(ND, D, T) :-
     D2 < D.
 
 % Counter-clockwise townsfolk neighbor
+% Counter-clockwise distance from ND to P is the clockwise distance from P to ND
 nd_townsfolk_neighbor_counterclockwise(ND, P, T) :-
-    nd_townsfolk_neighbor_clockwise(P, ND, T),
     assigned(0, ND, no_dashii),
-    assigned(0, P, R), townsfolk(R).
+    time(T),
+    alive(ND, T),
+    player(P), P != ND,
+    alive(P, T),
+    assigned(0, P, R), townsfolk(R),
+    clockwise_distance(P, ND, D),  % counter-clockwise distance from ND to P
+    not nd_closer_townsfolk_counterclockwise(ND, D, T).
+
+nd_closer_townsfolk_counterclockwise(ND, D, T) :-
+    assigned(0, ND, no_dashii),
+    time(T),
+    alive(ND, T),
+    player(P), P != ND,
+    alive(P, T),
+    assigned(0, P, R), townsfolk(R),
+    clockwise_distance(P, ND, D),  % counter-clockwise distance from ND to P
+    player(P2), P2 != ND, P2 != P,
+    alive(P2, T),
+    assigned(0, P2, R2), townsfolk(R2),
+    clockwise_distance(P2, ND, D2),  % counter-clockwise distance from ND to P2
+    D2 < D.
 
 % The two townsfolk neighbors are poisoned while No Dashii is alive
 reminder_on(nd_poisoned, P, T) :-
