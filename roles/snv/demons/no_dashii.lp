@@ -22,19 +22,11 @@ reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)) :-
     player_chooses(no_dashii, ND, point(Target), night(N, RoleOrd, 2)),
     functioning(ND, night(N, RoleOrd, 3)).
 
+% Register as demon kill token (generic handling in botc.lp)
+demon_kill_token(no_dashii_dead).
+
 snv_demon_killed(Target, T) :-
     reminder_on(no_dashii_dead, Target, T).
-
-no_dashii_kill_succeeds(P, T) :-
-    reminder_on(no_dashii_dead, P, T),
-    not protected_from_demon(P, T).
-
-dead_at_time(P, T) :- no_dashii_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    no_dashii_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
 
 % Find the No Dashii's townsfolk neighbors
 % A "townsfolk neighbor" is the closest living Townsfolk in each direction

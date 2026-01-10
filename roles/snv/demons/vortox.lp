@@ -22,19 +22,11 @@ reminder_on(vortox_dead, Target, night(N, RoleOrd, 3)) :-
     player_chooses(vortox, Vortox, point(Target), night(N, RoleOrd, 2)),
     functioning(Vortox, night(N, RoleOrd, 3)).
 
+% Register as demon kill token (generic handling in botc.lp)
+demon_kill_token(vortox_dead).
+
 snv_demon_killed(Target, T) :-
     reminder_on(vortox_dead, Target, T).
-
-vortox_kill_succeeds(P, T) :-
-    reminder_on(vortox_dead, P, T),
-    not protected_from_demon(P, T).
-
-dead_at_time(P, T) :- vortox_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    vortox_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
 
 % Vortox is in play
 vortox_in_play :-

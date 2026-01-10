@@ -85,19 +85,15 @@ reminder_on(fang_gu_dead, Target, night(N, RoleOrd, 3)) :-
     fang_gu_normal_kill(_, Target, N),
     other_night_role_order(fang_gu, RoleOrd).
 
+% Register as demon kill token (generic handling in botc.lp)
+demon_kill_token(fang_gu_dead).
+
+% Block the generic kill for targets that "jumped" (became the new Fang Gu)
+demon_kill_blocked(fang_gu_dead, P, T) :-
+    fang_gu_jumped(P, _, _),
+    reminder_on(fang_gu_dead, P, T).
+
 snv_demon_killed(Target, T) :-
     fang_gu_normal_kill(_, Target, N),
     T = night(N, RoleOrd, 3),
     other_night_role_order(fang_gu, RoleOrd).
-
-fang_gu_kill_succeeds(P, T) :-
-    reminder_on(fang_gu_dead, P, T),
-    not protected_from_demon(P, T),
-    not fang_gu_jumped(P, _, _).
-
-dead_at_time(P, T) :- fang_gu_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    fang_gu_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).

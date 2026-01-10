@@ -46,16 +46,13 @@ token_removed(imp_dead, OldTarget, night(N, RoleOrd, 3)) :-
 % Constraint: imp_dead token cannot be on a player at the same time it's being removed
 :- reminder_on(imp_dead, P, T), token_removed(imp_dead, P, T).
 
+% Register imp_dead as a demon kill token (generic handling in botc.lp)
+demon_kill_token(imp_dead).
+
+% Local helper for starpass logic
 imp_kill_succeeds(P, T) :-
     reminder_on(imp_dead, P, T),
     not protected_from_demon(P, T).
-
-dead_at_time(P, T) :- imp_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    imp_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
 
 % Starpass
 

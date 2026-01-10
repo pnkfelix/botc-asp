@@ -24,19 +24,16 @@ reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)) :-
     player_chooses(vigormortis, Vigor, point(Target), night(N, RoleOrd, 2)),
     functioning(Vigor, night(N, RoleOrd, 3)).
 
+% Register as demon kill token (generic handling in botc.lp)
+demon_kill_token(vigor_dead).
+
 snv_demon_killed(Target, T) :-
     reminder_on(vigor_dead, Target, T).
 
+% Local helper for minion tracking
 vigor_kill_succeeds(P, T) :-
     reminder_on(vigor_dead, P, T),
     not protected_from_demon(P, T).
-
-dead_at_time(P, T) :- vigor_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    vigor_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
 
 % Track minions killed by Vigormortis
 vigor_killed_minion(Minion, N) :-

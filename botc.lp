@@ -232,6 +232,34 @@ impaired(P, T) :- reminder_on(Token, P, T), causes_impairment(Token).
 functioning(P, T) :- player(P), time(T), not impaired(P, T).
 
 % ===========================================================================
+% Generic Demon Kill Logic
+% Each demon places its own death token via reminder_on rules.
+% The kill processing (success check, death recording) is shared here.
+% ===========================================================================
+
+% Demons register their kill tokens here
+% (Each demon's .lp file adds: demon_kill_token(X_dead).)
+
+% Generic: kill succeeds if death token is on player and not protected
+demon_kill_succeeds(P, T) :-
+    reminder_on(Token, P, T),
+    demon_kill_token(Token),
+    not protected_from_demon(P, T),
+    not demon_kill_blocked(Token, P, T).
+
+% Hook for special cases (e.g., Fang Gu jump - target becomes demon, not dead)
+% Demons can add demon_kill_blocked(Token, P, T) to prevent the kill.
+
+% Player becomes dead at the time the kill succeeds
+dead_at_time(P, T) :- demon_kill_succeeds(P, T).
+
+% Death is recorded at the final time of the night
+died(P, T) :-
+    final_night_time(N, T),
+    demon_kill_succeeds(P, T),
+    alive(P, night(N, 0, 0)).
+
+% ===========================================================================
 % Night communication vocabulary
 % These are the signals available for ST <-> player communication at night
 % ===========================================================================
