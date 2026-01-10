@@ -8,13 +8,13 @@ other_night_substep(vigormortis, 2, player_chooses(kill_target)).
 other_night_substep(vigormortis, 3, st_places(vigor_dead)).
 
 % Vigormortis chooses a target each night (nights after the first)
+% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
 { player_chooses(vigormortis, Vigor, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(vigormortis, RoleOrd),
-    current_demon(Vigor, N),
-    assigned(0, Vigor, vigormortis),
-    alive(Vigor, night(N, 0, 0)),
+    character_assignment_state_at_time(T, Vigor, vigormortis),
+    alive(Vigor, T),
     game_active(night(N, 0, 0)).
 
 % Place the death token on the target

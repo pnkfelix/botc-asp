@@ -8,13 +8,13 @@ other_night_substep(fang_gu, 2, player_chooses(kill_target)).
 other_night_substep(fang_gu, 3, st_places(fang_gu_dead)).
 
 % Fang Gu chooses a target each night (nights after the first)
+% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
 { player_chooses(fang_gu, FG, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(fang_gu, RoleOrd),
-    current_demon(FG, N),
-    assigned(0, FG, fang_gu),
-    alive(FG, night(N, 0, 0)),
+    character_assignment_state_at_time(T, FG, fang_gu),
+    alive(FG, T),
     game_active(night(N, 0, 0)).
 
 % Track if this is the first outsider kill
@@ -55,8 +55,10 @@ died(FG, T) :-
     alive(FG, night(N, 0, 0)).
 
 % The outsider becomes an evil Fang Gu
-assigned(N, Target, fang_gu) :-
-    fang_gu_jumped(_, Target, N).
+% Use role_assignment_changes_to so character_assignment_state_at_time is updated
+role_assignment_changes_to(night(N, RoleOrd, 3), Target, fang_gu) :-
+    fang_gu_jumped(_, Target, N),
+    other_night_role_order(fang_gu, RoleOrd).
 
 registers_as(Target, evil, T) :-
     fang_gu_jumped(_, Target, N),
@@ -69,14 +71,6 @@ registers_as(Target, evil, T) :-
 registers_as(Target, evil, T) :-
     fang_gu_jumped(_, Target, N),
     time(T), T = dawn(N2), N2 >= N.
-
-% New Fang Gu becomes current demon
-current_demon(Target, N2) :-
-    fang_gu_jumped(_, Target, N),
-    night_number(N2), N2 > N.
-
-replaced_as_demon(FG, N+1) :-
-    fang_gu_jumped(FG, _, N).
 
 % Normal kill (non-outsider or after first jump)
 fang_gu_normal_kill(FG, Target, N) :-

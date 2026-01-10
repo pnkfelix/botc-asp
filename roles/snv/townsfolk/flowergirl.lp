@@ -9,7 +9,8 @@ other_night_substep(flowergirl, 1, st_tells(flowergirl_info)).
 demon_voted(N) :-
     day_number(N),
     voted(P, N),
-    current_demon(P, N).
+    character_assignment_state_at_time(day(N, 0), P, R),
+    demon(R).
 
 % Flowergirl learns yes/no when functioning (other nights only)
 st_tells_core(flowergirl, FG, yes, T) :-

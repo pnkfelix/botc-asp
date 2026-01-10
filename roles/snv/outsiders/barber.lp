@@ -19,14 +19,17 @@ barber_died(Barber, N) :- barber_died_tonight(Barber, N).
 barber_died(Barber, N) :- barber_died_today(Barber, N).
 
 % Demon may choose two players to swap (not another demon)
+% Check who is currently the demon at Barber's substep (role order 17)
 { barber_swap(Demon, P1, P2, N) :
     player(P1), player(P2), P1 != P2,
     not demon(R1), not demon(R2),
     assigned(0, P1, R1), assigned(0, P2, R2),
     chair(P1, C1), chair(P2, C2), C1 < C2 } <= 1 :-
     barber_died(_, N),
-    current_demon(Demon, N),
-    alive(Demon, night(N, 0, 0)).
+    other_night_role_order(barber, RoleOrd),
+    character_assignment_state_at_time(night(N, RoleOrd, 2), Demon, DemonRole),
+    demon(DemonRole),
+    alive(Demon, night(N, RoleOrd, 2)).
 
 % If the demon chooses to swap, the two players exchange characters
 % Role change is effective at dawn - use fine-grained predicate
