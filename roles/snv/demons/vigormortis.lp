@@ -19,23 +19,24 @@ other_night_substep(vigormortis, 3, st_places(vigor_dead)).
 
 % Place the death token on the target
 reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)) :-
-    player_chooses(vigormortis, Vigor, point(Target), night(N, RoleOrd, 2)),
+    night_number(N), N > 1,
     other_night_role_order(vigormortis, RoleOrd),
+    player_chooses(vigormortis, Vigor, point(Target), night(N, RoleOrd, 2)),
     functioning(Vigor, night(N, RoleOrd, 3)).
 
-snv_demon_killed(Target, T) :-
-    reminder_on(vigor_dead, Target, T).
+% Register as demon kill token (generic handling in botc.lp)
+demon_kill_token(vigor_dead).
 
+% snv_demon_killed(Target, N) - Target was killed by demon on night N
+snv_demon_killed(Target, N) :-
+    night_number(N), N > 1,
+    other_night_role_order(vigormortis, RoleOrd),
+    reminder_on(vigor_dead, Target, night(N, RoleOrd, 3)).
+
+% Local helper for minion tracking
 vigor_kill_succeeds(P, T) :-
     reminder_on(vigor_dead, P, T),
     not protected_from_demon(P, T).
-
-dead_at_time(P, T) :- vigor_kill_succeeds(P, T).
-
-died(P, T) :-
-    final_night_time(N, T),
-    vigor_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
 
 % Track minions killed by Vigormortis
 vigor_killed_minion(Minion, N) :-
@@ -57,16 +58,9 @@ vigor_minion_keeps_ability(Minion) :-
     other_night_role_order(vigormortis, RoleOrd).
 
 % The chosen townsfolk is poisoned permanently (as long as the minion stays dead)
-reminder_on(vigor_poisoned, P, T) :-
+% OPTIMIZATION: Place token at kill time, inertia carries it forward
+reminder_on(vigor_poisoned, P, night(N, RoleOrd, 3)) :-
     vigor_poison_target(_, P, N),
-    time(T), T = night(N2, _, _), N2 >= N.
-
-reminder_on(vigor_poisoned, P, T) :-
-    vigor_poison_target(_, P, N),
-    time(T), T = day(N2, _), N2 >= N.
-
-reminder_on(vigor_poisoned, P, T) :-
-    vigor_poison_target(_, P, N),
-    time(T), T = dawn(N2), N2 >= N.
+    other_night_role_order(vigormortis, RoleOrd).
 
 causes_impairment(vigor_poisoned).

@@ -158,7 +158,7 @@ This project uses naming conventions to categorize predicates:
 **State predicates** (derived from events):
 - `alive(Player, Time)` - Player is alive at this time
 - `poisoned(Player, Time)` - Player is currently poisoned
-- `current_demon(Player, Time)` - Player is the current demon
+- `character_assignment_state_at_time(Time, Player, Role)` - Player's current role at Time
 
 **Assert predicates** (UI-driven constraints):
 - `assert_drawn(Role)` - Role token must be in the bag

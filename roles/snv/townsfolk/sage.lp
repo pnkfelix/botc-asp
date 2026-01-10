@@ -4,13 +4,12 @@
 other_night_substep(sage, 1, st_tells(sage_info)).
 
 % Sage died tonight (killed by demon)
-% Note: For S&V demons, we need to check for the appropriate death token
-% This checks for any snv demon's kill token
+% Note: For S&V demons, we check snv_demon_killed(Target, N) which indicates
+% Target was killed by a demon on night N
 sage_died_tonight(Sage, N) :-
     assigned(0, Sage, sage),
     night_number(N), N > 1,
-    other_night_role_order(sage, RoleOrd),
-    snv_demon_killed(Sage, night(N, RoleOrd, 1)).
+    snv_demon_killed(Sage, N).
 
 % Generic predicate for S&V demon kills (will be defined by demon files)
 % For now, also check imp_dead for compatibility with TB testing
