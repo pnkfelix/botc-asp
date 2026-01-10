@@ -13,12 +13,13 @@ other_night_substep(poisoner, 3, st_places(poisoned)).
     first_night_role_order(poisoner, RoleOrd),
     assigned(0, Poisoner, poisoner).
 
-% Helper: player was reassigned to a different role before night N
+% Helper: player was reassigned to a different role at start of night N
+% This triggers when the poisoner's role has changed (e.g., via starpass, pit-hag)
 poi_reassigned(P, N) :-
-    assigned(T, P, _),
-    T > 0,
-    night_number(N),
-    T < N.
+    assigned(0, P, poisoner),           % P was originally the poisoner
+    character_assignment_state_at_time(night(N, 0, 0), P, R),  % P's role at start of night N
+    R != poisoner,                      % Role has changed
+    night_number(N), N > 1.
 
 { player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
     T = night(N, RoleOrd, 2),
