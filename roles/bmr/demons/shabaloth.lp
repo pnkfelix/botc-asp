@@ -49,7 +49,7 @@ shabaloth_kill_succeeds(P, T) :-
 reminder_on(shabaloth_dead, P, T) :- shabaloth_kill_succeeds(P, T).
 
 dead_at_time(P, T) :- shabaloth_kill_succeeds(P, T).
-died(P, T) :- shabaloth_kill_succeeds(P, T), final_night_time(N, T), alive(P, night(N, 0, 0)).
+died(P, T) :- shabaloth_kill_succeeds(P, KillTime), KillTime = night(N, _, _), final_night_time(N, T), alive(P, night(N, 0, 0)).
 
 % === Regurgitation ===
 % A dead player killed last night might come back to life
