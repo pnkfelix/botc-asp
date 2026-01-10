@@ -25,8 +25,9 @@ reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)) :-
 % Register as demon kill token (generic handling in botc.lp)
 demon_kill_token(no_dashii_dead).
 
-% snv_demon_killed only fires at the actual kill time, not every time token exists
-snv_demon_killed(Target, night(N, RoleOrd, 3)) :-
+% snv_demon_killed(Target, N) - Target was killed by demon on night N
+% Uses night number only (not specific time) so Sage can check without time mismatch
+snv_demon_killed(Target, N) :-
     night_number(N), N > 1,
     other_night_role_order(no_dashii, RoleOrd),
     reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)).

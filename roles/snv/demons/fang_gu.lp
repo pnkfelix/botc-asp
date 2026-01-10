@@ -38,10 +38,9 @@ reminder_on(fang_gu_dead, FG, night(N, RoleOrd, 3)) :-
     fang_gu_jumped(FG, _, N),
     other_night_role_order(fang_gu, RoleOrd).
 
-snv_demon_killed(FG, T) :-
-    fang_gu_jumped(FG, _, N),
-    T = night(N, RoleOrd, 3),
-    other_night_role_order(fang_gu, RoleOrd).
+% snv_demon_killed(Target, N) - Target was killed by demon on night N
+snv_demon_killed(FG, N) :-
+    fang_gu_jumped(FG, _, N).
 
 dead_at_time(FG, T) :-
     fang_gu_jumped(FG, _, N),
@@ -93,7 +92,5 @@ demon_kill_blocked(fang_gu_dead, P, T) :-
     fang_gu_jumped(P, _, _),
     reminder_on(fang_gu_dead, P, T).
 
-snv_demon_killed(Target, T) :-
-    fang_gu_normal_kill(_, Target, N),
-    T = night(N, RoleOrd, 3),
-    other_night_role_order(fang_gu, RoleOrd).
+snv_demon_killed(Target, N) :-
+    fang_gu_normal_kill(_, Target, N).
