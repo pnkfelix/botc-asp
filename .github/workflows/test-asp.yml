@@ -28,3 +28,20 @@ jobs:
       - name: Run ASP tests
         run: |
           nix shell nixpkgs#clingo nixpkgs#python3 --command python run_tests.py --format=plain --no-save-timing-data --hide-timing-history
+
+  # Diagnostic job: runs tests with extended timeout to distinguish
+  # "just over the limit" from "truly exploded" when tests timeout
+  test-extended-timeout:
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Don't block PR on this job
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Run ASP tests (extended timeout)
+        run: |
+          echo "Running with 60s timeout (12x normal) for diagnostic purposes"
+          nix shell nixpkgs#clingo nixpkgs#python3 --command python run_tests.py --timeout=60 --format=plain --no-save-timing-data --hide-timing-history
