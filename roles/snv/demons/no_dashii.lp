@@ -34,11 +34,19 @@ snv_demon_killed(Target, N) :-
 
 % Find the No Dashii's townsfolk neighbors
 % A "townsfolk neighbor" is the closest living Townsfolk in each direction
+%
+% OPTIMIZATION: Neighbors only change when someone dies. Compute at state-change
+% points (night start, dawn, after execution) instead of every time(T).
+% This reduces O(all_substeps) to O(nights + days).
 
-% Clockwise townsfolk neighbor
+nd_state_time(night(N, 0, 0)) :- night_number(N).
+nd_state_time(dawn(N)) :- day_number(N).
+nd_state_time(day(N, exec)) :- day_number(N).
+
+% Clockwise townsfolk neighbor (computed at state times only)
 nd_townsfolk_neighbor_clockwise(ND, P, T) :-
     assigned(0, ND, no_dashii),
-    time(T),
+    nd_state_time(T),
     alive(ND, T),
     player(P), P != ND,
     alive(P, T),
@@ -48,7 +56,7 @@ nd_townsfolk_neighbor_clockwise(ND, P, T) :-
 
 nd_closer_townsfolk_clockwise(ND, D, T) :-
     assigned(0, ND, no_dashii),
-    time(T),
+    nd_state_time(T),
     alive(ND, T),
     player(P), P != ND,
     alive(P, T),
@@ -64,7 +72,7 @@ nd_closer_townsfolk_clockwise(ND, D, T) :-
 % Counter-clockwise distance from ND to P is the clockwise distance from P to ND
 nd_townsfolk_neighbor_counterclockwise(ND, P, T) :-
     assigned(0, ND, no_dashii),
-    time(T),
+    nd_state_time(T),
     alive(ND, T),
     player(P), P != ND,
     alive(P, T),
@@ -74,7 +82,7 @@ nd_townsfolk_neighbor_counterclockwise(ND, P, T) :-
 
 nd_closer_townsfolk_counterclockwise(ND, D, T) :-
     assigned(0, ND, no_dashii),
-    time(T),
+    nd_state_time(T),
     alive(ND, T),
     player(P), P != ND,
     alive(P, T),
@@ -86,13 +94,23 @@ nd_closer_townsfolk_counterclockwise(ND, D, T) :-
     clockwise_distance(P2, ND, D2),  % counter-clockwise distance from ND to P2
     D2 < D.
 
-% The two townsfolk neighbors are poisoned while No Dashii is alive
+% Place poison token at state times (inertia carries it forward)
 reminder_on(nd_poisoned, P, T) :-
+    nd_state_time(T),
     nd_townsfolk_neighbor_clockwise(ND, P, T),
     alive(ND, T).
 
 reminder_on(nd_poisoned, P, T) :-
+    nd_state_time(T),
     nd_townsfolk_neighbor_counterclockwise(ND, P, T),
     alive(ND, T).
+
+% Remove poison at state times when ND dies or neighbor changes
+token_removed(nd_poisoned, P, T) :-
+    nd_state_time(T),
+    reminder_on(nd_poisoned, P, TPrev),
+    next(TPrev, T),
+    not nd_townsfolk_neighbor_clockwise(_, P, T),
+    not nd_townsfolk_neighbor_counterclockwise(_, P, T).
 
 causes_impairment(nd_poisoned).

@@ -58,16 +58,9 @@ vigor_minion_keeps_ability(Minion) :-
     other_night_role_order(vigormortis, RoleOrd).
 
 % The chosen townsfolk is poisoned permanently (as long as the minion stays dead)
-reminder_on(vigor_poisoned, P, T) :-
+% OPTIMIZATION: Place token at kill time, inertia carries it forward
+reminder_on(vigor_poisoned, P, night(N, RoleOrd, 3)) :-
     vigor_poison_target(_, P, N),
-    time(T), T = night(N2, _, _), N2 >= N.
-
-reminder_on(vigor_poisoned, P, T) :-
-    vigor_poison_target(_, P, N),
-    time(T), T = day(N2, _), N2 >= N.
-
-reminder_on(vigor_poisoned, P, T) :-
-    vigor_poison_target(_, P, N),
-    time(T), T = dawn(N2), N2 >= N.
+    other_night_role_order(vigormortis, RoleOrd).
 
 causes_impairment(vigor_poisoned).

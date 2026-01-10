@@ -62,17 +62,16 @@ role_assignment_changes_to(night(N, RoleOrd, 3), Demon, snake_charmer) :-
     N > 1.
 
 % Former demon is poisoned after becoming snake charmer
-reminder_on(sc_poisoned, Demon, T) :-
+% OPTIMIZATION: Place token at swap time, inertia carries it forward
+reminder_on(sc_poisoned, Demon, night(N, RoleOrd, 3)) :-
     snake_charmer_swaps(_, Demon, _, N),
-    time(T), T = night(N2, _, _), N2 >= N.
+    first_night_role_order(snake_charmer, RoleOrd),
+    N = 1.
 
-reminder_on(sc_poisoned, Demon, T) :-
+reminder_on(sc_poisoned, Demon, night(N, RoleOrd, 3)) :-
     snake_charmer_swaps(_, Demon, _, N),
-    time(T), T = day(N2, _), N2 >= N.
-
-reminder_on(sc_poisoned, Demon, T) :-
-    snake_charmer_swaps(_, Demon, _, N),
-    time(T), T = dawn(N2), N2 >= N.
+    other_night_role_order(snake_charmer, RoleOrd),
+    N > 1.
 
 causes_impairment(sc_poisoned).
 

@@ -37,11 +37,11 @@ vortox_in_play :-
 
 % All Townsfolk are effectively poisoned (their abilities yield false info)
 % This is modeled by making all townsfolk "impaired" when Vortox is in play
-reminder_on(vortox_false_info, P, T) :-
+% OPTIMIZATION: Place token at game start, inertia carries it forward
+reminder_on(vortox_false_info, P, night(1, 0, 0)) :-
     vortox_in_play,
     assigned(0, P, R),
-    townsfolk(R),
-    time(T).
+    townsfolk(R).
 
 causes_impairment(vortox_false_info).
 
