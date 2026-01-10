@@ -241,12 +241,13 @@ functioning(P, T) :- player(P), time(T), not impaired(P, T).
 % (Each demon's .lp file adds: demon_kill_token(X_dead).)
 
 % Generic: kill succeeds if death token is on player and not protected
-% IMPORTANT: Only check at final_night_time to avoid grounding explosion.
-% Demon kill tokens persist via inertia; checking at every time point causes timeouts.
+% GROUNDING OPTIMIZATION: Start with small domains (final_night_time, player, demon_kill_token)
+% then look up reminder_on. This avoids iterating through all reminder_on atoms.
 demon_kill_succeeds(P, T) :-
     final_night_time(N, T),
-    reminder_on(Token, P, T),
+    player(P),
     demon_kill_token(Token),
+    reminder_on(Token, P, T),
     not protected_from_demon(P, T),
     not demon_kill_blocked(Token, P, T).
 
