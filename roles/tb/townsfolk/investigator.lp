@@ -4,13 +4,15 @@ first_night_substep(investigator, 1, st_places(inv_minion)).
 first_night_substep(investigator, 2, st_places(inv_wrong)).
 first_night_substep(investigator, 3, st_tells(inv_info)).
 
+% Place reminder tokens for anyone who received the investigator token
+% (includes both actual investigators and drunks/marionettes who think they are)
 { reminder_on(inv_minion, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(investigator, RoleOrd),
-    assigned(0, _, investigator).
+    received(_, investigator).
 
 { reminder_on(inv_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(investigator, RoleOrd),
-    assigned(0, _, investigator).
+    received(_, investigator).
 
 :- reminder_on(inv_minion, P, _),
    reminder_on(inv_wrong, P, _).

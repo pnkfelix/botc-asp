@@ -24,3 +24,10 @@ st_tells_core(chef, Chef, count(N), T) :-
     first_night_role_order(chef, RoleOrd),
     assigned(0, Chef, chef),
     not functioning(Chef, T).
+
+% Drunk/Marionette who think they're Chef get arbitrary info
+{ st_tells_core(chef, Chef, count(N), T) : N = 0..player_count/2 } = 1 :-
+    T = night(1, RoleOrd, 1),
+    first_night_role_order(chef, RoleOrd),
+    received(Chef, chef),
+    not assigned(0, Chef, chef).

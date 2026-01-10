@@ -4,13 +4,15 @@ first_night_substep(washerwoman, 1, st_places(ww_townsfolk)).
 first_night_substep(washerwoman, 2, st_places(ww_wrong)).
 first_night_substep(washerwoman, 3, st_tells(ww_info)).
 
+% Place reminder tokens for anyone who received the washerwoman token
+% (includes both actual washerwomen and drunks/marionettes who think they are)
 { reminder_on(ww_townsfolk, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(washerwoman, RoleOrd),
-    assigned(0, _, washerwoman).
+    received(_, washerwoman).
 
 { reminder_on(ww_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(washerwoman, RoleOrd),
-    assigned(0, _, washerwoman).
+    received(_, washerwoman).
 
 :- reminder_on(ww_townsfolk, P, T1),
    reminder_on(ww_wrong, P, T2).

@@ -4,13 +4,15 @@ first_night_substep(librarian, 1, st_places(lib_outsider)).
 first_night_substep(librarian, 2, st_places(lib_wrong)).
 first_night_substep(librarian, 3, st_tells(lib_info)).
 
+% Place reminder tokens for anyone who received the librarian token
+% (includes both actual librarians and drunks/marionettes who think they are)
 { reminder_on(lib_outsider, P, night(1, RoleOrd, 1)) : player(P) } = 1 :-
     first_night_role_order(librarian, RoleOrd),
-    assigned(0, _, librarian).
+    received(_, librarian).
 
 { reminder_on(lib_wrong, P, night(1, RoleOrd, 2)) : player(P) } = 1 :-
     first_night_role_order(librarian, RoleOrd),
-    assigned(0, _, librarian).
+    received(_, librarian).
 
 :- reminder_on(lib_outsider, P, _),
    reminder_on(lib_wrong, P, _).

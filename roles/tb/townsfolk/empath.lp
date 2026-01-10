@@ -4,7 +4,7 @@ first_night_substep(empath, 1, st_tells(empath_info)).
 other_night_substep(empath, 1, st_tells(empath_info)).
 
 empath_evil_neighbor_count(Empath, N, T) :-
-    assigned(0, Empath, empath),
+    received(Empath, empath),
     time(T),
     N = #count { P : living_neighbor(Empath, P, T), registers_as(P, evil, T) }.
 
@@ -20,3 +20,10 @@ st_tells_core(empath, Empath, count(N), T) :-
     assigned(0, Empath, empath),
     alive(Empath, T),
     not functioning(Empath, T).
+
+% Drunk/Marionette who think they're Empath get arbitrary info
+{ st_tells_core(empath, Empath, count(N), T) : N = 0..2 } = 1 :-
+    acting_role(T, empath),
+    received(Empath, empath),
+    not assigned(0, Empath, empath),
+    alive(Empath, T).
