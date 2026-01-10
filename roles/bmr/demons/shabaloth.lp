@@ -36,20 +36,26 @@ player_chooses(shabaloth, Shabaloth, point(P), night(N, RoleOrd, 3)) :-
     other_night_role_order(shabaloth, RoleOrd),
     shabaloth_target(Shabaloth, P, 2, N).
 
-% Both targets die if Shabaloth is functioning
-shabaloth_kill_succeeds(P, T) :-
+% Place the dead token when Shabaloth targets someone (if functioning)
+reminder_on(shabaloth_dead, P, night(N, RoleOrd, 4)) :-
     shabaloth_target(Shabaloth, P, _, N),
     assigned(0, Shabaloth, shabaloth),
     night_number(N), N > 1,
     other_night_role_order(shabaloth, RoleOrd),
-    T = night(N, RoleOrd, 4),
-    functioning(Shabaloth, T),
+    functioning(Shabaloth, night(N, RoleOrd, 4)).
+
+% Kill succeeds where the token is present and target is not protected
+shabaloth_kill_succeeds(P, T) :-
+    reminder_on(shabaloth_dead, P, T),
     not protected_from_demon(P, T).
 
-reminder_on(shabaloth_dead, P, T) :- shabaloth_kill_succeeds(P, T).
-
 dead_at_time(P, T) :- shabaloth_kill_succeeds(P, T).
-died(P, T) :- shabaloth_kill_succeeds(P, KillTime), KillTime = night(N, _, _), final_night_time(N, T), alive(P, night(N, 0, 0)).
+
+% Death at final night time (works because token persists)
+died(P, T) :-
+    final_night_time(N, T),
+    shabaloth_kill_succeeds(P, T),
+    alive(P, night(N, 0, 0)).
 
 % === Regurgitation ===
 % A dead player killed last night might come back to life
