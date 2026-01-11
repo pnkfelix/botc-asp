@@ -220,28 +220,39 @@ def run_tests(test_files: list[Path], timeout: int = DEFAULT_TIMEOUT, save_timin
 
     # Print summary
     pass_count = sum(1 for r in results if r[4])
-    fail_count = len(results) - pass_count
+    timeout_count = sum(1 for r in results if not r[4] and r[2] == "TIMEOUT")
+    fail_count = sum(1 for r in results if not r[4] and r[2] != "TIMEOUT")
     outlier_count = sum(1 for r in results if r[6])
 
     if use_rich:
         console.print()
-        if fail_count == 0:
+        if fail_count == 0 and timeout_count == 0:
             msg = f"[green bold]All {pass_count} tests passed![/green bold]"
             if show_history and outlier_count > 0:
                 msg += f" [yellow]({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})[/yellow]"
             console.print(msg)
         else:
-            console.print(f"[red bold]{fail_count} failed[/red bold], [green]{pass_count} passed[/green]")
+            parts = [f"[green]{pass_count} passed[/green]"]
+            if fail_count > 0:
+                parts.append(f"[red bold]{fail_count} failed[/red bold]")
+            if timeout_count > 0:
+                parts.append(f"[yellow]{timeout_count} timed out[/yellow]")
+            console.print(", ".join(parts))
     else:
         print()
-        msg = f"Results: {pass_count} passed, {fail_count} failed"
+        parts = [f"{pass_count} passed"]
+        if fail_count > 0:
+            parts.append(f"{fail_count} failed")
+        if timeout_count > 0:
+            parts.append(f"{timeout_count} timed out")
+        msg = f"Results: {', '.join(parts)}"
         if show_history and outlier_count > 0:
             msg += f" ({outlier_count} timing outlier{'s' if outlier_count > 1 else ''})"
         print(msg)
 
     # Print summary line of failed tests for easy copy/paste
     # Separate outright failures (wrong result) from timeouts
-    if fail_count > 0:
+    if fail_count > 0 or timeout_count > 0:
         outright_failures = [r[0] for r in results if not r[4] and r[2] != "TIMEOUT"]
         timeouts = [r[0] for r in results if not r[4] and r[2] == "TIMEOUT"]
 
@@ -257,7 +268,8 @@ def run_tests(test_files: list[Path], timeout: int = DEFAULT_TIMEOUT, save_timin
         else:
             print(f"\n{summary_line}")
 
-    return fail_count
+    # Return non-zero if any tests failed or timed out
+    return fail_count + timeout_count
 
 
 def main():
@@ -325,7 +337,7 @@ def main():
         print("(Install 'rich' for nicer output: pip install rich)")
         print()
 
-    fail_count = run_tests(
+    error_count = run_tests(
         test_files,
         timeout=args.timeout,
         save_timings=not args.no_save_timing_data,
@@ -333,7 +345,7 @@ def main():
         use_rich=use_rich
     )
 
-    return 1 if fail_count > 0 else 0
+    return 1 if error_count > 0 else 0
 
 
 if __name__ == "__main__":
