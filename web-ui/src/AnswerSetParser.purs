@@ -715,6 +715,22 @@ buildGameState atoms targetTime =
     -- Get received tokens
     tokens = mapMaybe getReceived atoms
 
+    -- Get role change notifications (starpass, Scarlet Woman, etc.)
+    -- These represent when a player is told their new role
+    roleChangeNotifications = mapMaybe getRoleChangeNotification atoms
+
+    -- For each player, find the most recent role change at or before target time
+    getEffectiveToken playerName =
+      let
+        -- All role changes for this player at or before target time
+        validChanges = filter (\rc ->
+          rc.player == playerName &&
+          (rc.time == targetTime || compareTimePoints rc.time targetTime == LT)
+        ) roleChangeNotifications
+        -- Sort by time descending to get most recent first
+        sorted = sortBy (\a b -> compareTimePoints b.time a.time) validChanges
+      in head sorted # map _.newRole
+
     -- Get all death events (d_died atoms)
     -- A player is dead at time T if any d_died(player, T') exists where T' <= T
     allDeaths = mapMaybe getDeath atoms
@@ -741,7 +757,12 @@ buildGameState atoms targetTime =
     players = chairs # map \c ->
       let
         role = fromMaybe "?" $ lookup c.name assignments
-        token = fromMaybe role $ lookup c.name tokens
+        -- Token priority:
+        -- 1. If player received a role change notification (starpass), use the new role
+        -- 2. Otherwise use their received token (what they believe they are)
+        -- 3. Fall back to their actual role if no received token
+        receivedToken = fromMaybe role $ lookup c.name tokens
+        token = fromMaybe receivedToken $ getEffectiveToken c.name
         isAlive = not (elem c.name deadPlayersAtTime)
         hasUsedGhostVote = elem c.name ghostVoteUsedPlayers
       in { name: c.name, chair: c.pos, role, token, alive: isAlive, ghostVoteUsed: hasUsedGhostVote }
@@ -804,6 +825,10 @@ buildGameState atoms targetTime =
 
     getReceived (Received player token) = Just { key: player, value: token }
     getReceived _ = Nothing
+
+    -- Extract role change notifications (starpass, Scarlet Woman, etc.)
+    getRoleChangeNotification (StTellsRoleChange player newRole time) = Just { player, newRole, time }
+    getRoleChangeNotification _ = Nothing
 
     -- Extract death event from Died atom
     getDeath (Died player time) = Just { player, time }
