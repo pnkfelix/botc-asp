@@ -22,7 +22,7 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
 
-DEFAULT_TIMEOUT = 5
+DEFAULT_TIMEOUT = 10
 HOSTNAME = socket.gethostname()
 
 
