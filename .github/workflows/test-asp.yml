@@ -43,5 +43,5 @@ jobs:
 
       - name: Run ASP tests (extended timeout)
         run: |
-          echo "Running with 60s timeout (12x normal) for diagnostic purposes"
+          echo "Running with 60s timeout (6x normal) for diagnostic purposes"
           nix shell nixpkgs#clingo nixpkgs#python3 --command python run_tests.py --timeout=60 --format=plain --no-save-timing-data --hide-timing-history
