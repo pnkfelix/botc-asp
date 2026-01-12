@@ -49,6 +49,7 @@ needs_night(3).
 #show received/2.
 #show reminder_on/3.
 #show character_assignment_state_at_time/3.  % Fine-grained role at each time point
+#show grimoire_token/3.  % Token to display for player at time (handles starpass)
 
 % Delta predicates (d_ prefix = events/changes, not ongoing state)
 % Parser derives alive/dead state from d_died events

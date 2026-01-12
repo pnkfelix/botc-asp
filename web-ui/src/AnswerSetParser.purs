@@ -46,6 +46,7 @@ data Atom
   | Bluff String                        -- bluff(role) - role shown to demon as bluff
   | CharacterAssignmentAtTime TimePoint String String  -- character_assignment_state_at_time(time, player, role)
   | CausesImpairment String             -- causes_impairment(token) - token causes drunk/poison effect
+  | GrimoireToken String String TimePoint  -- grimoire_token(player, token, time) - what token to display
   | UnknownAtom String                  -- anything we don't recognize
 
 derive instance eqAtom :: Eq Atom
@@ -90,6 +91,7 @@ atomCategory = case _ of
   ReminderOn _ _ _      -> StatePredicate
   GhostVoteUsed _ _     -> StatePredicate
   CharacterAssignmentAtTime _ _ _ -> StatePredicate  -- Role at specific time point
+  GrimoireToken _ _ _   -> StatePredicate  -- Token to display at time point
   -- Structural predicates: game setup and timeline markers
   Assigned _ _ _        -> StructuralPredicate
   Received _ _          -> StructuralPredicate
@@ -252,7 +254,8 @@ parseAtom atomStr =
       parseBag trimmed <|>
       parseBluff trimmed <|>
       parseCharacterAssignmentAtTime trimmed <|>
-      parseCausesImpairment trimmed
+      parseCausesImpairment trimmed <|>
+      parseGrimoireToken trimmed
 
 -- | Parse assigned(T, Player, Role)
 parseAssigned :: String -> Maybe Atom
@@ -514,6 +517,22 @@ parseCausesImpairment s = do
   let rest = drop (length pattern) (take (length s - 1) s)  -- Remove "causes_impairment(" and ")"
   Just $ CausesImpairment (trim rest)
 
+-- | Parse grimoire_token(Player, Token, Time)
+parseGrimoireToken :: String -> Maybe Atom
+parseGrimoireToken s =
+  let pattern = "grimoire_token("
+  in if take (length pattern) s == pattern
+     then
+       let rest = drop (length pattern) (take (length s - 1) s)
+       in case splitAtFirstComma rest of
+            Just { before: player, after: rest1 } ->
+              case splitAtFirstComma rest1 of
+                Just { before: token, after: timeStr } ->
+                  Just $ GrimoireToken (trim player) (trim token) (parseTime (trim timeStr))
+                Nothing -> Nothing
+            Nothing -> Nothing
+     else Nothing
+
 -- | Parse character_assignment_state_at_time(Time, Player, Role)
 parseCharacterAssignmentAtTime :: String -> Maybe Atom
 parseCharacterAssignmentAtTime s =
@@ -712,8 +731,12 @@ buildGameState atoms targetTime =
     -- Use fine-grained if available, otherwise fall back to coarse-grained
     assignments = if null fineGrainedAssignments then coarseAssignments else fineGrainedAssignments
 
-    -- Get received tokens
+    -- Get received tokens (fallback for answer sets without grimoire_token)
     tokens = mapMaybe getReceived atoms
+
+    -- Get grimoire_token from ASP - the source of truth for what token to display
+    -- grimoire_token/3 handles starpass, Scarlet Woman, etc. automatically
+    grimoireTokens = mapMaybe (getGrimoireTokenAt targetTime) atoms
 
     -- Get all death events (d_died atoms)
     -- A player is dead at time T if any d_died(player, T') exists where T' <= T
@@ -741,7 +764,12 @@ buildGameState atoms targetTime =
     players = chairs # map \c ->
       let
         role = fromMaybe "?" $ lookup c.name assignments
-        token = fromMaybe role $ lookup c.name tokens
+        -- Token priority (simplified - ASP handles the logic now):
+        -- 1. Use grimoire_token from ASP if available (handles starpass, etc.)
+        -- 2. Fall back to received token (for backward compat with older answer sets)
+        -- 3. Fall back to actual role if no token info
+        receivedToken = fromMaybe role $ lookup c.name tokens
+        token = fromMaybe receivedToken $ lookup c.name grimoireTokens
         isAlive = not (elem c.name deadPlayersAtTime)
         hasUsedGhostVote = elem c.name ghostVoteUsedPlayers
       in { name: c.name, chair: c.pos, role, token, alive: isAlive, ghostVoteUsed: hasUsedGhostVote }
@@ -804,6 +832,12 @@ buildGameState atoms targetTime =
 
     getReceived (Received player token) = Just { key: player, value: token }
     getReceived _ = Nothing
+
+    -- Extract grimoire_token at target time from ASP
+    -- grimoire_token/3 is the source of truth for what token to display
+    getGrimoireTokenAt t (GrimoireToken player token time) =
+      if time == t then Just { key: player, value: token } else Nothing
+    getGrimoireTokenAt _ _ = Nothing
 
     -- Extract death event from Died atom
     getDeath (Died player time) = Just { player, time }
@@ -1043,6 +1077,7 @@ atomToPredicateName = case _ of
   Bluff _                -> { name: "bluff", arity: 1 }
   CharacterAssignmentAtTime _ _ _ -> { name: "character_assignment_state_at_time", arity: 3 }
   CausesImpairment _     -> { name: "causes_impairment", arity: 1 }
+  GrimoireToken _ _ _    -> { name: "grimoire_token", arity: 3 }
   UnknownAtom s          -> { name: takeUntilParen s, arity: 0 }
   where
     takeUntilParen s =

@@ -671,9 +671,29 @@ reminder_on(ex_d5, P, day(5, exec)) :- executed(P, 5).
 % ===========================================================================
 
 % grimoire_token(Player, RoleToken, Time) - what role token to display for a player
-% This is the token they received (what they think they are), not their true role.
-% A Drunk with the Chef token should display as Chef.
-grimoire_token(P, R, T) :- received(P, R), time(T).
+% This is the token they hold (what they think they are), not their true role.
+% A Drunk with the Chef token displays as Chef.
+% After starpass/SW takeover, the new demon displays as Imp (or other demon).
+%
+% Uses inertia like character_assignment_state_at_time:
+% 1. Initial token is from received(P, R) at night(1, 0, 0)
+% 2. Token persists through time unless st_tells_role_change occurs
+% 3. When player is told their new role, token updates to that role
+
+% Initial grimoire token from what they received
+grimoire_token(P, R, night(1, 0, 0)) :- received(P, R).
+
+% Inertia: token persists through time unless a role change notification occurred
+grimoire_token(P, R, T2) :-
+    grimoire_token(P, R, T1),
+    next(T1, T2),
+    not grimoire_token_changed_at(P, T2).
+
+% Update token when ST tells player their new role (starpass, Scarlet Woman, etc.)
+grimoire_token(P, R, T) :- st_tells_role_change(P, R, T).
+
+% Helper: detect that a token change occurred at this time
+grimoire_token_changed_at(P, T) :- st_tells_role_change(P, _, T).
 
 % grimoire_reminder(Player, ReminderToken, Time) - which reminder tokens to show
 grimoire_reminder(P, Token, T) :- reminder_on(Token, P, T).
