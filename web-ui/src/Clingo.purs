@@ -5,10 +5,8 @@ module Clingo
   , ClingoTime
   , ClingoError
   , SolveResult(..)
-  , GroundResult(..)
   , ScriptRoles
   , run
-  , ground
   , init
   , restart
   , resolveIncludes
@@ -78,24 +76,13 @@ data SolveResult
   | OptimumFound ClingoResult
   | Error String
 
--- | Result from grounding (may succeed with output, or fail with error)
-data GroundResult
-  = GroundSuccess String    -- The ground program text
-  | GroundError String      -- Error message (e.g., unsupported option)
-
 -- | Foreign imports
 foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
-foreign import groundImpl :: String -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
 foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
 foreign import resolveIncludesWithPathImpl :: String -> String -> Fn1 String (Nullable String) -> String
 foreign import extractScriptRolesImpl :: String -> ScriptRoles
-foreign import showForeignImpl :: Foreign -> String
-
--- | Helper to stringify a foreign value for debugging
-showForeign :: Foreign -> String
-showForeign = showForeignImpl
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit
@@ -112,34 +99,11 @@ run program numModels = do
   result <- toAffE (runImpl program numModels)
   pure $ parseResult result
 
--- | Ground a program without solving (outputs ground program text)
--- | This tests whether clingo-wasm supports --mode=gringo
-ground :: String -> Aff GroundResult
-ground program = do
-  result <- toAffE (groundImpl program)
-  pure $ parseGroundResult result
-
--- | Parse the raw foreign result from grounding
--- | clingo-wasm returns JSON with various fields depending on success/error
-parseGroundResult :: Foreign -> GroundResult
-parseGroundResult foreign' =
-  let
-    raw :: { "Result" :: String }
-    raw = unsafeFromForeign foreign'
-  in
-    case raw."Result" of
-      "ERROR" ->
-        let
-          err :: ClingoError
-          err = unsafeFromForeign foreign'
-        in
-          GroundError err."Error"
-      -- When grounding succeeds, clingo may return SATISFIABLE with no witnesses
-      -- or the output might be in a different field. We'll need to inspect what we get.
-      -- For now, return the whole JSON stringified so we can see what clingo-wasm returns
-      other ->
-        -- Try to extract any useful output - for now just show what we got
-        GroundSuccess ("Result type: " <> other <> "\nFull result: " <> showForeign foreign')
+-- NOTE: Extracting the ground program from clingo-wasm is NOT possible.
+-- clingo-wasm hardcodes --outf=2 (JSON), which conflicts with grounding modes:
+--   - --mode=gringo outputs aspif format, not JSON
+--   - --text outputs ground rules as text, conflicts with --outf=2
+-- A fork of clingo-wasm would be needed to expose a grounding API.
 
 -- | Parse the raw foreign result into our ADT
 parseResult :: Foreign -> SolveResult

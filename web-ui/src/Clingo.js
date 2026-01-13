@@ -1,9 +1,6 @@
 // FFI bindings for clingo-wasm
 import * as clingo from "clingo-wasm";
 
-// Helper to stringify a foreign value for debugging
-export const showForeignImpl = (value) => JSON.stringify(value, null, 2);
-
 export const initImpl = (wasmUrl) => () => {
   // The worker runs in a blob context where relative URLs don't work.
   // Construct an absolute URL using the current page location.
@@ -15,11 +12,14 @@ export const initImpl = (wasmUrl) => () => {
 export const runImpl = (program) => (numModels) => () =>
   clingo.run(program, numModels, ["--opt-mode=optN"]);
 
-// Ground only - try to get the ground program without solving
-// Note: clingo-wasm hardcodes --outf=2 (JSON), so we can't use --output=text
-// This just tests if --mode=gringo is supported at all
-export const groundImpl = (program) => () =>
-  clingo.run(program, 0, ["--mode=gringo"]);
+// NOTE: Extracting the ground program from clingo-wasm is NOT possible with
+// the current architecture. clingo-wasm hardcodes --outf=2 (JSON output for
+// answer sets), which conflicts with grounding-only modes:
+//   - --mode=gringo outputs aspif format, not JSON
+//   - --text outputs ground rules as text, conflicts with --outf=2
+// To enable ground program extraction, clingo-wasm would need to be forked
+// to expose a separate grounding API that doesn't use --outf=2.
+// See: https://github.com/domoritz/clingo-wasm
 
 export const restartImpl = (wasmUrl) => () => {
   // Terminate the worker and re-initialize

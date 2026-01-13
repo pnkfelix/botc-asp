@@ -251,16 +251,6 @@ render state =
                   then "Run Clingo"
                   else "Initializing..."
             ]
-        , -- Ground button (experimental - outputs ground program)
-          HH.button
-            [ HP.style $ "padding: 12px 20px; font-size: 16px; cursor: pointer; "
-                <> "background: #9C27B0; color: white; border: none; border-radius: 4px;"
-                <> if state.isGrounding then " opacity: 0.6;" else ""
-            , HE.onClick \_ -> GroundProgram
-            , HP.disabled (state.isGrounding || state.isLoading || not state.isInitialized)
-            , HP.title "Experimental: Try to extract grounded program (--mode=gringo)"
-            ]
-            [ HH.text $ if state.isGrounding then "Grounding..." else "Ground" ]
         , -- Cancel button (only shown when loading)
           if state.isLoading
             then HH.button
@@ -313,9 +303,6 @@ render state =
 
     -- Results display (status and answer set output)
     , renderResult state
-
-    -- Ground result display (when Ground button is clicked)
-    , renderGroundResult state.groundResult
 
     -- Timing history table (shows after any runs)
     , renderTimingTable state.timingHistory
@@ -703,36 +690,6 @@ renderCopyIcon =
             []
         ]
     ]
-
--- | Render the ground program result (experimental feature for ZDD/SAT)
-renderGroundResult :: forall m. Maybe String -> H.ComponentHTML Action Slots m
-renderGroundResult maybeResult =
-  case maybeResult of
-    Nothing -> HH.text ""  -- Don't render anything if no ground result
-    Just result ->
-      HH.div
-        [ HP.style "margin: 20px 0; padding: 15px; background: #f3e5f5; border-radius: 4px; border: 1px solid #ce93d8;" ]
-        [ HH.div
-            [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
-            [ HH.h3
-                [ HP.style "margin: 0; color: #7b1fa2; font-size: 14px;" ]
-                [ HH.text "Ground Program Output (Experimental)" ]
-            , HH.button
-                [ HP.style "background: #9c27b0; color: white; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px;"
-                , HE.onClick \_ -> ClearGroundResult
-                ]
-                [ HH.text "Clear" ]
-            ]
-        , HH.p
-            [ HP.style "margin: 0 0 10px 0; color: #666; font-size: 11px; font-style: italic;" ]
-            [ HH.text "This shows what clingo-wasm returns when called with --mode=gringo --output=text" ]
-        , HH.pre
-            [ HP.style $ "background: white; padding: 10px; border-radius: 4px; border: 1px solid #ce93d8; "
-                <> "font-family: monospace; font-size: 11px; white-space: pre-wrap; word-wrap: break-word; "
-                <> "max-height: 300px; overflow: auto; margin: 0;"
-            ]
-            [ HH.text result ]
-        ]
 
 -- | Render the timing history table
 -- | Shows a table with diff description, model limit, and timing for each run
