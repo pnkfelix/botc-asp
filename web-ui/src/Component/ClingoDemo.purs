@@ -259,6 +259,26 @@ handleAction = case _ of
     H.liftAff $ Clingo.restart "./clingo.wasm"
     H.modify_ \s -> s { isLoading = false, result = Just (ResultError "Solve cancelled by user") }
 
+  GroundProgram -> do
+    -- Ground the program using --mode=gringo to get ground program text
+    H.modify_ \s -> s { isGrounding = true, groundResult = Nothing }
+    state <- H.get
+    -- Build file resolver for #include directives
+    let resolver filename = Map.lookup filename state.files
+    let entryFile = state.currentFile
+    let entryProgram = fromMaybe "" $ Map.lookup entryFile state.files
+    let fullProgram = Clingo.resolveIncludesWithPath entryProgram entryFile resolver
+    -- Call grounding
+    result <- H.liftAff $ Clingo.ground fullProgram
+    -- Update state with result
+    let resultText = case result of
+          Clingo.GroundSuccess text -> text
+          Clingo.GroundError err -> "ERROR: " <> err
+    H.modify_ \s -> s { isGrounding = false, groundResult = Just resultText }
+
+  ClearGroundResult ->
+    H.modify_ \s -> s { groundResult = Nothing }
+
   SelectModel idx ->
     H.modify_ \s -> s { selectedModelIndex = idx }
 
