@@ -16,9 +16,10 @@ export const runImpl = (program) => (numModels) => () =>
   clingo.run(program, numModels, ["--opt-mode=optN"]);
 
 // Ground only - try to get the ground program without solving
-// This tests whether clingo-wasm supports --mode=gringo
+// Note: clingo-wasm hardcodes --outf=2 (JSON), so we can't use --output=text
+// This just tests if --mode=gringo is supported at all
 export const groundImpl = (program) => () =>
-  clingo.run(program, 0, ["--mode=gringo", "--output=text"]);
+  clingo.run(program, 0, ["--mode=gringo"]);
 
 export const restartImpl = (wasmUrl) => () => {
   // Terminate the worker and re-initialize
