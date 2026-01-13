@@ -238,6 +238,8 @@ initialState =
   , timingHistory: []      -- No timing history initially
   , nextRunIndex: 1        -- Start run indexing at 1
   , selectedTimingEntry: Nothing  -- No diff modal initially
+  , groundResult: Nothing  -- No ground result initially
+  , isGrounding: false     -- Not grounding initially
   }
 
 -- | Get current file content from state

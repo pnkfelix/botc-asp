@@ -1,6 +1,9 @@
 // FFI bindings for clingo-wasm
 import * as clingo from "clingo-wasm";
 
+// Helper to stringify a foreign value for debugging
+export const showForeignImpl = (value) => JSON.stringify(value, null, 2);
+
 export const initImpl = (wasmUrl) => () => {
   // The worker runs in a blob context where relative URLs don't work.
   // Construct an absolute URL using the current page location.
@@ -11,6 +14,11 @@ export const initImpl = (wasmUrl) => () => {
 
 export const runImpl = (program) => (numModels) => () =>
   clingo.run(program, numModels, ["--opt-mode=optN"]);
+
+// Ground only - try to get the ground program without solving
+// This tests whether clingo-wasm supports --mode=gringo
+export const groundImpl = (program) => () =>
+  clingo.run(program, 0, ["--mode=gringo", "--output=text"]);
 
 export const restartImpl = (wasmUrl) => () => {
   // Terminate the worker and re-initialize
