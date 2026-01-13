@@ -76,6 +76,9 @@ type State =
   , nextRunIndex :: Int                    -- Counter for unique run indices
   -- Diff modal (shows detailed diff when clicking a timing table row)
   , selectedTimingEntry :: Maybe TimingEntry  -- Entry to show in diff modal
+  -- Ground program experiment (for ZDD/SAT exploration)
+  , groundResult :: Maybe String              -- Raw output from grounding attempt
+  , isGrounding :: Boolean                    -- True while grounding is in progress
   }
 
 -- | How to display results
@@ -97,6 +100,8 @@ data Action
   | SetMinNights Int            -- Update min nights via slider (updates inst.lp and URL)
   | SetScript String            -- Update script via dropdown (updates inst.lp and URL)
   | RunClingo
+  | GroundProgram                -- Experimental: Try to extract ground program
+  | ClearGroundResult            -- Clear the ground result display
   | CancelSolve
   | SelectModel Int             -- Select which model to display in Timeline/Grimoire
   | PrevAnswerSetPage

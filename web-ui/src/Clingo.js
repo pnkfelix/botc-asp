@@ -12,14 +12,36 @@ export const initImpl = (wasmUrl) => () => {
 export const runImpl = (program) => (numModels) => () =>
   clingo.run(program, numModels, ["--opt-mode=optN"]);
 
-// NOTE: Extracting the ground program from clingo-wasm is NOT possible with
-// the current architecture. clingo-wasm hardcodes --outf=2 (JSON output for
-// answer sets), which conflicts with grounding-only modes:
-//   - --mode=gringo outputs aspif format, not JSON
-//   - --text outputs ground rules as text, conflicts with --outf=2
-// To enable ground program extraction, clingo-wasm would need to be forked
-// to expose a separate grounding API that doesn't use --outf=2.
-// See: https://github.com/domoritz/clingo-wasm
+// Experimental: Try to extract ground program using --text option
+// This wraps the call with a timeout to prevent hanging.
+// The aspif format is line-based text starting with "asp 1 0 0"
+// See: https://potassco.org/clingo/python-api/5.8/clingo/tests/test_aspif.html
+export const groundImpl = (program) => (timeoutMs) => () => {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`Grounding timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  // Try --text which should output human-readable ground rules
+  // clingo-wasm hardcodes --outf=2, so this may conflict or produce interesting results
+  const clingoPromise = clingo.run(program, 0, ["--text"]);
+
+  return Promise.race([clingoPromise, timeoutPromise])
+    .then(result => {
+      // Return whatever we got - stringify to see the full structure
+      return {
+        success: true,
+        resultType: result?.Result || "unknown",
+        raw: JSON.stringify(result, null, 2)
+      };
+    })
+    .catch(err => {
+      return {
+        success: false,
+        error: err.message || String(err),
+        raw: null
+      };
+    });
+};
 
 export const restartImpl = (wasmUrl) => () => {
   // Terminate the worker and re-initialize

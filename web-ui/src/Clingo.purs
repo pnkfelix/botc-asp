@@ -5,8 +5,10 @@ module Clingo
   , ClingoTime
   , ClingoError
   , SolveResult(..)
+  , GroundResult
   , ScriptRoles
   , run
+  , ground
   , init
   , restart
   , resolveIncludes
@@ -76,9 +78,18 @@ data SolveResult
   | OptimumFound ClingoResult
   | Error String
 
+-- | Result from grounding attempt (with timeout)
+type GroundResult =
+  { success :: Boolean
+  , resultType :: String
+  , raw :: String        -- JSON stringified result or null
+  , error :: String      -- Error message if failed
+  }
+
 -- | Foreign imports
 foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
+foreign import groundImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import restartImpl :: String -> Effect (Promise Unit)
 foreign import resolveIncludesImpl :: String -> Fn1 String (Nullable String) -> String
 foreign import resolveIncludesWithPathImpl :: String -> String -> Fn1 String (Nullable String) -> String
@@ -99,11 +110,13 @@ run program numModels = do
   result <- toAffE (runImpl program numModels)
   pure $ parseResult result
 
--- NOTE: Extracting the ground program from clingo-wasm is NOT possible.
--- clingo-wasm hardcodes --outf=2 (JSON), which conflicts with grounding modes:
---   - --mode=gringo outputs aspif format, not JSON
---   - --text outputs ground rules as text, conflicts with --outf=2
--- A fork of clingo-wasm would be needed to expose a grounding API.
+-- | Experimental: Try to ground a program using --text option
+-- | Returns raw output with timeout to prevent hanging
+-- | clingo-wasm hardcodes --outf=2 (JSON), so --text may conflict or produce interesting results
+ground :: String -> Int -> Aff GroundResult
+ground program timeoutMs = do
+  result <- toAffE (groundImpl program timeoutMs)
+  pure $ unsafeFromForeign result
 
 -- | Parse the raw foreign result into our ADT
 parseResult :: Foreign -> SolveResult
