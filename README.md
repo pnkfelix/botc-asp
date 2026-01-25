@@ -124,6 +124,84 @@ npm run build       # Runs all build steps
 npm run dev         # Watch mode with live reload
 ```
 
+## Development Setup
+
+The project requires several tools: **clingo** (ASP solver), **Node.js**, **PureScript**, and **spago** (PureScript build tool). There are two ways to get these installed.
+
+### Option A: Nix (Recommended)
+
+[Nix](https://nixos.org/) provides a reproducible development environment that works identically on macOS and Linux. All dependencies are managed declaratively—no manual installation or version conflicts.
+
+**Install Nix** (if you haven't already):
+```bash
+curl -L https://nixos.org/nix/install | sh
+```
+
+**Enter the development shell:**
+```bash
+# Using shell.nix (works with any Nix installation)
+nix-shell
+
+# Or using flakes (requires Nix 2.4+ with flakes enabled)
+nix develop
+```
+
+**With direnv** (optional, for automatic activation):
+```bash
+# Install direnv, then:
+direnv allow
+# Now the environment activates automatically when you cd into the project
+```
+
+### Option B: Manual Installation
+
+If you prefer not to use Nix, install the tools directly:
+
+**macOS (Homebrew):**
+```bash
+brew install clingo node@20
+npm install -g purescript spago
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+# Clingo
+sudo apt install gringo clasp    # or build from source for latest
+
+# Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install nodejs
+
+# PureScript toolchain
+npm install -g purescript spago
+```
+
+**Linux (Arch):**
+```bash
+sudo pacman -S clingo nodejs npm
+npm install -g purescript spago
+```
+
+### Verify Your Setup
+
+After installation (either method), verify everything works:
+
+```bash
+# Check tool versions
+clingo --version     # Should show clingo 5.x
+node --version       # Should show v20.x or later
+spago --version      # Should show 0.21.x or later
+purs --version       # Should show 0.15.x
+
+# Run ASP tests
+python run_tests.py
+
+# Build the web UI
+cd web-ui
+npm install
+npm run build
+```
+
 ## Design Principles
 
 1. **Declarative game rules**: Game logic is expressed as ASP constraints, not imperative code. This makes rules easy to verify against the official rulebook.
