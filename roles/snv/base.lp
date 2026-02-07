@@ -1,8 +1,12 @@
 % Sects & Violets - Base Definitions
 
+% Promote SNV townsfolk to the generic townsfolk category (separate rules per category: different source)
 townsfolk(X) :- snv_townsfolk(X).
+% Promote SNV outsiders to the generic outsider category
 outsider(X) :- snv_outsider(X).
+% Promote SNV minions to the generic minion category
 minion(X) :- snv_minion(X).
+% Promote SNV demons to the generic demon category
 demon(X) :- snv_demon(X).
 
 snv_townsfolk(clockmaker; dreamer; snake_charmer; mathematician; flowergirl; town_crier; oracle; savant; seamstress; philosopher; artist; juggler; sage).
