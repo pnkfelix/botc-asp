@@ -11,7 +11,8 @@
 % savant_statement(Savant, Day, 2, Statement) - second statement
 % savant_true_statement(Savant, Day, 1 or 2) - which statement is true
 
-% When the savant visits, exactly one statement is true
+% Functioning visit: exactly one of the two statements is true (= 1 cardinality).
+% Can't merge with not-functioning: that rule allows 0, 1, or 2 true statements.
 { savant_true_statement(Savant, N, 1);
   savant_true_statement(Savant, N, 2) } = 1 :-
     savant_visits(Savant, N),
@@ -19,7 +20,8 @@
     alive(Savant, day(N, 0)),
     functioning(Savant, day(N, 0)).
 
-% When not functioning, either or neither could be "true" (from ST's perspective it's arbitrary)
+% Not-functioning visit: ST may make 0, 1, or 2 statements true (unconstrained choice).
+% Can't merge with functioning: that rule enforces exactly-one; this is fully arbitrary.
 { savant_true_statement(Savant, N, 1);
   savant_true_statement(Savant, N, 2) } :-
     savant_visits(Savant, N),
