@@ -4,3 +4,10 @@
 *.timings.*.json
 web-ui/src/EmbeddedPrograms.js
 web-ui/src/BuildInfo.js
+
+# Engine build artifacts
+engine/__pycache__/
+engine-ts/node_modules/
+engine-ts/dist/
+*.pyc
+.DS_Store

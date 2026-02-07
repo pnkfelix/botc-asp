@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant storyteller
+    participant alice
+    participant bob
+    participant charlie
+    participant diana
+    participant eve
+    Note over storyteller,alice,bob,charlie,diana,eve: === NIGHT 1 ===
+    storyteller->>+diana: Demon, wake. Choose someone to kill.
+    diana-->>-storyteller: points at bob
+    Note over storyteller,alice,bob,charlie,diana,eve: === DAY 1 ===
+    Note over storyteller,alice,bob,charlie,diana,eve: bob was found dead!
+    Note over storyteller,alice,bob,charlie,diana,eve: === NIGHT 2 ===
+    storyteller->>+eve: Monk, wake. Choose someone to protect.
+    eve-->>-storyteller: points at alice
+    storyteller->>+diana: Demon, wake. Choose someone to kill.
+    diana-->>-storyteller: points at eve
+    Note over storyteller,alice,bob,charlie,diana,eve: === DAY 2 ===
+    Note over storyteller,alice,bob,charlie,diana,eve: eve was found dead!
+    Note over storyteller,alice,bob,charlie,diana,eve: diana nominates alice
+    Note over storyteller,alice,bob,charlie,diana,eve: alice votes NO
+    Note over storyteller,alice,bob,charlie,diana,eve: charlie votes NO
+    Note over storyteller,alice,bob,charlie,diana,eve: diana votes YES
+    Note over storyteller,alice,bob,charlie,diana,eve: bob votes YES (ghost)
+    Note over storyteller,alice,bob,charlie,diana,eve: eve votes NO (ghost)
+    Note over storyteller,alice,bob,charlie,diana,eve: alice is executed!
