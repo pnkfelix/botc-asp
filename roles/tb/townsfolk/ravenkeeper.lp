@@ -4,14 +4,18 @@ other_night_substep(ravenkeeper, 1, st_asks(choose_player)).
 other_night_substep(ravenkeeper, 2, player_chooses(target)).
 other_night_substep(ravenkeeper, 3, st_tells(rk_info)).
 
+% Ravenkeeper dies tonight (has imp_dead token at their substep)
 rk_died_tonight(RK, N) :-
-    assigned(0, RK, ravenkeeper),
+    T = night(N, RoleOrd, 1),
+    character_assignment_state_at_time(T, RK, ravenkeeper),
     night_number(N), N > 1,
     other_night_role_order(ravenkeeper, RoleOrd),
-    reminder_on(imp_dead, RK, night(N, RoleOrd, 1)).
+    reminder_on(imp_dead, RK, T).
 
-{ rk_choice(RK, P, night(N, RoleOrd, 2)) : player(P) } = 1 :-
-    assigned(0, RK, ravenkeeper),
+% Ravenkeeper chooses a player to learn about (dying ability)
+{ rk_choice(RK, P, T) : player(P) } = 1 :-
+    T = night(N, RoleOrd, 2),
+    character_assignment_state_at_time(T, RK, ravenkeeper),
     other_night_role_order(ravenkeeper, RoleOrd),
     night_number(N), N > 1,
     rk_died_tonight(RK, N).
@@ -25,18 +29,22 @@ rk_choice(RK, P, night(N, RoleOrd, 3)) :-
 player_chooses(ravenkeeper, RK, point(P), T) :-
     rk_choice(RK, P, T).
 
-st_tells_core(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) :-
+% Ravenkeeper learns role of chosen player (functioning)
+st_tells_core(ravenkeeper, RK, point(R), T) :-
+    T = night(N, RoleOrd, 3),
     night_number(N), N > 1,
     other_night_role_order(ravenkeeper, RoleOrd),
-    assigned(0, RK, ravenkeeper),
+    character_assignment_state_at_time(T, RK, ravenkeeper),
     rk_died_tonight(RK, N),
-    functioning(RK, night(N, RoleOrd, 3)),
-    rk_choice(RK, P, night(N, RoleOrd, 3)),
-    may_register_as_role(P, R, night(N, RoleOrd, 3)).
+    functioning(RK, T),
+    rk_choice(RK, P, T),
+    may_register_as_role(P, R, T).
 
-{ st_tells_core(ravenkeeper, RK, point(R), night(N, RoleOrd, 3)) : role(R) } = 1 :-
+% Ravenkeeper learns arbitrary role (not functioning)
+{ st_tells_core(ravenkeeper, RK, point(R), T) : role(R) } = 1 :-
+    T = night(N, RoleOrd, 3),
     night_number(N), N > 1,
     other_night_role_order(ravenkeeper, RoleOrd),
-    assigned(0, RK, ravenkeeper),
+    character_assignment_state_at_time(T, RK, ravenkeeper),
     rk_died_tonight(RK, N),
-    not functioning(RK, night(N, RoleOrd, 3)).
+    not functioning(RK, T).
