@@ -15,12 +15,12 @@ evil_pair_count(N, T) :-
 st_tells_core(chef, Chef, count(N), T) :-
     T = night(1, RoleOrd, 1),
     first_night_role_order(chef, RoleOrd),
-    assigned(0, Chef, chef),
+    character_assignment_state_at_time(T, Chef, chef),
     functioning(Chef, T),
     evil_pair_count(N, T).
 
 { st_tells_core(chef, Chef, count(N), T) : N = 0..player_count/2 } = 1 :-
     T = night(1, RoleOrd, 1),
     first_night_role_order(chef, RoleOrd),
-    assigned(0, Chef, chef),
+    character_assignment_state_at_time(T, Chef, chef),
     not functioning(Chef, T).
