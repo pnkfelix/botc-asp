@@ -11,7 +11,7 @@ other_night_substep(poisoner, 3, st_places(poisoned)).
 { player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
     T = night(1, RoleOrd, 2),
     first_night_role_order(poisoner, RoleOrd),
-    assigned(0, Poisoner, poisoner).
+    character_assignment_state_at_time(T, Poisoner, poisoner).
 
 % Helper: player was reassigned to a different role before night N
 poi_reassigned(P, N) :-
@@ -38,12 +38,16 @@ reminder_on(poi_poisoned, P, night(N, RoleOrd, 3)) :-
     player_chooses(poisoner, _, point(P), night(N, RoleOrd, 2)).
 
 token_removed(poi_poisoned, P, night(N, 0, 0)) :-
+    T = night(N, 0, 0),
     night_number(N), N > 1,
     reminder_on(poi_poisoned, P, day(N-1, exec)),
-    assigned(0, _, poisoner).
+    character_assignment_state_at_time(T, _, poisoner).
 
-% Remove poison token when poisoner is reassigned to a different role
+% Remove poison token when originally assigned poisoner is reassigned to a different role
 % (e.g., via starpass, pit-hag, etc.)
+% Note: We still use assigned(0,...) here because we need to track the original
+% poisoner to know if they were reassigned. The poi_reassigned predicate checks
+% if they were given a new role.
 token_removed(poi_poisoned, Target, night(N, 0, 0)) :-
     night_number(N), N > 1,
     reminder_on(poi_poisoned, Target, day(N-1, exec)),
