@@ -3,12 +3,14 @@
 
 other_night_substep(oracle, 1, st_tells(oracle_info)).
 
-% Count dead evil players
+% Helper: aggregate count of dead players who register as evil at time T.
+% Factored out because #count cannot appear directly in a rule head argument.
 dead_evil_count(N, T) :-
     time(T),
     N = #count { P : dead_at_time(P, T), registers_as(P, evil, T) }.
 
-% Oracle learns the count when functioning (other nights only)
+% Functioning tell: deterministic count of dead evil players.
+% Can't merge with not-functioning rule: this is a normal rule, not a choice rule.
 st_tells_core(oracle, Oracle, count(N), T) :-
     T = night(NightNum, RoleOrd, 1),
     night_number(NightNum), NightNum > 1,
@@ -18,7 +20,8 @@ st_tells_core(oracle, Oracle, count(N), T) :-
     functioning(Oracle, T),
     dead_evil_count(N, T).
 
-% When not functioning, can get any count from 0 to total dead
+% Not-functioning tell: ST freely chooses any count from 0..player_count (choice rule).
+% Can't merge with functioning rule: different semantics (choice vs deterministic).
 { st_tells_core(oracle, Oracle, count(N), T) : N = 0..player_count } = 1 :-
     T = night(NightNum, RoleOrd, 1),
     night_number(NightNum), NightNum > 1,
