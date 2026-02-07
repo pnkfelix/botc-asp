@@ -4,26 +4,32 @@ other_night_substep(monk, 1, st_asks(choose_target)).
 other_night_substep(monk, 2, player_chooses(target)).
 other_night_substep(monk, 3, st_places(monk_protected)).
 
-{ player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)) : player(P), P != Monk } = 1 :-
+% Monk chooses a player to protect (functioning)
+{ player_chooses(monk, Monk, point(P), T) : player(P), P != Monk } = 1 :-
+    T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(monk, RoleOrd),
-    assigned(0, Monk, monk),
+    character_assignment_state_at_time(T, Monk, monk),
     alive(Monk, night(N, 0, 0)),
-    functioning(Monk, night(N, RoleOrd, 2)).
+    functioning(Monk, T).
 
-{ player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)) : player(P), P != Monk } = 1 :-
+% Monk chooses a player to protect (not functioning - choice still happens)
+{ player_chooses(monk, Monk, point(P), T) : player(P), P != Monk } = 1 :-
+    T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(monk, RoleOrd),
-    assigned(0, Monk, monk),
+    character_assignment_state_at_time(T, Monk, monk),
     alive(Monk, night(N, 0, 0)),
-    not functioning(Monk, night(N, RoleOrd, 2)).
+    not functioning(Monk, T).
 
+% Place protection token (only if functioning)
 reminder_on(monk_protected, P, night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
     other_night_role_order(monk, RoleOrd),
-    player_chooses(monk, Monk, point(P), night(N, RoleOrd, 2)),
-    assigned(0, Monk, monk),
-    functioning(Monk, night(N, RoleOrd, 2)).
+    T = night(N, RoleOrd, 2),
+    player_chooses(monk, Monk, point(P), T),
+    character_assignment_state_at_time(T, Monk, monk),
+    functioning(Monk, T).
 
 token_removed(monk_protected, P, night(N, 0, 0)) :-
     night_number(N), N > 1,
