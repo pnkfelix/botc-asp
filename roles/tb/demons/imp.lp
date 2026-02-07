@@ -4,8 +4,7 @@ other_night_substep(imp, 1, st_asks(choose_target)).
 other_night_substep(imp, 2, player_chooses(kill_target)).
 other_night_substep(imp, 3, st_places(imp_dead)).
 
-% Imp chooses a target each night (nights after the first)
-% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
+% Imp picks any player (including self for starpass); uses character_assignment_state_at_time for mid-night swaps
 { player_chooses(imp, Imp, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
@@ -14,48 +13,48 @@ other_night_substep(imp, 3, st_places(imp_dead)).
     alive(Imp, T),
     game_active(night(N, 0, 0)).
 
-% House rule: Imp cannot target itself if all minions are dead
+% Self-target (starpass) is only legal when at least one minion is alive to receive the demon role
 :- player_chooses(imp, Imp, point(Imp), night(N, RoleOrd, 2)),
    other_night_role_order(imp, RoleOrd),
    night_number(N), N > 1,
    not any_minion_alive(night(N, 0, 0)).
 
-% Check if any player who is CURRENTLY a minion is alive
-% (not just initially assigned as minion - role may have changed via SW, etc.)
+% Helper: true if any current minion is alive; uses current role (not initial) to handle SW promotion etc.
 any_minion_alive(T) :-
     character_assignment_state_at_time(T, P, R),
     minion(R),
     alive(P, T).
 
+% Functioning Imp's choice places the kill token on the target (no token if poisoned/drunk)
 reminder_on(imp_dead, Target, night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
     player_chooses(imp, Imp, point(Target), night(N, RoleOrd, 2)),
     functioning(Imp, night(N, RoleOrd, 3)).
 
-% When Imp moves the DIE token to a new target, remove it from any previous target.
-% The Imp has only ONE DIE token that moves from victim to victim.
+% The Imp has one kill token; placing it on a new target removes it from the previous one
 token_removed(imp_dead, OldTarget, night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
     player_chooses(imp, Imp, point(NewTarget), night(N, RoleOrd, 2)),
     functioning(Imp, night(N, RoleOrd, 3)),
-    reminder_on(imp_dead, OldTarget, night(N, 0, 0)),  % Token was on OldTarget at start of night
-    OldTarget != NewTarget.  % Only remove if moving to different target
+    reminder_on(imp_dead, OldTarget, night(N, 0, 0)),
+    OldTarget != NewTarget.
 
-% Constraint: imp_dead token cannot be on a player at the same time it's being removed
+% Token removal takes effect: can't simultaneously exist and be removed at the same time
 :- reminder_on(imp_dead, P, T), token_removed(imp_dead, P, T).
 
-% Register imp_dead as a demon kill token (generic handling in botc.lp)
+% Register imp_dead as a demon kill token so botc.lp's generic death logic processes it
 demon_kill_token(imp_dead).
 
-% Local helper for starpass logic
+% Helper: the kill succeeds unless the target has demon protection (Monk, etc.)
 imp_kill_succeeds(P, T) :-
     reminder_on(imp_dead, P, T),
     not protected_from_demon(P, T).
 
-% Starpass
+% --- Starpass ---
 
+% Starpass triggers when the Imp targets itself and the kill is not blocked by protection
 imp_starpass_triggered(Imp, N) :-
     night_number(N), N > 1,
     other_night_role_order(imp, RoleOrd),
@@ -64,6 +63,7 @@ imp_starpass_triggered(Imp, N) :-
     player_chooses(imp, Imp, point(Imp), T),
     imp_kill_succeeds(Imp, night(N, RoleOrd, 3)).
 
+% Eligible recipients: initial minions who are still alive (uses assigned(0,...) per game rules)
 eligible_for_starpass(Minion, N) :-
     imp_starpass_triggered(_, N),
     assigned(0, Minion, R),
@@ -71,13 +71,12 @@ eligible_for_starpass(Minion, N) :-
     other_night_role_order(imp, RoleOrd),
     alive(Minion, night(N, RoleOrd, 3)).
 
+% Exactly one eligible minion is chosen to become the new Imp (ST's choice if multiple candidates)
 { starpass_target(Minion, N) : eligible_for_starpass(Minion, N) } = 1 :-
     imp_starpass_triggered(_, N),
     eligible_for_starpass(_, N).
 
-% Role change happens at the same time as imp death (night N, substep 3)
-% This ensures there's never a moment without a demon during starpass,
-% which is important for the victory condition check.
+% The role change fires at the same substep as the Imp's death, ensuring no demon-less moment
 role_assignment_changes_to(night(N, RoleOrd, 3), Minion, imp) :-
     starpass_target(Minion, N),
     other_night_role_order(imp, RoleOrd).
