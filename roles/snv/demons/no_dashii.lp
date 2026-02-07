@@ -5,8 +5,7 @@ other_night_substep(no_dashii, 1, st_asks(choose_target)).
 other_night_substep(no_dashii, 2, player_chooses(kill_target)).
 other_night_substep(no_dashii, 3, st_places(no_dashii_dead)).
 
-% No Dashii chooses a target each night (nights after the first)
-% Check role at action time T, not night start (handles Snake Charmer swaps etc.)
+% Choice rule: ND picks exactly one target each other-night (choice cannot be deterministic).
 { player_chooses(no_dashii, ND, point(P), T) : player(P) } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
@@ -15,35 +14,27 @@ other_night_substep(no_dashii, 3, st_places(no_dashii_dead)).
     alive(ND, T),
     game_active(night(N, 0, 0)).
 
-% Place the death token on the target
+% Places death token; deterministic derivation from choice, so separate from the choice rule above.
 reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)) :-
     night_number(N), N > 1,
     other_night_role_order(no_dashii, RoleOrd),
     player_chooses(no_dashii, ND, point(Target), night(N, RoleOrd, 2)),
     functioning(ND, night(N, RoleOrd, 3)).
 
-% Register as demon kill token (generic handling in botc.lp)
 demon_kill_token(no_dashii_dead).
 
-% snv_demon_killed(Target, N) - Target was killed by demon on night N
-% Uses night number only (not specific time) so Sage can check without time mismatch
+% Projects reminder into script-level snv_demon_killed/2; uses night-number (not full time) so other roles (e.g. Sage) can query it.
 snv_demon_killed(Target, N) :-
     night_number(N), N > 1,
     other_night_role_order(no_dashii, RoleOrd),
     reminder_on(no_dashii_dead, Target, night(N, RoleOrd, 3)).
 
-% Find the No Dashii's townsfolk neighbors
-% A "townsfolk neighbor" is the closest living Townsfolk in each direction
-%
-% OPTIMIZATION: Neighbors only change when someone dies. Compute at state-change
-% points (night start, dawn, after execution) instead of every time(T).
-% This reduces O(all_substeps) to O(nights + days).
-
+% State-change times for neighbor recomputation; three rules needed because night/dawn/day have different functors.
 nd_state_time(night(N, 0, 0)) :- night_number(N).
 nd_state_time(dawn(N)) :- day_number(N).
 nd_state_time(day(N, exec)) :- day_number(N).
 
-% Clockwise townsfolk neighbor (computed at state times only)
+% Nearest clockwise townsfolk neighbor; uses negation of "closer exists" pattern, requiring the helper below.
 nd_townsfolk_neighbor_clockwise(ND, P, T) :-
     assigned(0, ND, no_dashii),
     nd_state_time(T),
@@ -54,6 +45,7 @@ nd_townsfolk_neighbor_clockwise(ND, P, T) :-
     clockwise_distance(ND, P, D),
     not nd_closer_townsfolk_clockwise(ND, D, T).
 
+% Auxiliary for clockwise minimum: witnesses a strictly closer townsfolk; can't fold into neighbor rule due to negation stratification.
 nd_closer_townsfolk_clockwise(ND, D, T) :-
     assigned(0, ND, no_dashii),
     nd_state_time(T),
@@ -68,8 +60,7 @@ nd_closer_townsfolk_clockwise(ND, D, T) :-
     clockwise_distance(ND, P2, D2),
     D2 < D.
 
-% Counter-clockwise townsfolk neighbor
-% Counter-clockwise distance from ND to P is the clockwise distance from P to ND
+% Nearest counter-clockwise townsfolk neighbor; separate from clockwise because distance direction is reversed (P->ND not ND->P).
 nd_townsfolk_neighbor_counterclockwise(ND, P, T) :-
     assigned(0, ND, no_dashii),
     nd_state_time(T),
@@ -77,9 +68,10 @@ nd_townsfolk_neighbor_counterclockwise(ND, P, T) :-
     player(P), P != ND,
     alive(P, T),
     assigned(0, P, R), townsfolk(R),
-    clockwise_distance(P, ND, D),  % counter-clockwise distance from ND to P
+    clockwise_distance(P, ND, D),
     not nd_closer_townsfolk_counterclockwise(ND, D, T).
 
+% Auxiliary for counter-clockwise minimum; mirrors clockwise helper but with reversed distance argument order.
 nd_closer_townsfolk_counterclockwise(ND, D, T) :-
     assigned(0, ND, no_dashii),
     nd_state_time(T),
@@ -87,25 +79,26 @@ nd_closer_townsfolk_counterclockwise(ND, D, T) :-
     player(P), P != ND,
     alive(P, T),
     assigned(0, P, R), townsfolk(R),
-    clockwise_distance(P, ND, D),  % counter-clockwise distance from ND to P
+    clockwise_distance(P, ND, D),
     player(P2), P2 != ND, P2 != P,
     alive(P2, T),
     assigned(0, P2, R2), townsfolk(R2),
-    clockwise_distance(P2, ND, D2),  % counter-clockwise distance from ND to P2
+    clockwise_distance(P2, ND, D2),
     D2 < D.
 
-% Place poison token at state times (inertia carries it forward)
+% Poison for clockwise neighbor; two separate reminder rules needed because clockwise and counter-clockwise are distinct predicates.
 reminder_on(nd_poisoned, P, T) :-
     nd_state_time(T),
     nd_townsfolk_neighbor_clockwise(ND, P, T),
     alive(ND, T).
 
+% Poison for counter-clockwise neighbor; can't merge with clockwise rule since the neighbor predicates differ.
 reminder_on(nd_poisoned, P, T) :-
     nd_state_time(T),
     nd_townsfolk_neighbor_counterclockwise(ND, P, T),
     alive(ND, T).
 
-% Remove poison at state times when ND dies or neighbor changes
+% Removes poison when P is no longer a neighbor (ND died or seating changed); needs negation of both directions so can't fold into placement rules.
 token_removed(nd_poisoned, P, T) :-
     nd_state_time(T),
     reminder_on(nd_poisoned, P, TPrev),
