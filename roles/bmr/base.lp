@@ -1,5 +1,6 @@
 % Bad Moon Rising - Base Definitions
 
+% Promote BMR-specific role atoms into the generic category predicates used by botc.lp
 townsfolk(X) :- bmr_townsfolk(X).
 outsider(X) :- bmr_outsider(X).
 minion(X) :- bmr_minion(X).
