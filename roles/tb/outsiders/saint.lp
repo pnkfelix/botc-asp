@@ -13,7 +13,8 @@
 
 % Evil wins if a Good Saint is executed and their ability is functioning
 evil_wins(day(N, exec)) :-
+    T = day(N, exec),
     executed(P, N),
-    assigned(0, P, saint),
+    character_assignment_state_at_time(T, P, saint),
     actual_category(P, good),
-    functioning(P, day(N, exec)).
+    functioning(P, T).
