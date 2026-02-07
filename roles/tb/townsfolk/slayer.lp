@@ -1,6 +1,6 @@
 % Slayer
 
-:- slayer_shot(Slayer, _, _), not assigned(0, Slayer, slayer).
+:- slayer_shot(Slayer, _, N), not character_assignment_state_at_time(day(N, 0), Slayer, slayer).
 :- slayer_shot(Slayer, _, N), not alive(Slayer, day(N, 0)).
 :- slayer_shot(_, Target, N), not alive(Target, day(N, 0)).
 
