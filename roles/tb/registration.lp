@@ -1,8 +1,7 @@
 % Role Registration Rules
 
 may_register_as_role(P, R, T) :-
-    assigned(0, P, R),
-    time(T).
+    character_assignment_state_at_time(T, P, R).
 
 may_register_as_role(P, R, T) :-
     townsfolk(R),
