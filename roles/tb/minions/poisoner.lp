@@ -20,13 +20,13 @@ poi_reassigned(P, N) :-
     night_number(N),
     T < N.
 
+% Poisoner chooses a target (other nights)
 { player_chooses(poisoner, Poisoner, point(P), T) : player(P), P != Poisoner } = 1 :-
     T = night(N, RoleOrd, 2),
     night_number(N), N > 1,
     other_night_role_order(poisoner, RoleOrd),
-    assigned(0, Poisoner, poisoner),
-    alive(Poisoner, night(N, 0, 0)),
-    not poi_reassigned(Poisoner, N).  % Don't act as poisoner if reassigned
+    character_assignment_state_at_time(T, Poisoner, poisoner),
+    alive(Poisoner, night(N, 0, 0)).
 
 reminder_on(poi_poisoned, P, night(1, RoleOrd, 3)) :-
     first_night_role_order(poisoner, RoleOrd),
