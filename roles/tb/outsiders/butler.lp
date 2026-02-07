@@ -7,7 +7,7 @@ first_night_substep(butler, 3, st_places(but_master)).
 { player_chooses(butler, Butler, point(P), T) : player(P), P != Butler } = 1 :-
     T = night(1, RoleOrd, 2),
     first_night_role_order(butler, RoleOrd),
-    assigned(0, Butler, butler).
+    character_assignment_state_at_time(T, Butler, butler).
 
 reminder_on(but_master, P, night(1, RoleOrd, 3)) :-
     first_night_role_order(butler, RoleOrd),
