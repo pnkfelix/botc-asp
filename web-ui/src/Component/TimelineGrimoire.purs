@@ -63,6 +63,17 @@ data Output
       , toPlayer :: String        -- New player receiving the role
       , time :: ASP.TimePoint     -- The time point at which this role assignment applies
       }
+  | TimePointSelected
+      { time :: ASP.TimePoint         -- The selected time point
+      , actingRole :: Maybe String    -- Role acting at this time (from acting_role atom), if any
+      , actingPlayer :: Maybe String  -- Player assigned to the acting role, if known
+      }
+  | PlayerClicked
+      { player :: String              -- The player that was clicked
+      , time :: ASP.TimePoint         -- Current selected time point
+      , actingRole :: Maybe String    -- Role acting at this time
+      , actingPlayer :: Maybe String  -- Player assigned to the acting role
+      }
 
 -- | Drag state for reminder tokens
 type DragState =
@@ -129,6 +140,8 @@ data Action
   | HandleReminderDrop Drag.DropEvent
   -- Drop event from JS role drag handler (for HTML view)
   | HandleRoleDrop RoleDrag.DropEvent
+  -- Player clicked (for incremental validation)
+  | ClickPlayer String  -- player name
 
 -- | The Halogen component with output events
 component :: forall m. MonadEffect m => H.Component Query Input Output m
@@ -241,6 +254,39 @@ findTimeAtomSource parsedAtoms targetTime =
     getTimeFromEventAtom (ASP.StTells _ _ _ t) = Just t
     getTimeFromEventAtom (ASP.PlayerChooses _ _ _ t) = Just t
     getTimeFromEventAtom _ = Nothing
+
+-- | Find the acting role at a given time point from ActingRole atoms
+findActingRole :: Array ASP.Atom -> ASP.TimePoint -> Maybe String
+findActingRole atoms targetTime =
+  Array.findMap getActingRoleAt atoms
+  where
+    getActingRoleAt (ASP.ActingRole t role) | t == targetTime = Just role
+    getActingRoleAt _ = Nothing
+
+-- | Find which player is assigned to a given role at a given time point
+findPlayerForRole :: Array ASP.Atom -> ASP.TimePoint -> String -> Maybe String
+findPlayerForRole atoms targetTime role =
+  -- Use character_assignment_state_at_time if available, otherwise fall back to assigned(0,...)
+  case Array.findMap (getAssignmentAt targetTime role) atoms of
+    Just p -> Just p
+    Nothing -> Array.findMap (getInitialAssignment role) atoms
+  where
+    getAssignmentAt t r (ASP.CharacterAssignmentAtTime time player assignedRole)
+      | time == t && assignedRole == r = Just player
+    getAssignmentAt _ _ _ = Nothing
+    getInitialAssignment r (ASP.Assigned _ player assignedRole)
+      | assignedRole == r = Just player
+    getInitialAssignment _ _ = Nothing
+
+-- | Build TimePointSelected info for a given time point and atom set
+buildTimePointInfo :: Array ASP.Atom -> ASP.TimePoint -> { actingRole :: Maybe String, actingPlayer :: Maybe String }
+buildTimePointInfo atoms t =
+  let
+    actingRole = findActingRole atoms t
+    actingPlayer = case actingRole of
+      Just role -> findPlayerForRole atoms t role
+      Nothing -> Nothing
+  in { actingRole, actingPlayer }
 
 -- | Main render function
 render :: forall cs m. State -> H.ComponentHTML Action cs m
@@ -1219,9 +1265,10 @@ renderHtmlPlayer scriptRoles reminders impairmentTokens selectedTime player =
     HH.div
       [ HP.style $ "background: " <> roleColor <> "; border-radius: 8px; padding: 10px; "
           <> "border: 3px solid " <> aliveColor <> "; "
-          <> "text-align: center; min-height: 80px; "
+          <> "text-align: center; min-height: 80px; cursor: pointer; "
           <> deathSlashStyle
       , HP.attr (HH.AttrName "data-player") player.name
+      , HE.onClick \_ -> ClickPlayer player.name
       ]
       (
       -- Death/ghost vote overlay slashes (rendered as absolute positioned div)
@@ -1530,6 +1577,13 @@ handleAction = case _ of
       , predicateName: "time"
       , predicateArity: 1
       }
+    -- Also emit structured TimePointSelected for incremental validation
+    let tpInfo = buildTimePointInfo state.atoms t
+    H.raise $ TimePointSelected
+      { time: t
+      , actingRole: tpInfo.actingRole
+      , actingPlayer: tpInfo.actingPlayer
+      }
 
   ClickTimelineEvent event -> do
     -- Extract source atom and predicate info from the event
@@ -1665,6 +1719,20 @@ handleAction = case _ of
       , toPlayer: dropEvent.toPlayer
       , time
       }
+
+  ClickPlayer playerName -> do
+    -- Player was clicked — emit PlayerClicked for incremental validation
+    state <- H.get
+    case state.selectedTime of
+      Just t -> do
+        let tpInfo = buildTimePointInfo state.atoms t
+        H.raise $ PlayerClicked
+          { player: playerName
+          , time: t
+          , actingRole: tpInfo.actingRole
+          , actingPlayer: tpInfo.actingPlayer
+          }
+      Nothing -> pure unit
 
 -- | Calculate grid dimensions for a hollow rectangle that fits n players on perimeter
 -- For n players, perimeter = 2*cols + 2*rows - 4 = n
