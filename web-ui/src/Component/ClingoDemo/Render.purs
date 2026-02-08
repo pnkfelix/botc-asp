@@ -4,6 +4,7 @@ module Component.ClingoDemo.Render where
 
 import Prelude
 
+import AnswerSetParser (TimePoint)
 import AspParser as ASP
 import BuildInfo as BI
 import Data.Array (filter, length, mapWithIndex, null, slice, sort)
@@ -316,6 +317,9 @@ render state =
 
     -- Ground result display (when Ground button is clicked)
     , renderGroundResult state.groundResult
+
+    -- Incremental validation panel
+    , renderIncrementalPanel state
 
     -- Timing history table (shows after any runs)
     , renderTimingTable state.timingHistory
@@ -733,6 +737,108 @@ renderGroundResult maybeResult =
             ]
             [ HH.text result ]
         ]
+
+-- | Render the incremental validation panel
+-- | Allows the user to enter an action constraint and validate it against the current game state
+renderIncrementalPanel :: forall m. State -> H.ComponentHTML Action Slots m
+renderIncrementalPanel state =
+  HH.div
+    [ HP.style "margin: 20px 0; padding: 15px; background: #e3f2fd; border-radius: 4px; border: 1px solid #90caf9;" ]
+    [ HH.div
+        [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;" ]
+        [ HH.h3
+            [ HP.style "margin: 0; color: #1565c0; font-size: 14px;" ]
+            [ HH.text "Incremental Validation (Fast)" ]
+        , HH.div
+            [ HP.style "display: flex; gap: 8px;" ]
+            [ HH.button
+                [ HP.style $ "background: #1976d2; color: white; border: none; border-radius: 4px; "
+                    <> "padding: 6px 16px; cursor: pointer; font-size: 13px;"
+                    <> if state.isValidating then " opacity: 0.6;" else ""
+                , HE.onClick \_ -> ValidateIncremental
+                , HP.disabled (state.isValidating || not state.isInitialized)
+                ]
+                [ HH.text $ if state.isValidating then "Validating..." else "Validate" ]
+            , case state.incrementalResult of
+                Just _ -> HH.button
+                  [ HP.style "background: #90caf9; color: #1565c0; border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px;"
+                  , HE.onClick \_ -> ClearIncrementalResult
+                  ]
+                  [ HH.text "Clear" ]
+                Nothing -> HH.text ""
+            ]
+        ]
+    , HH.p
+        [ HP.style "margin: 0 0 8px 0; color: #666; font-size: 11px; font-style: italic;" ]
+        [ HH.text "Validate actions against the current game state using incremental.lp (~40-80ms vs full re-solve). Requires a previous full solve." ]
+    -- Show current time point context from grimoire
+    , case state.selectedTimeContext of
+        Nothing -> HH.text ""
+        Just ctx -> HH.div
+          [ HP.style "margin-bottom: 8px; padding: 6px 10px; background: rgba(25, 118, 210, 0.08); border-radius: 4px; font-size: 12px;" ]
+          [ HH.span [ HP.style "color: #1565c0; font-weight: bold;" ] [ HH.text "Grimoire: " ]
+          , HH.text $ show ctx.time
+          , case ctx.actingRole of
+              Nothing -> HH.text ""
+              Just role -> HH.span_
+                [ HH.text " — "
+                , HH.span [ HP.style "color: #1565c0;" ] [ HH.text role ]
+                , case ctx.actingPlayer of
+                    Nothing -> HH.text " acts"
+                    Just player -> HH.text $ " (" <> player <> ") acts"
+                ]
+          ]
+    , HH.div
+        [ HP.style "margin-bottom: 8px;" ]
+        [ HH.label
+            [ HP.style "display: block; font-size: 12px; color: #555; margin-bottom: 4px;" ]
+            [ HH.text "Action constraint (e.g. :- not player_chooses(imp, alice, point(bob), night(2,4,2)).)" ]
+        , HH.textarea
+            [ HP.style $ "width: 100%; height: 60px; font-family: monospace; font-size: 12px; "
+                <> "padding: 8px; border: 1px solid #90caf9; border-radius: 4px; resize: vertical;"
+            , HP.value state.actionConstraint
+            , HP.placeholder ":- not player_chooses(imp, alice, point(bob), night(2, 4, 2))."
+            , HE.onValueInput SetActionConstraint
+            ]
+        ]
+    , case state.incrementalResult of
+        Nothing -> HH.text ""
+        Just result ->
+          HH.div
+            [ HP.style $ "padding: 10px; border-radius: 4px; margin-top: 8px; "
+                <> if result.valid
+                   then "background: #e8f5e9; border: 1px solid #81c784;"
+                   else "background: #ffebee; border: 1px solid #e57373;"
+            ]
+            [ HH.div
+                [ HP.style "display: flex; justify-content: space-between; align-items: center;" ]
+                [ HH.span
+                    [ HP.style $ "font-weight: bold; font-size: 14px; "
+                        <> if result.valid then "color: #2e7d32;" else "color: #c62828;"
+                    ]
+                    [ HH.text result.message ]
+                , HH.span
+                    [ HP.style "color: #666; font-size: 12px;" ]
+                    [ HH.text $ show (Int.round result.elapsedMs) <> "ms" ]
+                ]
+            , if null result.atoms
+                then HH.text ""
+                else HH.div
+                  [ HP.style "margin-top: 8px;" ]
+                  [ HH.details
+                      []
+                      [ HH.summary
+                          [ HP.style "cursor: pointer; font-size: 12px; color: #555;" ]
+                          [ HH.text $ "Validated atoms (" <> show (length result.atoms) <> ")" ]
+                      , HH.pre
+                          [ HP.style $ "background: white; padding: 8px; border-radius: 4px; "
+                              <> "font-family: monospace; font-size: 11px; max-height: 150px; overflow: auto; margin: 4px 0 0 0;"
+                          ]
+                          [ HH.text $ intercalate "\n" result.atoms ]
+                      ]
+                  ]
+            ]
+    ]
 
 -- | Render the timing history table
 -- | Shows a table with diff description, model limit, and timing for each run

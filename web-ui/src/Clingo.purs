@@ -7,6 +7,9 @@ module Clingo
   , SolveResult(..)
   , GroundResult(..)
   , ScriptRoles
+  , IncrementalGameState
+  , IncrementalPlayer
+  , IncrementalReminder
   , run
   , ground
   , init
@@ -14,6 +17,8 @@ module Clingo
   , resolveIncludes
   , resolveIncludesWithPath
   , extractScriptRoles
+  , gameStateToIncFacts
+  , runIncremental
   ) where
 
 import Prelude
@@ -186,3 +191,45 @@ resolveIncludesWithPath program currentFilePath resolver =
 -- | Returns categorized role lists for the script
 extractScriptRoles :: String -> ScriptRoles
 extractScriptRoles = extractScriptRolesImpl
+
+-- | Types for incremental validation
+
+-- | A simplified player record for incremental validation
+type IncrementalPlayer =
+  { name :: String
+  , chair :: Int
+  , role :: String
+  , token :: String
+  , alive :: Boolean
+  , ghostVoteUsed :: Boolean
+  }
+
+-- | A simplified reminder record for incremental validation
+type IncrementalReminder =
+  { token :: String
+  , player :: String
+  }
+
+-- | Game state record passed to the JS FFI for incremental validation
+type IncrementalGameState =
+  { players :: Array IncrementalPlayer
+  , reminders :: Array IncrementalReminder
+  , bagTokens :: Array String
+  , bluffTokens :: Array String
+  , impairmentTokens :: Array String
+  }
+
+-- | Foreign imports for incremental validation
+foreign import gameStateToIncFactsImpl :: IncrementalGameState -> Int -> String
+foreign import runIncrementalImpl :: String -> String -> String -> String -> Effect (Promise Foreign)
+
+-- | Convert a game state to inc_* ASP facts for incremental validation
+gameStateToIncFacts :: IncrementalGameState -> Int -> String
+gameStateToIncFacts = gameStateToIncFactsImpl
+
+-- | Run incremental validation
+-- | Takes resolved incremental.lp, resolved script program, state facts, and action constraint
+runIncremental :: String -> String -> String -> String -> Aff SolveResult
+runIncremental incProgram scriptProgram stateFacts actionConstraint = do
+  result <- toAffE (runIncrementalImpl incProgram scriptProgram stateFacts actionConstraint)
+  pure $ parseResult result

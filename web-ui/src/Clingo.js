@@ -112,6 +112,89 @@ export const resolveIncludesImpl = (program) => (fileResolver) => {
   return resolveIncludesWithPathImpl(program)("")(fileResolver);
 };
 
+// Convert a GameState (from AnswerSetParser) to inc_* ASP facts for incremental validation.
+// gameState: { players: [{name, chair, role, token, alive, ghostVoteUsed}],
+//              reminders: [{token, player}],  (placedAt stripped by PureScript caller)
+//              time: string (e.g. "night(2,3,1)"),
+//              bagTokens: [string], bluffTokens: [string],
+//              impairmentTokens: [string] }
+// currentNight: Int - which night we're validating
+// Returns: string of ASP facts
+export const gameStateToIncFactsImpl = (gameState) => (currentNight) => {
+  const lines = [];
+
+  // Player count
+  lines.push(`#const player_count = ${gameState.players.length}.`);
+  lines.push('');
+
+  // Players and seating
+  for (const p of gameState.players) {
+    lines.push(`name(${p.name}). chair(${p.name}, ${p.chair}).`);
+  }
+  lines.push('');
+
+  // Current night
+  lines.push(`current_night(${currentNight}).`);
+  lines.push('');
+
+  // Role assignments (inc_role)
+  for (const p of gameState.players) {
+    if (p.role && p.role !== '?') {
+      lines.push(`inc_role(${p.name}, ${p.role}).`);
+    }
+  }
+  lines.push('');
+
+  // Received tokens (inc_received) - only when different from role
+  for (const p of gameState.players) {
+    if (p.token && p.token !== p.role && p.token !== '?') {
+      lines.push(`inc_received(${p.name}, ${p.token}).`);
+    }
+  }
+  lines.push('');
+
+  // Alive status (inc_alive)
+  for (const p of gameState.players) {
+    if (p.alive) {
+      lines.push(`inc_alive(${p.name}).`);
+    }
+  }
+  lines.push('');
+
+  // Reminders (inc_reminder)
+  for (const r of gameState.reminders) {
+    lines.push(`inc_reminder(${r.token}, ${r.player}).`);
+  }
+  lines.push('');
+
+  // Bluffs (inc_bluff)
+  for (const b of gameState.bluffTokens) {
+    lines.push(`inc_bluff(${b}).`);
+  }
+  lines.push('');
+
+  // Impaired players - find players with impairment reminders
+  const impairmentSet = new Set(gameState.impairmentTokens);
+  for (const r of gameState.reminders) {
+    if (impairmentSet.has(r.token)) {
+      lines.push(`inc_poisoned(${r.player}).`);
+    }
+  }
+
+  return lines.join('\n');
+};
+
+// Assemble and run an incremental validation program.
+// incProgram: resolved incremental.lp content
+// scriptProgram: resolved script (e.g. tb.lp) content
+// stateFacts: inc_* facts string (from gameStateToIncFactsImpl)
+// actionConstraint: ASP constraint string (e.g. ":- not player_chooses(imp, alice, point(bob), night(2,4,2)).")
+// Returns: Promise<Foreign> (clingo result JSON)
+export const runIncrementalImpl = (incProgram) => (scriptProgram) => (stateFacts) => (actionConstraint) => () => {
+  const fullProgram = `${incProgram}\n${scriptProgram}\n${stateFacts}\n\n% === PROPOSED ACTION ===\n${actionConstraint}\n`;
+  return clingo.run(fullProgram, 1, ["--opt-mode=optN"]);
+};
+
 // Extract script roles from a resolved ASP program
 // Looks for patterns like:
 //   tb_townsfolk(washerwoman; librarian; ...).
