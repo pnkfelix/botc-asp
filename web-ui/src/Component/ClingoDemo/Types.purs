@@ -79,6 +79,10 @@ type State =
   -- Ground program output (for ZDD/SAT experimentation)
   , groundResult :: Maybe String              -- Output from --mode=gringo (or error message)
   , isGrounding :: Boolean                    -- True while grounding is in progress
+  -- Incremental validation state
+  , incrementalResult :: Maybe IncrementalResult  -- Result of last incremental validation
+  , isValidating :: Boolean                       -- True while incremental validation is running
+  , actionConstraint :: String                    -- User-entered action constraint for incremental mode
   }
 
 -- | How to display results
@@ -86,6 +90,14 @@ data ResultDisplay
   = ResultSuccess (Array (Array String)) -- Answer sets
   | ResultUnsat
   | ResultError String
+
+-- | Result of an incremental validation check
+type IncrementalResult =
+  { valid :: Boolean
+  , elapsedMs :: Number
+  , message :: String       -- Human-readable description
+  , atoms :: Array String   -- Validated atoms (if SAT)
+  }
 
 -- | Component actions
 data Action
@@ -121,6 +133,9 @@ data Action
   | CloseDiffModal              -- Close the diff modal
   | CopyToClipboard String      -- Copy text to clipboard
   | CopyToClipboardStopPropagation MouseEvent String  -- Copy and stop event propagation
+  | ValidateIncremental           -- Run incremental validation with current state + action constraint
+  | SetActionConstraint String    -- Update the action constraint text
+  | ClearIncrementalResult        -- Clear the incremental validation result
   | NoOp  -- Used to stop event propagation
 
 -- | Number of answer sets to display per page (prevents browser crash with many models)

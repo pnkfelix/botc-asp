@@ -240,6 +240,9 @@ initialState =
   , selectedTimingEntry: Nothing  -- No diff modal initially
   , groundResult: Nothing  -- No ground result initially
   , isGrounding: false     -- Not grounding initially
+  , incrementalResult: Nothing  -- No incremental result initially
+  , isValidating: false         -- Not validating initially
+  , actionConstraint: ""        -- Empty action constraint initially
   }
 
 -- | Get current file content from state

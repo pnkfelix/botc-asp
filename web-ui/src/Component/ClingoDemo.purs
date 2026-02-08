@@ -596,6 +596,100 @@ handleAction = case _ of
     _ <- liftEffect $ TU.copyToClipboardWithEvent (toEvent mouseEvent) text
     pure unit
 
+  ValidateIncremental -> do
+    -- Run incremental validation using the current game state + action constraint
+    state <- H.get
+    -- Need a previous full solve result to get game state
+    case state.result of
+      Just (ResultSuccess answerSets) ->
+        case index answerSets state.selectedModelIndex of
+          Just atoms -> do
+            let parsedAtoms = AnswerSet.parseAnswerSet atoms
+            -- Find the latest Night time point to determine current night
+            let timePoints = Array.mapMaybe getTimeFromAtom parsedAtoms
+            let nightNum = getLatestNight timePoints
+            case nightNum of
+              Nothing -> do
+                H.modify_ \s -> s { incrementalResult = Just
+                  { valid: false, elapsedMs: 0.0
+                  , message: "No night time point found in current solve result"
+                  , atoms: [] } }
+              Just n -> do
+                -- Build game state at the start of this night
+                let gameState = AnswerSet.buildGameState parsedAtoms (AnswerSet.Night n 0 0)
+                -- Convert to IncrementalGameState (strip placedAt from reminders)
+                let incState =
+                      { players: gameState.players
+                      , reminders: map (\r -> { token: r.token, player: r.player }) gameState.reminders
+                      , bagTokens: gameState.bagTokens
+                      , bluffTokens: gameState.bluffTokens
+                      , impairmentTokens: gameState.impairmentTokens
+                      }
+                -- Generate inc_* facts
+                let stateFacts = Clingo.gameStateToIncFacts incState n
+                -- Resolve incremental.lp and script program
+                let resolver filename = Map.lookup filename state.files
+                let incContent = fromMaybe "" $ Map.lookup "incremental.lp" state.files
+                let incProgram = Clingo.resolveIncludesWithPath incContent "incremental.lp" resolver
+                -- Find the script include from inst.lp to resolve the script program
+                let instContent = fromMaybe "" $ Map.lookup "inst.lp" state.files
+                let scriptFile = findScriptInclude instContent
+                let scriptContent = fromMaybe "" $ Map.lookup scriptFile state.files
+                let scriptProgram = Clingo.resolveIncludesWithPath scriptContent scriptFile resolver
+                -- Run incremental validation
+                H.modify_ \s -> s { isValidating = true }
+                result <- H.liftAff $ Clingo.runIncremental incProgram scriptProgram stateFacts state.actionConstraint
+                -- Process result
+                let incResult = case result of
+                      Clingo.Satisfiable res ->
+                        { valid: true
+                        , elapsedMs: res."Time"."Total" * 1000.0
+                        , message: "VALID - Action is consistent with game rules"
+                        , atoms: case Array.head res."Call" of
+                            Just call -> case Array.head call."Witnesses" of
+                              Just w -> w."Value"
+                              Nothing -> []
+                            Nothing -> []
+                        }
+                      Clingo.Unsatisfiable res ->
+                        { valid: false
+                        , elapsedMs: res."Time"."Total" * 1000.0
+                        , message: "INVALID - Action violates game constraints"
+                        , atoms: []
+                        }
+                      Clingo.Error err ->
+                        { valid: false, elapsedMs: 0.0
+                        , message: "Error: " <> err
+                        , atoms: [] }
+                      Clingo.Unknown res ->
+                        { valid: false
+                        , elapsedMs: res."Time"."Total" * 1000.0
+                        , message: "Unknown result"
+                        , atoms: [] }
+                      Clingo.OptimumFound res ->
+                        { valid: true
+                        , elapsedMs: res."Time"."Total" * 1000.0
+                        , message: "VALID (optimum) - Action is consistent"
+                        , atoms: []
+                        }
+                H.modify_ \s -> s { isValidating = false, incrementalResult = Just incResult }
+          Nothing ->
+            H.modify_ \s -> s { incrementalResult = Just
+              { valid: false, elapsedMs: 0.0
+              , message: "No answer set at selected model index"
+              , atoms: [] } }
+      _ ->
+        H.modify_ \s -> s { incrementalResult = Just
+          { valid: false, elapsedMs: 0.0
+          , message: "Run a full solve first to establish game state"
+          , atoms: [] } }
+
+  SetActionConstraint text ->
+    H.modify_ \s -> s { actionConstraint = text }
+
+  ClearIncrementalResult ->
+    H.modify_ \s -> s { incrementalResult = Nothing }
+
   NoOp ->
     pure unit  -- Do nothing, used to stop event propagation
 
@@ -606,3 +700,42 @@ take = String.take
 -- Helper for fromFoldable
 fromFoldable :: forall f a. Foldable f => f a -> Array a
 fromFoldable = Array.fromFoldable
+
+-- | Extract time point from a parsed atom (for incremental validation)
+getTimeFromAtom :: AnswerSet.Atom -> Maybe AnswerSet.TimePoint
+getTimeFromAtom (AnswerSet.Time t) = Just t
+getTimeFromAtom _ = Nothing
+
+-- | Get the latest night number from a list of time points
+getLatestNight :: Array AnswerSet.TimePoint -> Maybe Int
+getLatestNight timePoints =
+  let nights = Array.mapMaybe getNightNum timePoints
+  in Array.last $ Array.sort nights
+  where
+    getNightNum (AnswerSet.Night n _ _) = Just n
+    getNightNum _ = Nothing
+
+-- | Find the script file from inst.lp's #include directives
+-- | Looks for an include that isn't "botc.lp" or common infrastructure files
+findScriptInclude :: String -> String
+findScriptInclude content =
+  let
+    lines = String.split (String.Pattern "\n") content
+    includes = Array.mapMaybe extractInclude lines
+    -- Filter out botc.lp and incremental.lp to find the script file
+    scriptIncludes = Array.filter (\f -> f /= "botc.lp" && f /= "incremental.lp") includes
+  in fromMaybe "tb.lp" $ Array.head scriptIncludes
+  where
+    extractInclude line =
+      let trimmed = trim line
+      in if String.indexOf (String.Pattern "#include") trimmed == Just 0
+         then extractQuoted trimmed
+         else Nothing
+    extractQuoted s =
+      case String.indexOf (String.Pattern "\"") s of
+        Just start ->
+          let rest = String.drop (start + 1) s
+          in case String.indexOf (String.Pattern "\"") rest of
+            Just end -> Just $ String.take end rest
+            Nothing -> Nothing
+        Nothing -> Nothing
