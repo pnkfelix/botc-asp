@@ -7,6 +7,7 @@ import Prelude
 import Data.Map as Map
 import Data.Set as Set
 import Data.Maybe (Maybe(..))
+import AnswerSetParser (TimePoint)
 import AspParser as ASP
 import Component.TimelineGrimoire as TG
 import Halogen as H
@@ -83,6 +84,8 @@ type State =
   , incrementalResult :: Maybe IncrementalResult  -- Result of last incremental validation
   , isValidating :: Boolean                       -- True while incremental validation is running
   , actionConstraint :: String                    -- User-entered action constraint for incremental mode
+  -- Time point context from grimoire (for incremental validation)
+  , selectedTimeContext :: Maybe TimePointContext  -- What time/role is selected in the grimoire
   }
 
 -- | How to display results
@@ -97,6 +100,14 @@ type IncrementalResult =
   , elapsedMs :: Number
   , message :: String       -- Human-readable description
   , atoms :: Array String   -- Validated atoms (if SAT)
+  }
+
+-- | Context about what's selected in the grimoire timeline
+-- | Tracks which time point and role is active, for incremental validation
+type TimePointContext =
+  { time :: TimePoint                -- The selected time point
+  , actingRole :: Maybe String      -- Role acting at this time (e.g., "imp")
+  , actingPlayer :: Maybe String    -- Player assigned to the acting role
   }
 
 -- | Component actions

@@ -4,6 +4,7 @@ module Component.ClingoDemo.Render where
 
 import Prelude
 
+import AnswerSetParser (TimePoint)
 import AspParser as ASP
 import BuildInfo as BI
 import Data.Array (filter, length, mapWithIndex, null, slice, sort)
@@ -769,7 +770,24 @@ renderIncrementalPanel state =
         ]
     , HH.p
         [ HP.style "margin: 0 0 8px 0; color: #666; font-size: 11px; font-style: italic;" ]
-        [ HH.text "Validate a single action against the current game state using incremental.lp (~40-80ms vs full re-solve). Requires a previous full solve." ]
+        [ HH.text "Validate actions against the current game state using incremental.lp (~40-80ms vs full re-solve). Requires a previous full solve." ]
+    -- Show current time point context from grimoire
+    , case state.selectedTimeContext of
+        Nothing -> HH.text ""
+        Just ctx -> HH.div
+          [ HP.style "margin-bottom: 8px; padding: 6px 10px; background: rgba(25, 118, 210, 0.08); border-radius: 4px; font-size: 12px;" ]
+          [ HH.span [ HP.style "color: #1565c0; font-weight: bold;" ] [ HH.text "Grimoire: " ]
+          , HH.text $ show ctx.time
+          , case ctx.actingRole of
+              Nothing -> HH.text ""
+              Just role -> HH.span_
+                [ HH.text " — "
+                , HH.span [ HP.style "color: #1565c0;" ] [ HH.text role ]
+                , case ctx.actingPlayer of
+                    Nothing -> HH.text " acts"
+                    Just player -> HH.text $ " (" <> player <> ") acts"
+                ]
+          ]
     , HH.div
         [ HP.style "margin-bottom: 8px;" ]
         [ HH.label

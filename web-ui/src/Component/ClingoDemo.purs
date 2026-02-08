@@ -521,6 +521,15 @@ handleAction = case _ of
             -- Only re-run Clingo in post-solve mode; in pre-solve mode, state update triggers re-render
             if isPostSolve then handleAction RunClingo else pure unit
 
+    TG.TimePointSelected { time, actingRole, actingPlayer } -> do
+      -- Track the selected time point context for incremental validation
+      H.modify_ \s -> s { selectedTimeContext = Just { time, actingRole, actingPlayer } }
+
+    TG.PlayerClicked { player, time, actingRole, actingPlayer } -> do
+      -- Track context and store the clicked player info
+      -- For now, just update the time context — the draft/staging UI will use this later
+      H.modify_ \s -> s { selectedTimeContext = Just { time, actingRole, actingPlayer } }
+
   ClearScrollNotification ->
     H.modify_ \s -> s { scrollNotification = Nothing }
 

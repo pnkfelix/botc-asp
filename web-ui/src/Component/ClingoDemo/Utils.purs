@@ -243,6 +243,7 @@ initialState =
   , incrementalResult: Nothing  -- No incremental result initially
   , isValidating: false         -- Not validating initially
   , actionConstraint: ""        -- Empty action constraint initially
+  , selectedTimeContext: Nothing -- No time point context initially
   }
 
 -- | Get current file content from state
