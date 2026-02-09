@@ -1,8 +1,10 @@
 % Role Registration Rules
 
+% Base case: a player may always register as their actual current role
 may_register_as_role(P, R, T) :-
     character_assignment_state_at_time(T, P, R).
 
+% Misregistration: each category has its own rule because Spy/Recluse opt into categories independently
 may_register_as_role(P, R, T) :-
     townsfolk(R),
     may_misregister_as(P, townsfolk),

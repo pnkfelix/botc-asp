@@ -4,39 +4,34 @@
 first_night_substep(evil_twin, 1, st_places(evil_twin_pair)).
 first_night_substep(evil_twin, 2, st_tells(evil_twin_info)).
 
-% The Evil Twin is paired with a good player (the "good twin")
-% This is set up during the first night
+% Setup: pair Evil Twin with exactly one good player (choice rule: ST picks the good twin at game start)
 { evil_twin_pair(ET, GoodTwin) : player(GoodTwin), GoodTwin != ET, actual_category(GoodTwin, good) } = 1 :-
     assigned(0, ET, evil_twin).
 
-% Both twins learn each other
+% Tell Evil Twin who their good twin is (separate from good twin's tell: different recipient)
 st_tells_core(evil_twin, ET, point(GoodTwin), night(1, RoleOrd, 2)) :-
     first_night_role_order(evil_twin, RoleOrd),
     evil_twin_pair(ET, GoodTwin).
 
-% The good twin also learns who the evil twin is (through ST pointing)
-% This is modeled as the ST telling the good twin about the evil twin
+% Tell good twin who the Evil Twin is (separate from ET's tell: different recipient and value)
 st_tells_core(evil_twin, GoodTwin, point(ET), night(1, RoleOrd, 2)) :-
     first_night_role_order(evil_twin, RoleOrd),
     evil_twin_pair(ET, GoodTwin).
 
-% If the good twin is executed, evil wins
+% Evil wins immediately if the good twin is executed while the Evil Twin lives
 evil_wins(day(N, exec)) :-
     evil_twin_pair(ET, GoodTwin),
     executed(GoodTwin, N),
     alive(ET, day(N, 0)).
 
-% Good cannot win while both twins are alive
-% This blocks the normal good win condition when demon is executed
+% Helper: true when both twins are alive on day N (can't inline: used by constraint below)
 good_twins_both_alive(N) :-
     evil_twin_pair(ET, GoodTwin),
     day_number(N),
     alive(ET, day(N, 0)),
     alive(GoodTwin, day(N, 0)).
 
-% Override demon_dies_unreplaced to not trigger good win if twins both alive
-% Note: This requires modifying the interaction with game_end.lp
-% For now, we add a constraint that good cannot win while both twins live
+% Constraint: good cannot win by execution while both twins are alive (blocks normal demon-death win)
 :- good_wins(T),
    T = day(N, exec),
    good_twins_both_alive(N).

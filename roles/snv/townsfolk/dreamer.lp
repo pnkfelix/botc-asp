@@ -9,28 +9,27 @@ other_night_substep(dreamer, 1, st_asks(choose_target)).
 other_night_substep(dreamer, 2, player_chooses(target)).
 other_night_substep(dreamer, 3, st_tells(dreamer_info)).
 
-% Dreamer chooses a player on first night
+% Night 1 choice: Dreamer picks a player (can't merge with other nights: uses first_night_role_order, different substep registration)
 { player_chooses(dreamer, Dreamer, point(P), night(1, RoleOrd, 2)) : player(P), P != Dreamer } = 1 :-
     first_night_role_order(dreamer, RoleOrd),
     assigned(0, Dreamer, dreamer).
 
-% Dreamer chooses a player on other nights (if alive)
+% Other nights choice: Dreamer picks a player (can't merge with night 1: uses other_night_role_order, requires alive check)
 { player_chooses(dreamer, Dreamer, point(P), night(N, RoleOrd, 2)) : player(P), P != Dreamer } = 1 :-
     night_number(N), N > 1,
     other_night_role_order(dreamer, RoleOrd),
     assigned(0, Dreamer, dreamer),
     alive(Dreamer, night(N, 0, 0)).
 
-% Good character options (townsfolk or outsider)
+% Helper: good characters are townsfolk or outsiders (two rules, one per category; can't merge: separate base predicates)
 good_character(R) :- townsfolk(R).
 good_character(R) :- outsider(R).
 
-% Evil character options (minion or demon)
+% Helper: evil characters are minions or demons (two rules, one per category; can't merge: separate base predicates)
 evil_character(R) :- minion(R).
 evil_character(R) :- demon(R).
 
-% When functioning: one of the two characters shown must be correct
-% The Dreamer sees the target's role as one of the two shown
+% Functioning info choice: ST picks one good and one evil character to show (can't merge with not-functioning: correctness constraint below applies only here)
 { dreamer_info(Dreamer, Target, GoodChar, EvilChar, T) :
     good_character(GoodChar), evil_character(EvilChar) } = 1 :-
     acting_role(T, dreamer),
@@ -41,14 +40,14 @@ evil_character(R) :- demon(R).
     alive(Dreamer, night(N, 0, 0)),
     functioning(Dreamer, T).
 
-% Constraint: the correct role must be one of the two shown (when functioning)
+% Correctness constraint: target's actual role must match one of the two shown (can't fold into choice rule: ASP requires separate integrity constraint)
 :- dreamer_info(Dreamer, Target, GoodChar, EvilChar, T),
    functioning(Dreamer, T),
    assigned(0, Target, ActualRole),
    ActualRole != GoodChar,
    ActualRole != EvilChar.
 
-% When not functioning: any good and evil character
+% Not-functioning info choice: ST freely picks any good/evil pair (can't merge with functioning: no correctness constraint applies)
 { dreamer_info(Dreamer, Target, GoodChar, EvilChar, T) :
     good_character(GoodChar), evil_character(EvilChar) } = 1 :-
     acting_role(T, dreamer),
@@ -59,6 +58,6 @@ evil_character(R) :- demon(R).
     alive(Dreamer, night(N, 0, 0)),
     not functioning(Dreamer, T).
 
-% Convert to st_tells_core
+% Bridge to st_tells_core: converts dreamer_info into the standard tell format (can't inline: dreamer_info carries Target for correctness constraint)
 st_tells_core(dreamer, Dreamer, info(GoodChar, EvilChar), T) :-
     dreamer_info(Dreamer, _, GoodChar, EvilChar, T).

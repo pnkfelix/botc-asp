@@ -1,27 +1,20 @@
 % Pacifist
 % Executed good players might not die.
 
-% The Pacifist ability is a soft effect - ST may choose to save good players
-% This is modeled as a choice for each execution of a good player
-
-% Check if a good player was executed
+% Helper: identifies when a good player was executed (trigger condition for Pacifist save)
 good_player_executed(P, N) :-
     executed(P, N),
     actual_category(P, good).
 
-% If Pacifist is in play and functioning, good players might not die from execution
+% ST may optionally save the executed good player if Pacifist is alive and functioning
 { pacifist_saves(P, N) } :-
     good_player_executed(P, N),
     assigned(0, Pacifist, pacifist),
     alive(Pacifist, day(N, 0)),
     functioning(Pacifist, day(N, exec)).
 
-% If saved, they don't die from execution
-% This requires modifying how execution death works
-% We need to not derive died(P, day(N, exec)) when pacifist_saves(P, N)
-
-% Override the base execution death rule for saved players
+% Constraint: saved player cannot die from execution (unless another cause killed them that day)
 :- pacifist_saves(P, N), died(P, day(N, exec)), not died_other_cause(P, N).
 
-% Marker for deaths from other causes on execution day
+% Helper: identifies deaths from non-execution causes on the same day (allows constraint exception)
 died_other_cause(P, N) :- died(P, day(N, 0)).

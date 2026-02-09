@@ -11,7 +11,7 @@
 % this will need to check actual alignment at time of execution, not just
 % initial role category.
 
-% Evil wins if a Good Saint is executed and their ability is functioning
+% Evil wins if a functioning Good Saint is executed (checks alignment separately for future Mezepheles support)
 evil_wins(day(N, exec)) :-
     T = day(N, exec),
     executed(P, N),

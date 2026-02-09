@@ -3,12 +3,12 @@
 
 other_night_substep(tea_lady, 1, st_checks(tl_neighbors)).
 
-% Tea Lady's alive neighbors
+% Helper: identifies the Tea Lady's alive neighbors via the generic living_neighbor predicate
 tl_alive_neighbor(TL, P, T) :-
     assigned(0, TL, tea_lady),
     living_neighbor(TL, P, T).
 
-% Both neighbors are good
+% Helper: true when both alive neighbors are actually good and Tea Lady is alive + functioning
 tl_both_neighbors_good(TL, T) :-
     assigned(0, TL, tea_lady),
     alive(TL, T),
@@ -20,23 +20,17 @@ tl_both_neighbors_good(TL, T) :-
     actual_category(P1, good),
     actual_category(P2, good).
 
-% If both neighbors are good, they are protected
-% Protection applies to all death types
+% Both good neighbors receive protection (applies to all death types)
 tea_lady_protects(P, T) :-
     tl_both_neighbors_good(TL, T),
     tl_alive_neighbor(TL, P, T).
 
-% Protected from demon kills
+% Bridge: Tea Lady protection grants demon kill immunity
 protected_from_demon(P, T) :- tea_lady_protects(P, T).
 
-% Protected from execution
+% Bridge: Tea Lady protection grants execution immunity (separate from demon: different time structure)
 protected_from_execution(P, N) :-
     tea_lady_protects(P, day(N, exec)).
 
-% Override execution death
+% Constraint: execution of a protected player must not produce a death (execution happens but they survive)
 :- executed(P, N), protected_from_execution(P, N), not died(P, day(N, exec)).
-% Actually, we need to prevent the death, not just complain about it
-% Let's use a different approach - the execution happens but they don't die
-
-% Tea Lady's neighbors can't die when protected (soft constraint for ST choice)
-% In practice, this means demon can't kill them and execution doesn't kill them
