@@ -38,6 +38,23 @@ if [ ! -d "$VENDOR_DIR" ] || [ -z "$(ls -A "$VENDOR_DIR"/ 2>/dev/null | grep -v 
   exit 1
 fi
 
+# Check for stale vendored dependencies
+LOCK_FILE="spago.lock"
+HASH_FILE="$VENDOR_DIR/.spago-lock-hash"
+if [ -f "$HASH_FILE" ] && [ -f "$LOCK_FILE" ]; then
+  STORED_HASH="$(cat "$HASH_FILE")"
+  CURRENT_HASH="$(shasum -a 256 "$LOCK_FILE" | awk '{print $1}')"
+  if [ "$STORED_HASH" != "$CURRENT_HASH" ]; then
+    echo "Warning: vendored dependencies may be stale (spago.lock has changed)." >&2
+    echo "  Run ./scripts/vendor-purescript-deps.sh to update them." >&2
+    echo ""
+  fi
+elif [ ! -f "$HASH_FILE" ]; then
+  echo "Note: No .spago-lock-hash found; cannot verify vendored deps are up to date."
+  echo "  Run ./scripts/vendor-purescript-deps.sh to create the hash marker."
+  echo ""
+fi
+
 # Count vendored packages (directories only, excluding README)
 PKG_COUNT=$(find "$VENDOR_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l)
 echo "Found $PKG_COUNT vendored dependency packages"

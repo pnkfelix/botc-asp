@@ -1,0 +1,16 @@
+{
+  "name": "purescript-halogen-svg-elems",
+  "description": "A collection of SVG elements for Halogen.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JordanMartinez/purescript-halogen-svg-elems.git"
+  },
+  "keywords": [
+    "halogen",
+    "svg"
+  ],
+  "scripts": {
+    "test": "spago bundle-app -m Test.Main -t dist/test.js",
+    "format": "purs-tidy format-in-place src test"
+  }
+}
