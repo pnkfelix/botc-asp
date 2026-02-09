@@ -1,0 +1,23 @@
+{
+    "name": "purescript-web-pointerevents",
+    "license": [
+        "MIT"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/purescript-web/purescript-web-pointerevents"
+    },
+    "ignore": [
+        "**/.*",
+        "node_modules",
+        "bower_components",
+        "output"
+    ],
+    "dependencies": {
+        "purescript-effect": "^v4.0.0",
+        "purescript-maybe": "^v6.0.0",
+        "purescript-prelude": "^v6.0.0",
+        "purescript-web-dom": "^v6.0.0",
+        "purescript-web-uievents": "^v5.0.0"
+    }
+}

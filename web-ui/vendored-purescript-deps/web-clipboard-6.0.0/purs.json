@@ -1,0 +1,13 @@
+{
+  "name": "web-clipboard",
+  "version": "6.0.0",
+  "license": "MIT",
+  "location": {
+    "githubOwner": "purescript-web",
+    "githubRepo": "purescript-web-clipboard"
+  },
+  "dependencies": {
+    "js-promise": ">=1.0.0 <2.0.0",
+    "web-html": ">=4.1.0 <5.0.0"
+  }
+}

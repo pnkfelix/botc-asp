@@ -1,0 +1,12 @@
+{
+  "name": "web-touchevents",
+  "version": "4.0.0",
+  "license": "MIT",
+  "location": {
+    "githubOwner": "purescript-web",
+    "githubRepo": "purescript-web-touchevents"
+  },
+  "dependencies": {
+    "web-uievents": ">=4.0.0 <5.0.0"
+  }
+}

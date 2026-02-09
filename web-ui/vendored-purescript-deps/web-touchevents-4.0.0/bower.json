@@ -1,0 +1,20 @@
+{
+  "name": "purescript-web-touchevents",
+  "homepage": "https://github.com/purescript-web/purescript-web-touchevents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/purescript-web/purescript-web-touchevents.git"
+  },
+  "ignore": [
+    "**/.*",
+    "bower_components",
+    "node_modules",
+    "output",
+    "bower.json",
+    "package.json"
+  ],
+  "dependencies": {
+    "purescript-web-uievents": "^4.0.0"
+  }
+}

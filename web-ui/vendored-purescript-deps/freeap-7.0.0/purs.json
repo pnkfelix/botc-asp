@@ -1,0 +1,15 @@
+{
+  "name": "freeap",
+  "version": "7.0.0",
+  "license": "MIT",
+  "location": {
+    "githubOwner": "ethul",
+    "githubRepo": "purescript-freeap"
+  },
+  "dependencies": {
+    "const": ">=6.0.0 <7.0.0",
+    "exists": ">=6.0.0 <7.0.0",
+    "gen": ">=4.0.0 <5.0.0",
+    "lists": ">=7.0.0 <8.0.0"
+  }
+}

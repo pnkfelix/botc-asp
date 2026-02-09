@@ -21,21 +21,21 @@ what `spago install` places in `.spago/p/`.
 
 ## How to populate / update
 
-On a machine with network access:
+On a machine with network access, run the automation script:
 
 ```bash
 cd web-ui
-npm install          # ensures spago is available
-npx spago install    # downloads deps into .spago/p/
-
-# Copy dependency sources into the vendored directory
-rm -rf vendored-purescript-deps/*/
-for dir in .spago/p/*/; do
-  cp -r "$dir" vendored-purescript-deps/
-done
+npm install                            # ensures spago is available
+./scripts/vendor-purescript-deps.sh    # downloads, copies, and hashes
 ```
 
-Then commit the result.
+The script runs `spago install`, copies all packages from `.spago/p/` into
+this directory, and writes a `.spago-lock-hash` file containing the SHA-256
+hash of `spago.lock`. This hash is used by `scripts/check-purs.sh` to warn
+when the vendored dependencies may be stale (i.e., `spago.lock` has changed
+since the last vendor run).
+
+Then commit the result (including `.spago-lock-hash`).
 
 ## Versions
 
