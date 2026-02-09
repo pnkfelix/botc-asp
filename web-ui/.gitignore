@@ -4,6 +4,8 @@ node_modules/
 # Build outputs
 output/
 .spago/
+# Note: vendored-purescript-deps/ is intentionally NOT ignored.
+# It contains vendored dependency sources for offline type checking.
 
 # Generated bundle files (keep index.html)
 dist/app.js
