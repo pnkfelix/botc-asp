@@ -46,19 +46,14 @@ reminder_on(shabaloth_dead, P, night(N, RoleOrd, 4)) :-
     other_night_role_order(shabaloth, RoleOrd),
     functioning(Shabaloth, night(N, RoleOrd, 4)).
 
-% Kill resolves: token present + no demon protection = death
-shabaloth_kill_succeeds(P, T) :-
-    reminder_on(shabaloth_dead, P, T),
-    not protected_from_demon(P, T).
+% Register kill token so botc.lp's generic death logic processes it
+demon_kill_token(shabaloth_dead).
 
-% Mark victim as dead at the instant of the kill (for mid-night state tracking)
-dead_at_time(P, T) :- shabaloth_kill_succeeds(P, T).
-
-% Record death at final night time for dawn processing
-died(P, T) :-
-    final_night_time(N, T),
-    shabaloth_kill_succeeds(P, T),
-    alive(P, night(N, 0, 0)).
+% Remove stale kill tokens from previous night's targets (prevents inertia-carried kills)
+token_removed(shabaloth_dead, P, night(N, RoleOrd, 4)) :-
+    reminder_on(shabaloth_dead, P, night(N, 0, 0)),
+    night_number(N), N > 1,
+    other_night_role_order(shabaloth, RoleOrd).
 
 % === Regurgitation ===
 

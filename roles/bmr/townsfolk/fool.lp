@@ -6,16 +6,12 @@ fool_would_die(Fool, T) :-
     assigned(0, Fool, fool),
     would_die(Fool, T).
 
-% would_die from Imp kill (separate rules per demon: each has a different kill predicate)
-would_die(P, T) :- imp_kill_succeeds(P, T), not protected_from_demon(P, T).
-% would_die from Zombuul kill
-would_die(P, T) :- zombuul_kill_succeeds(P, T), not protected_from_demon(P, T).
-% would_die from Pukka kill
-would_die(P, T) :- pukka_kill_succeeds(P, T), not protected_from_demon(P, T).
-% would_die from Shabaloth kill
-would_die(P, T) :- shabaloth_kill_succeeds(P, T), not protected_from_demon(P, T).
-% would_die from Po kill
-would_die(P, T) :- po_kill_succeeds(P, T), not protected_from_demon(P, T).
+% would_die from any demon kill (uses token presence to avoid cycle through demon_kill_blocked)
+would_die(P, T) :-
+    final_night_time(N, T),
+    demon_kill_token(Token),
+    reminder_on(Token, P, T),
+    not protected_from_demon(P, T).
 % would_die from execution (separate from demon kills: different time structure)
 would_die(P, T) :- executed(P, N), T = day(N, exec).
 
@@ -48,6 +44,12 @@ reminder_on(fool_used, Fool, T) :-
 reminder_on(fool_used, Fool, T2) :-
     reminder_on(fool_used, Fool, T1),
     next(T1, T2).
+
+% Block the generic pipeline from producing died when Fool survives
+demon_kill_blocked(Token, Fool, T) :-
+    fool_survives(Fool, T),
+    demon_kill_token(Token),
+    reminder_on(Token, Fool, T).
 
 % Constraint: Fool cannot be recorded as died at a time they survived (prevents contradictory state)
 :- fool_survives(Fool, T), died(Fool, T).

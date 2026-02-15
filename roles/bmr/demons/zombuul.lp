@@ -37,23 +37,22 @@ player_chooses(zombuul, Zombuul, point(P), night(N, RoleOrd, 2)) :-
     other_night_role_order(zombuul, RoleOrd),
     zombuul_target(Zombuul, P, N).
 
-% Kill resolves at substep 3: functioning + no protection = success
-zombuul_kill_succeeds(P, T) :-
+% Place kill token on target if functioning (token placement, not kill resolution)
+reminder_on(zombuul_dead, P, night(N, RoleOrd, 3)) :-
     zombuul_target(Zombuul, P, N),
     assigned(0, Zombuul, zombuul),
     night_number(N), N > 1,
     other_night_role_order(zombuul, RoleOrd),
-    T = night(N, RoleOrd, 3),
-    functioning(Zombuul, T),
-    not protected_from_demon(P, T).
+    functioning(Zombuul, night(N, RoleOrd, 3)).
 
-% Place the kill token on the victim for grimoire display
-reminder_on(zombuul_dead, P, T) :- zombuul_kill_succeeds(P, T).
+% Register kill token so botc.lp's generic death logic processes it
+demon_kill_token(zombuul_dead).
 
-% Mark victim as dead at the instant of the kill (for mid-night state tracking)
-dead_at_time(P, T) :- zombuul_kill_succeeds(P, T).
-% Record the death at the final night time for dawn processing (separate from dead_at_time for timing)
-died(P, T) :- zombuul_kill_succeeds(P, KillTime), KillTime = night(N, _, _), final_night_time(N, T), alive(P, night(N, 0, 0)).
+% Remove stale kill tokens from previous night's targets (prevents inertia-carried kills)
+token_removed(zombuul_dead, P, night(N, RoleOrd, 3)) :-
+    reminder_on(zombuul_dead, P, night(N, 0, 0)),
+    night_number(N), N > 1,
+    other_night_role_order(zombuul, RoleOrd).
 
 % === Zombuul's "fake death" ability ===
 
@@ -62,10 +61,13 @@ zombuul_fake_death_used(Zombuul) :-
     assigned(0, Zombuul, zombuul),
     zombuul_faked_death(Zombuul, _).
 
-% Zombuul "would die" from a demon kill (separate from execution below: different death source)
+% Zombuul "would die" from any demon kill (uses generic token detection, not per-demon predicates)
 zombuul_would_die(Zombuul, T) :-
     assigned(0, Zombuul, zombuul),
-    imp_kill_succeeds(Zombuul, T).
+    final_night_time(N, T),
+    demon_kill_token(Token),
+    reminder_on(Token, Zombuul, T),
+    not protected_from_demon(Zombuul, T).
 
 % Zombuul "would die" from execution (separate from kill above: different time structure)
 zombuul_would_die(Zombuul, day(N, exec)) :-
@@ -88,8 +90,11 @@ zombuul_actually_alive(Zombuul, T) :-
     assigned(0, Zombuul, zombuul),
     reminder_on(zombuul_appears_dead, Zombuul, T).
 
-% Prevent the died/2 atom from being generated when faking (the fake intercepts the death)
-:- zombuul_fakes_death(Zombuul, T), died(Zombuul, T).
+% Block the generic pipeline from producing died when Zombuul fakes death
+demon_kill_blocked(Token, Zombuul, T) :-
+    zombuul_fakes_death(Zombuul, T),
+    demon_kill_token(Token),
+    reminder_on(Token, Zombuul, T).
 
 % Second death is real: the fake death has already been used, so this time the Zombuul actually dies
 zombuul_truly_dies(Zombuul, T) :-

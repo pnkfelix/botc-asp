@@ -59,20 +59,19 @@ player_chooses(po, Po, point(P), night(N, RoleOrd, 2)) :-
     other_night_role_order(po, RoleOrd),
     po_target(Po, P, _, N).
 
-% Kill resolves at substep 3: functioning + no protection = success (applies to each target independently)
-po_kill_succeeds(P, T) :-
+% Place kill token on each target if functioning (token placement, not kill resolution)
+reminder_on(po_dead, P, night(N, RoleOrd, 3)) :-
     po_target(Po, P, _, N),
     assigned(0, Po, po),
     night_number(N), N > 1,
     other_night_role_order(po, RoleOrd),
-    T = night(N, RoleOrd, 3),
-    functioning(Po, T),
-    not protected_from_demon(P, T).
+    functioning(Po, night(N, RoleOrd, 3)).
 
-% Place kill token on victim for grimoire display
-reminder_on(po_dead, P, T) :- po_kill_succeeds(P, T).
+% Register kill token so botc.lp's generic death logic processes it
+demon_kill_token(po_dead).
 
-% Mark victim as dead at instant of kill (for mid-night state tracking)
-dead_at_time(P, T) :- po_kill_succeeds(P, T).
-% Record death at final night time for dawn processing
-died(P, T) :- po_kill_succeeds(P, KillTime), KillTime = night(N, _, _), final_night_time(N, T), alive(P, night(N, 0, 0)).
+% Remove stale kill tokens from previous night's targets (prevents inertia-carried kills)
+token_removed(po_dead, P, night(N, RoleOrd, 3)) :-
+    reminder_on(po_dead, P, night(N, 0, 0)),
+    night_number(N), N > 1,
+    other_night_role_order(po, RoleOrd).
