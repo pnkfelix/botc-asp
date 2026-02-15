@@ -42,16 +42,8 @@ grandmother_dies_from_grandchild(GM, T) :-
     died_from_demon(Grandchild, T),
     alive(GM, T).
 
-% died_from_demon for Imp (separate rules per demon: each has a different kill predicate)
-died_from_demon(P, T) :- imp_kill_succeeds(P, T).
-% died_from_demon for Zombuul
-died_from_demon(P, T) :- zombuul_kill_succeeds(P, T).
-% died_from_demon for Pukka
-died_from_demon(P, T) :- pukka_kill_succeeds(P, T).
-% died_from_demon for Shabaloth
-died_from_demon(P, T) :- shabaloth_kill_succeeds(P, T).
-% died_from_demon for Po
-died_from_demon(P, T) :- po_kill_succeeds(P, T).
+% died_from_demon: uses the generic pipeline (no cycles — Grandmother doesn't feed back into demon kill)
+died_from_demon(P, T) :- demon_kill_succeeds(P, T).
 
 % Mark Grandmother as dead at the instant of the grandchild kill (mid-night state tracking)
 dead_at_time(GM, T) :- grandmother_dies_from_grandchild(GM, T).
