@@ -1,6 +1,10 @@
 // FFI bindings for clingo-wasm
 import * as clingo from "clingo-wasm";
 
+// Check if WebAssembly is available in this browser
+export const isWasmAvailableImpl = () =>
+  typeof WebAssembly !== "undefined";
+
 // Helper to stringify a foreign value for debugging
 export const showForeignImpl = (value) => JSON.stringify(value, null, 2);
 

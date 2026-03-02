@@ -57,6 +57,7 @@ type State =
   , result :: Maybe ResultDisplay
   , isLoading :: Boolean
   , isInitialized :: Boolean
+  , wasmError :: Maybe String          -- Error message if WASM init failed (e.g. WebAssembly disabled)
   , selectedModelIndex :: Int       -- Which model to show in Timeline/Grimoire (0-indexed)
   -- Pagination for answer sets list (prevents browser crash with many models)
   , answerSetPage :: Int            -- Current page of answer sets (0-indexed)

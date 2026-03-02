@@ -11,7 +11,7 @@ import Data.Array (filter, length, mapWithIndex, null, slice, sort)
 import Data.Foldable (intercalate)
 import Data.Int as Int
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Set as Set
 import Effect.Aff.Class (class MonadAff)
 import FilterExpression as FE
@@ -161,6 +161,26 @@ render state =
         Nothing ->
           HH.text ""
 
+    -- WebAssembly error banner (shown when WASM is unavailable or failed to initialize)
+    , case state.wasmError of
+        Just errMsg ->
+          HH.div
+            [ HP.style $ "margin: 20px 0; padding: 20px; background: #fff3e0; border: 2px solid #ff9800; "
+                <> "border-radius: 8px; color: #e65100;"
+            ]
+            [ HH.h3
+                [ HP.style "margin: 0 0 10px 0; color: #e65100;" ]
+                [ HH.text "WebAssembly Unavailable" ]
+            , HH.p
+                [ HP.style "margin: 0 0 10px 0;" ]
+                [ HH.text errMsg ]
+            , HH.p
+                [ HP.style "margin: 0; font-size: 13px; color: #bf360c;" ]
+                [ HH.text "You can still browse and edit the ASP source files below, but the solver cannot run." ]
+            ]
+        Nothing ->
+          HH.text ""
+
     -- Game configuration controls: player count slider, min nights slider, script dropdown
     , let
         currentPlayerCount = Early.extractPlayerCount state.files
@@ -241,16 +261,18 @@ render state =
         , -- Run button
           HH.button
             [ HP.style $ "padding: 12px 30px; font-size: 18px; cursor: pointer; "
-                <> "background: #4CAF50; color: white; border: none; border-radius: 4px;"
+                <> "background: " <> (if isJust state.wasmError then "#9e9e9e" else "#4CAF50") <> "; color: white; border: none; border-radius: 4px;"
                 <> if state.isLoading then " opacity: 0.6;" else ""
             , HE.onClick \_ -> RunClingo
-            , HP.disabled (state.isLoading || not state.isInitialized)
+            , HP.disabled (state.isLoading || not state.isInitialized || isJust state.wasmError)
             ]
             [ HH.text $ if state.isLoading
                 then "Running..."
-                else if state.isInitialized
-                  then "Run Clingo"
-                  else "Initializing..."
+                else if isJust state.wasmError
+                  then "WASM Unavailable"
+                  else if state.isInitialized
+                    then "Run Clingo"
+                    else "Initializing..."
             ]
         , -- Ground button (experimental - outputs ground program)
           HH.button
@@ -258,7 +280,7 @@ render state =
                 <> "background: #9C27B0; color: white; border: none; border-radius: 4px;"
                 <> if state.isGrounding then " opacity: 0.6;" else ""
             , HE.onClick \_ -> GroundProgram
-            , HP.disabled (state.isGrounding || state.isLoading || not state.isInitialized)
+            , HP.disabled (state.isGrounding || state.isLoading || not state.isInitialized || isJust state.wasmError)
             , HP.title "Experimental: Try to extract grounded program (--mode=gringo)"
             ]
             [ HH.text $ if state.isGrounding then "Grounding..." else "Ground" ]

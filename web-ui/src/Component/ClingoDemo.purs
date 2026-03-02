@@ -16,10 +16,12 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Set as Set
 import Data.String (trim)
 import Data.String as String
+import Data.Either (Either(..))
 import Effect.Aff (Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Effect.Exception (message)
 import EarlyParser (parseMinNights, parsePlayerCount, parseScript, getValidPlayerNames)
 import Halogen as H
 import TextareaUtils as TU
@@ -48,8 +50,19 @@ component =
 handleAction :: forall cs o m. MonadAff m => Action -> H.HalogenM State Action cs o m Unit
 handleAction = case _ of
   Initialize -> do
-    -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
-    H.liftAff $ Clingo.init "./clingo.wasm"
+    -- Check if WebAssembly is available before trying to initialize
+    wasmAvailable <- liftEffect Clingo.isWasmAvailable
+    if wasmAvailable
+      then do
+        -- Initialize clingo-wasm (relative path works locally and on GitHub Pages)
+        initResult <- H.liftAff $ Aff.try $ Clingo.init "./clingo.wasm"
+        case initResult of
+          Left err ->
+            H.modify_ \s -> s { wasmError = Just ("Failed to initialize Clingo WASM: " <> message err) }
+          Right _ ->
+            H.modify_ \s -> s { isInitialized = true }
+      else
+        H.modify_ \s -> s { wasmError = Just "WebAssembly is not available in your browser. The ASP solver requires WebAssembly to run. Please enable WebAssembly in your browser settings, or try a different browser." }
     -- Check for URL parameters and update inst.lp if present
     maybePlayerCount <- liftEffect $ UP.getUrlParam "player_count"
     maybeMinNights <- liftEffect $ UP.getUrlParam "min_nights"
@@ -71,7 +84,7 @@ handleAction = case _ of
           Just scriptId | isValidScript s.files scriptId -> updateScript s.files scriptId withMinNights
           _ -> withMinNights
         updatedFiles = Map.insert "inst.lp" withScript s.files
-      in s { files = updatedFiles, isInitialized = true }
+      in s { files = updatedFiles }
     -- Initialize syntax highlighting for the initial file
     state <- H.get
     let content = fromMaybe "" $ Map.lookup state.currentFile state.files

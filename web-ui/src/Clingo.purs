@@ -10,6 +10,7 @@ module Clingo
   , IncrementalGameState
   , IncrementalPlayer
   , IncrementalReminder
+  , isWasmAvailable
   , run
   , ground
   , init
@@ -89,6 +90,7 @@ data GroundResult
   | GroundError String      -- Error message (e.g., unsupported option)
 
 -- | Foreign imports
+foreign import isWasmAvailableImpl :: Effect Boolean
 foreign import initImpl :: String -> Effect (Promise Unit)
 foreign import runImpl :: String -> Int -> Effect (Promise Foreign)
 foreign import groundImpl :: String -> Effect (Promise Foreign)
@@ -101,6 +103,10 @@ foreign import showForeignImpl :: Foreign -> String
 -- | Helper to stringify a foreign value for debugging
 showForeign :: Foreign -> String
 showForeign = showForeignImpl
+
+-- | Check if WebAssembly is available in this browser
+isWasmAvailable :: Effect Boolean
+isWasmAvailable = isWasmAvailableImpl
 
 -- | Initialize clingo-wasm with the WASM URL
 init :: String -> Aff Unit

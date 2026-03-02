@@ -226,6 +226,7 @@ initialState =
   , result: Nothing
   , isLoading: false
   , isInitialized: false
+  , wasmError: Nothing
   , selectedModelIndex: 0  -- First model selected by default
   , answerSetPage: 0       -- First page of answer sets
   , showPredicateList: false
