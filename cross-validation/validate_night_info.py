@@ -14,11 +14,10 @@ the ZDD world count.
 - ft_red_herring/1: which player is the FT red herring (derived from ft_red_herring)
 
 **Known discrepancies** (documented, not bugs in the cross-validation):
-- ASP Chef malfunctioning range is 0..player_count/2 (correct per game rules).
-  ZDD uses 0..numPlayers (too wide). ZDD bug, tracked separately.
-- ASP pair-based info roles (WW/Lib/Inv) allow naming ANY role the reference
-  player may_register_as, not just roles of the target type. E.g., WW can name
-  "Butler" when Spy is the reference. ASP bug, tracked separately.
+- ZDD treats Spy/Recluse registration independently per info role (each role
+  decides whether the Spy "registers as" its target type). The ASP models
+  registration as a single global ST choice that correlates across all info
+  roles. This causes the ZDD to overcount in multi-info-role + Spy scenarios.
 
 Requirements:
 - Python clingo package: pip install clingo
@@ -59,20 +58,17 @@ SCENARIOS = [
         "name": "5p Poisoner: WW,Chef,Empath,Poisoner,Imp",
         "seats": {0: "washerwoman", 1: "chef", 2: "empath", 3: "poisoner", 4: "imp"},
         "player_count": 5,
-        "known_discrepancy": "Chef malfunctioning range: ASP uses 0..N/2, ZDD uses 0..N",
     },
     {
         "name": "5p Poisoner rotated: Poisoner,WW,Empath,Imp,Chef",
         "seats": {0: "poisoner", 1: "washerwoman", 2: "empath", 3: "imp", 4: "chef"},
         "player_count": 5,
-        "known_discrepancy": "Chef malfunctioning range",
     },
     # --- Spy (no Poisoner) ---
     {
         "name": "5p Spy: WW,Chef,Empath,Spy,Imp",
         "seats": {0: "washerwoman", 1: "chef", 2: "empath", 3: "spy", 4: "imp"},
         "player_count": 5,
-        "known_discrepancy": "ASP WW may_register_as_role includes non-townsfolk for Spy",
     },
     # --- Recluse (no Poisoner) ---
     {
@@ -84,41 +80,36 @@ SCENARIOS = [
         "name": "5p Recluse+Inv: Investigator,Chef,Recluse,SW,Imp",
         "seats": {0: "investigator", 1: "chef", 2: "recluse", 3: "scarlet_woman", 4: "imp"},
         "player_count": 5,
-        "known_discrepancy": "ASP Inv may_register_as_role includes non-minion for Recluse",
     },
     # --- Fortune Teller (no Poisoner) ---
     {
         "name": "5p FT: FT,Chef,Empath,SW,Imp",
         "seats": {0: "fortune_teller", 1: "chef", 2: "empath", 3: "scarlet_woman", 4: "imp"},
         "player_count": 5,
-        "known_discrepancy": "ZDD excludes FT from own pair choices; ASP allows self-pick",
     },
     # --- Fortune Teller + Poisoner ---
     {
         "name": "5p FT+Poisoner: FT,Chef,Empath,Poisoner,Imp",
         "seats": {0: "fortune_teller", 1: "chef", 2: "empath", 3: "poisoner", 4: "imp"},
         "player_count": 5,
-        "known_discrepancy": "Chef malfunctioning range + FT self-pick",
     },
     # --- Spy + Recluse ---
     {
         "name": "6p Spy+Recluse: WW,Chef,Spy,Recluse,SW,Imp",
         "seats": {0: "washerwoman", 1: "chef", 2: "spy", 3: "recluse", 4: "scarlet_woman", 5: "imp"},
         "player_count": 6,
-        "known_discrepancy": "ASP WW may_register_as_role includes non-townsfolk for Spy",
     },
     # --- Large: 7 players ---
     {
         "name": "7p all info: WW,Lib,Inv,Chef,Empath,SW,Imp",
         "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "scarlet_woman", 6: "imp"},
         "player_count": 7,
-        "known_discrepancy": "ASP Librarian has no 'No Outsiders' path (UNSAT when no outsider registers)",
     },
     {
         "name": "7p Spy+info: WW,Lib,Inv,Chef,Empath,Spy,Imp",
         "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "spy", 6: "imp"},
         "player_count": 7,
-        "known_discrepancy": "ASP may_register_as_role includes cross-category roles for Spy",
+        "known_discrepancy": "ZDD treats Spy registration per-info-role independently; ASP correlates globally",
     },
 ]
 
@@ -323,11 +314,9 @@ def compare():
 
     if discrepancy_count > 0:
         print("\nKnown discrepancies to fix:")
-        print("  1. ZDD: Chef malfunctioning range is 0..N, should be 0..N/2")
-        print("  2. ASP: WW/Lib/Inv may_register_as_role allows cross-category")
-        print("     role names when Spy/Recluse is the reference player")
-        print("  3. ZDD: FT excludes self from pair choices; ASP allows self-pick")
-        print("  4. ASP: Librarian has no 'No Outsiders' info path")
+        print("  1. ZDD: Spy/Recluse registration is treated independently per info")
+        print("     role, but in the ASP (and in the real game) registration is a")
+        print("     single global ST choice that constrains all info roles together.")
 
     return all_pass
 
