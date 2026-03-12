@@ -14,10 +14,13 @@ the ZDD world count.
 - ft_red_herring/1: which player is the FT red herring (derived from ft_red_herring)
 
 **Known discrepancies** (documented, not bugs in the cross-validation):
-- ZDD treats Spy/Recluse registration independently per info role (each role
-  decides whether the Spy "registers as" its target type). The ASP models
-  registration as a single global ST choice that correlates across all info
-  roles. This causes the ZDD to overcount in multi-info-role + Spy scenarios.
+- ZDD Investigator: when Spy is the reference, findPairTargets offers all minion
+  role names (Baron, Poisoner, SW, Spy). But Spy lacks may_misregister_as(minion),
+  so the only valid name is "spy" (the true role). Overcounts by 4x.
+- ZDD Librarian: when the only outsider-registering player is the Spy, the ZDD
+  always treats Spy as an eligible reference. But Spy's outsider registration is
+  optional (a ST choice), so there should also be a "No Outsiders" branch for
+  when the Spy doesn't register as outsider. Undercounts by 1.
 
 Requirements:
 - Python clingo package: pip install clingo
@@ -109,7 +112,7 @@ SCENARIOS = [
         "name": "7p Spy+info: WW,Lib,Inv,Chef,Empath,Spy,Imp",
         "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "spy", 6: "imp"},
         "player_count": 7,
-        "known_discrepancy": "ZDD treats Spy registration per-info-role independently; ASP correlates globally",
+        "known_discrepancy": "Two ZDD bugs: (1) Inv names any minion role for Spy, but Spy lacks may_misregister_as(minion) so only 'spy' is valid; (2) Lib missing 'No Outsiders' branch when Spy is the only outsider-registering player (registration is optional)",
     },
 ]
 
@@ -313,10 +316,11 @@ def compare():
     print("=" * 70)
 
     if discrepancy_count > 0:
-        print("\nKnown discrepancies to fix:")
-        print("  1. ZDD: Spy/Recluse registration is treated independently per info")
-        print("     role, but in the ASP (and in the real game) registration is a")
-        print("     single global ST choice that constrains all info roles together.")
+        print("\nKnown discrepancies to fix (both ZDD-side):")
+        print("  1. ZDD Inv: Spy as reference offers all minion role names, but Spy")
+        print("     lacks may_misregister_as(minion); only 'spy' is valid (4x overcount)")
+        print("  2. ZDD Lib: when Spy is the only outsider-registering player, Spy's")
+        print("     outsider registration is optional; missing 'No Outsiders' branch")
 
     return all_pass
 
