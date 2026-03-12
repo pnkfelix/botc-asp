@@ -38,8 +38,7 @@ Established:
 
 ## Prompt 2: Poisoner + Drunk (malfunctioning info)
 
-**Status: PR #5 open, CI passing**
-**Branch: claude/add-poisoner-malfunctioning-roles-bDI3I**
+**Status: Merged (PR #5). Cross-validation passing.**
 
 The poisoner's target choice is part of the Night 1 phase — it happens before
 info roles act. This expands the Night 1 ZDD: for each poisoner target choice,
@@ -86,8 +85,43 @@ for distributions.
 ## Integration Milestones
 
 - **Prompts 1-3**: Minimum for useful integration (info roles with full TB complexity)
+- **Prompt 3 specifically**: Enables switching cross-validation to the real ASP oracle (see below)
 - **Prompt 4**: Enables multi-night games
 - **Prompt 5**: Bridge back to this repo
+
+---
+
+## Cross-Validation Strategy
+
+### Current state (Prompts 1-2)
+
+The night info cross-validation (`cross-validation/validate_night_info.py`) uses
+a **Python oracle** that independently computes expected world counts. This is
+NOT ideal — it reimplements the same spec as the ZDD, so shared misunderstandings
+of the spec would not be caught. We use it because the ZDD doesn't yet model
+Spy/Recluse registration or Fortune Teller, so running clingo against the full
+botc-asp rules would produce different (larger) answer set counts.
+
+Distribution cross-validation already uses the real clingo oracle and passes.
+
+### Target state (after Prompt 3)
+
+Once Prompt 3 lands (Spy/Recluse registration + Fortune Teller red herring), the
+ZDD's modeling scope for Night 1 info will match what the botc-asp ASP rules
+encode. At that point, **replace the Python oracle with clingo enumeration
+against the real ASP rules**:
+
+1. Feed clingo the concrete seat assignment + `botc.lp` + `tb.lp` + role files
+2. Enumerate all valid `st_tells_core` answer sets (including poisoner target,
+   malfunctioning outputs, Spy/Recluse registration, FT red herring)
+3. Count answer sets and compare against ZDD world count
+
+This is the real validation — two independent implementations (ASP declarative
+rules vs ZDD procedural builder) of the same game logic, compared by output.
+Any disagreement reveals a genuine bug in one or the other.
+
+**Priority: Switch to the ASP oracle as soon as Prompt 3 merges.** The Python
+oracle is a stopgap. Do not let it persist beyond Prompt 3.
 
 ---
 
