@@ -52,22 +52,76 @@ variables.
 
 ## Prompt 3: Spy/Recluse registration + Fortune Teller red herring
 
-**Status: Not started**
+**Status: Merged (PRs #6, #8). Cross-validation switched to ASP oracle.**
 
 These modify what counts as "truthful" for info roles. Spy can appear as good to
 info roles, Recluse can appear as evil. Fortune Teller has a pre-designated red
 herring player. All three expand the set of valid ST info choices without changing
 the phase architecture.
 
+Key changes:
+- Spy registers as any Townsfolk/Outsider for info role purposes
+- Recluse registers as any Minion/Demon for info role purposes
+- Fortune Teller red herring: one non-Demon player designated to trigger "Yes"
+- FT pair choice variables added (which two players the FT chooses to read)
+- PR #8 fix: Spy/Recluse cannot register as their own type, and Librarian
+  correctly handles optional "No Outsiders" branch
+
+After this prompt landed, the Python oracle in `validate_night_info.py` was
+replaced with the real clingo ASP oracle — two fully independent implementations
+now cross-validate against each other. All 11 scenarios pass.
+
 ---
 
-## Prompt 4: Active night roles + death
+## Prompt 4: Night 2 active roles + death
 
-**Status: Not started**
+**Status: Merged (PRs #9, #10). Cross-validation passing.**
 
-Imp demon kill (not Night 1), Monk protection, Soldier immunity. These add
-variables to later night phases and introduce the concept of players dying between
-nights, which affects Empath neighbor calculations and game progression.
+Adds Night 2 action phase as a new ZDD phase type (`NightAction`), separate from
+Night 1 info (`NightInfo`). Introduces:
+
+- **Poisoner N2 retarget**: Poisoner picks a new target for Night 2
+- **Monk protection**: Monk chooses one player to protect from demon kill
+- **Imp kill**: Imp chooses a target; kill resolves considering Monk protection
+- **Imp starpass**: Imp can self-target if living minions exist, passing demon
+  status to a minion (recipient choice is a ZDD variable)
+- **Soldier immunity**: Soldier is immune to demon kill (functioning only)
+- **Empath N2**: Re-queries after death, skipping dead neighbors
+- **Fortune Teller N2**: Re-queries after death, checking for new demon after
+  starpass
+
+Architecture: cascading branches — each Poisoner target creates a malfunctioning
+context, each Monk target creates a protection context, each Imp target resolves
+kill/no-kill, then info roles build on top. Branches combined via union.
+
+PR #10 fix: Fortune Teller correctly detects starpass (demon changed) and Soldier
+immunity prevents kill when functioning (not poisoned).
+
+---
+
+## Prompt 6: Day phase + Undertaker + dead seat handling
+
+**Status: Merged (PR #11). Cross-validation passing.**
+
+Adds Day phase support to the Game class and implements Undertaker as the first
+Night 2 info role that depends on Day phase state.
+
+Key changes:
+- **`DayResult` type**: Records execution (seat, role), other deaths, cumulative
+  dead set
+- **`recordDay()` method**: State transition with zero ZDD variables (root = TOP),
+  validates alive, snapshots for undo
+- **`recordNightDeath()` method**: Records observed night deaths without creating
+  a new phase
+- **Dead seat handling**: Dead actors skipped (Poisoner, Monk, Imp), dead seats
+  excluded from targets, dead minions excluded from starpass, Empath/FT skip
+  pre-dead neighbors
+- **Undertaker**: Learns executed player's role; one variable per role in
+  selected set; functioning → exact role, malfunctioning → any role; inactive
+  when dead or no execution
+- **Undo support**: Restores dead set from snapshot, pops day results
+
+Test coverage: 20 tests (17 specified + 3 integration).
 
 ---
 
@@ -80,48 +134,55 @@ same inputs the botc-asp web app works with and produces comparable outputs.
 Verify browser bundleability. Maybe a small cross-validation script like we have
 for distributions.
 
+Now that we have the full Night 1 → Day 1 → Night 2 pipeline with Undertaker,
+integration can demonstrate multi-phase gameplay. Potential scope:
+
+- Browser bundle verification (ZDD + game engine in WASM-free JS)
+- Shadow mode: run ZDD engine alongside ASP engine in the web UI, compare outputs
+- Night 2 cross-validation script (extend `validate_night_info.py` pattern to
+  cover Night 2 action scenarios)
+- API surface cleanup: ensure Game class methods have a clean, documented interface
+
 ---
 
 ## Integration Milestones
 
-- **Prompts 1-3**: Minimum for useful integration (info roles with full TB complexity)
-- **Prompt 3 specifically**: Enables switching cross-validation to the real ASP oracle (see below)
-- **Prompt 4**: Enables multi-night games
-- **Prompt 5**: Bridge back to this repo
+- **Prompts 1-3**: Minimum for useful integration (info roles with full TB complexity) — **DONE**
+- **Prompt 3 specifically**: Enables switching cross-validation to the real ASP oracle — **DONE**
+- **Prompt 4**: Enables multi-night games — **DONE**
+- **Prompt 6**: Day phase + Undertaker, completing the Night 1 → Day 1 → Night 2 loop — **DONE**
+- **Prompt 5**: Bridge back to this repo — **NEXT**
 
 ---
 
 ## Cross-Validation Strategy
 
-### Current state (Prompts 1-2)
+### Current state (Prompts 1-4, 6 complete)
 
-The night info cross-validation (`cross-validation/validate_night_info.py`) uses
-a **Python oracle** that independently computes expected world counts. This is
-NOT ideal — it reimplements the same spec as the ZDD, so shared misunderstandings
-of the spec would not be caught. We use it because the ZDD doesn't yet model
-Spy/Recluse registration or Fortune Teller, so running clingo against the full
-botc-asp rules would produce different (larger) answer set counts.
+Cross-validation uses the **real clingo ASP oracle** for Night 1 info. The Python
+oracle was retired after Prompt 3 landed. Two independent implementations (ASP
+declarative rules vs ZDD procedural builder) are compared by output count.
 
-Distribution cross-validation already uses the real clingo oracle and passes.
+**Night 1 info** (`cross-validation/validate_night_info.py`):
+- 11 scenarios covering 5p–7p games with Poisoner, Spy, Recluse, Fortune Teller
+- All pass: ASP projected model count == ZDD world count
+- ZDD is 130x–8,000x faster than clingo across all scenarios
 
-### Target state (after Prompt 3)
+**Distributions** (`cross-validation/validate_distributions.py`):
+- 12 scenarios (5p–10p, with/without Baron)
+- All pass
 
-Once Prompt 3 lands (Spy/Recluse registration + Fortune Teller red herring), the
-ZDD's modeling scope for Night 1 info will match what the botc-asp ASP rules
-encode. At that point, **replace the Python oracle with clingo enumeration
-against the real ASP rules**:
+**Benchmarks** (`cross-validation/benchmark_night_info.py`):
+- ZDD: sub-2ms per scenario, 5 MB heap, max 510 nodes
+- ASP: 250ms–5s per scenario, 70 MB peak RSS
+- Largest scenario (7p Spy+info, 34,020 worlds): 0.6ms ZDD vs 5.0s ASP
 
-1. Feed clingo the concrete seat assignment + `botc.lp` + `tb.lp` + role files
-2. Enumerate all valid `st_tells_core` answer sets (including poisoner target,
-   malfunctioning outputs, Spy/Recluse registration, FT red herring)
-3. Count answer sets and compare against ZDD world count
+### Future: Night 2 cross-validation
 
-This is the real validation — two independent implementations (ASP declarative
-rules vs ZDD procedural builder) of the same game logic, compared by output.
-Any disagreement reveals a genuine bug in one or the other.
-
-**Priority: Switch to the ASP oracle as soon as Prompt 3 merges.** The Python
-oracle is a stopgap. Do not let it persist beyond Prompt 3.
+Night 2 action phase cross-validation is not yet implemented. This would require
+extending the ASP oracle to model Night 2 actions (Poisoner retarget, Monk
+protection, Imp kill, Empath/FT re-query, Undertaker) and comparing against the
+ZDD `buildNightActionZDD` output. This is a natural Prompt 5 task.
 
 ---
 
@@ -175,3 +236,84 @@ The implementation correctly addresses all Prompt 2 requirements:
 2. Chef maximal variable count is `numPlayers + 1` whether functioning or not.
    No variable count mismatch.
 3. CI passes.
+
+### PR #6 Review (2026-03-12)
+
+**Verdict: Approve — Prompt 3 complete**
+
+Adds Spy/Recluse registration and Fortune Teller with red herring (+1,485 -373
+across 5 files). Major rework of the night info builder:
+
+- Spy registers as any Townsfolk/Outsider; Recluse as any Minion/Demon
+- Fortune Teller: red herring seat config, FT pair choice variables, "Yes"/"No"
+  output based on whether either chosen player is Demon (or red herring)
+- Comprehensive test suite covering Spy/Recluse/FT interactions
+- Cross-validated against clingo ASP oracle: all scenarios pass
+
+### PR #8 Review (2026-03-12)
+
+**Verdict: Approve — Prompt 3 bugfix**
+
+Fixes two issues found during cross-validation (+77 -17 across 3 files):
+
+1. Spy cannot register as Minion/Demon (own type), Recluse cannot register as
+   Townsfolk/Outsider (own type) — this was producing extra worlds
+2. Librarian correctly handles "No Outsiders" output as an optional branch when
+   no Outsiders are in the game
+
+After this fix, all 11 cross-validation scenarios pass against the ASP oracle.
+
+### PR #9 Review (2026-03-12)
+
+**Verdict: Approve — Prompt 4 complete**
+
+Adds Night 2 action phase (+1,748 lines, 4 new files). Entirely new module
+`night-action.ts` with cascading branch architecture:
+
+- Variables: PoisonerN2 targets, MonkTarget, ImpTarget, StarpassRecipient,
+  EmpathN2, FortuneTellerN2
+- Kill resolution: Imp target dies unless Monk-protected or Soldier (functioning)
+- Starpass: Imp self-targets → dies, demon status passes to living minion
+- Empath/FT re-query after death with updated neighbor/demon state
+- 37 tests covering all role interactions and branch counts
+
+### PR #10 Review (2026-03-12)
+
+**Verdict: Approve — Prompt 4 bugfix**
+
+Fixes two issues (+299 -13 across 2 files):
+
+1. Fortune Teller starpass detection: FT now correctly identifies the new demon
+   seat after starpass (was using original demon seat)
+2. Soldier immunity: Soldier is immune to demon kill when functioning (not
+   poisoned by Night 2 Poisoner target)
+
+### PR #11 Review (2026-03-12)
+
+**Verdict: Approve — Prompt 6 (Day phase + Undertaker)**
+
+Adds Day phase support and Undertaker role (+896 -31 across 4 files):
+
+**Day phase (Game class):**
+- `DayResult` interface: dayNumber, executedSeat/Role, otherDeaths, deadSeats
+- `recordDay()`: zero ZDD variables (root = TOP), validates alive, snapshots for undo
+- `recordNightDeath()`: state update without new phase
+- Undo restores dead set from snapshot
+
+**Dead seat handling (night-action.ts):**
+- Dead Poisoner/Monk/Imp skipped (no variables generated)
+- Dead seats excluded from all target lists
+- Dead minions excluded from starpass eligibility
+- Empath/FT skip pre-dead seats in neighbor calculations
+
+**Undertaker:**
+- One variable per role in selectedRoles
+- Active only when alive AND execution occurred
+- Functioning: exactly the executed role; malfunctioning: any role
+- Integrated into `buildInfoRolesForBranch` via `zdd.product`
+
+**Tests:** 20 tests (5 Day phase, 5 dead seats, 5 Undertaker, 2 branch counts,
+3 Game class integration). All pass.
+
+**Cross-validation:** All 11 Night 1 info scenarios and 12 distribution scenarios
+continue to pass. ZDD performance unchanged (sub-2ms, 5 MB heap).
