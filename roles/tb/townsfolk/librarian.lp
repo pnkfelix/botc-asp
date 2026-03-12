@@ -47,7 +47,18 @@ lib_outsider_available :-
     chair_ordered(POutsider, PWrong, First, Second),
     functioning(LIB, T).
 
+% Not functioning: ST may choose to lie with "no outsiders" even when outsiders exist
+{ lib_tells_no_outsiders(LIB, T) } :-
+    T = night(1, RoleOrd, 3),
+    first_night_role_order(librarian, RoleOrd),
+    character_assignment_state_at_time(T, LIB, librarian),
+    not functioning(LIB, T),
+    lib_outsider_available.
+
+st_tells_core(librarian, LIB, no_outsiders, T) :- lib_tells_no_outsiders(LIB, T).
+
 % Not functioning (poisoned/drunk): ST may name any outsider role (no truthfulness constraint)
+% Only fires if the ST didn't choose to say "no outsiders" instead
 { st_tells_core(librarian, LIB, info(First, Second, R), T) : outsider(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(librarian, RoleOrd),
@@ -55,10 +66,10 @@ lib_outsider_available :-
     reminder_on(lib_outsider, POutsider, T),
     reminder_on(lib_wrong, PWrong, T),
     chair_ordered(POutsider, PWrong, First, Second),
-    not functioning(LIB, T).
+    not functioning(LIB, T),
+    not lib_tells_no_outsiders(LIB, T).
 
-% No outsiders in game: ST tells librarian there are no outsiders
-% This applies regardless of functioning status (the info is always truthful in this case)
+% No outsiders in game: ST tells librarian there are no outsiders (always truthful)
 st_tells_core(librarian, LIB, no_outsiders, T) :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(librarian, RoleOrd),
