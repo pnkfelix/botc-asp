@@ -2,8 +2,12 @@
 """
 Cross-validate botc-zdd- Night 1 info role outputs against clingo oracle.
 
-For a fixed 5-player seat assignment, counts the number of valid ST
-information choices per info role and compares ZDD vs ASP results.
+For a fixed seat assignment, counts the number of valid ST information
+choices per info role and compares ZDD vs ASP results.
+
+When the Poisoner is in play, the oracle computes per-branch world counts
+(one branch per poisoner target), where the targeted info role gets
+unconstrained outputs. The total world count is the sum across branches.
 
 Requirements:
 - Python clingo package: pip install clingo
@@ -20,7 +24,25 @@ SCRIPT_DIR = Path(__file__).parent
 ZDD_REPO = SCRIPT_DIR.parent.parent / "botc-zdd-"
 
 # =============================================================================
-# Test scenarios: (seat assignments, expected info)
+# Role categories (Trouble Brewing)
+# =============================================================================
+
+TOWNSFOLK = {"washerwoman", "librarian", "investigator", "chef", "empath",
+             "fortune_teller", "undertaker", "monk", "ravenkeeper",
+             "virgin", "slayer", "soldier", "mayor"}
+
+OUTSIDERS = {"butler", "drunk", "recluse", "saint"}
+
+MINIONS = {"poisoner", "spy", "scarlet_woman", "baron"}
+
+DEMONS = {"imp"}
+
+ALL_TOWNSFOLK_COUNT = len(TOWNSFOLK)  # 13
+ALL_OUTSIDER_COUNT = len(OUTSIDERS)   # 4
+ALL_MINION_COUNT = len(MINIONS)       # 4
+
+# =============================================================================
+# Test scenarios
 # =============================================================================
 
 SCENARIOS = [
@@ -49,135 +71,188 @@ SCENARIOS = [
         "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "poisoner", 6: "imp"},
         "player_count": 7,
     },
+    # No-Poisoner scenarios (use Spy as the minion)
+    {
+        "name": "5p: WW,Chef,Empath,Spy,Imp (no Poisoner)",
+        "seats": {0: "washerwoman", 1: "chef", 2: "empath", 3: "spy", 4: "imp"},
+        "player_count": 5,
+    },
+    {
+        "name": "7p: WW,Lib,Inv,Chef,Empath,Spy,Imp (no Poisoner)",
+        "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "spy", 6: "imp"},
+        "player_count": 7,
+    },
 ]
 
 
 # =============================================================================
-# Clingo Oracle
+# Clingo Oracle — per-role choice counts
 # =============================================================================
 
-def asp_role_name(name):
-    """Convert Python role name to ASP format."""
-    return name.lower().replace(" ", "_")
+def is_info_role(role):
+    """Check if a role is a Night 1 info role."""
+    return role in {"washerwoman", "librarian", "investigator", "chef", "empath"}
 
 
-def count_washerwoman_choices(seats, player_count):
-    """Count valid (playerA, playerB, townsfolk_role) triples for Washerwoman via ASP."""
-    # Find Washerwoman's seat
-    ww_seat = None
-    for s, r in seats.items():
-        if r == "washerwoman":
-            ww_seat = s
-            break
-    if ww_seat is None:
+def count_pair_role_choices(seats, player_count, info_seat, info_role, target_category,
+                            malfunctioning=False):
+    """Count valid choices for a pair-based info role (WW, Lib, Inv).
+
+    When functioning: target must actually have a role of the target category.
+    When malfunctioning: any pair of other players × any role of target category from script.
+    """
+    if info_role == "washerwoman":
+        category_set = TOWNSFOLK
+        all_count = ALL_TOWNSFOLK_COUNT
+    elif info_role == "librarian":
+        category_set = OUTSIDERS
+        all_count = ALL_OUTSIDER_COUNT
+    elif info_role == "investigator":
+        category_set = MINIONS
+        all_count = ALL_MINION_COUNT
+    else:
         return 0
 
-    # Townsfolk roles (from BotC)
-    townsfolk = {"washerwoman", "librarian", "investigator", "chef", "empath",
-                 "fortune_teller", "undertaker", "monk", "ravenkeeper",
-                 "virgin", "slayer", "soldier", "mayor"}
+    if malfunctioning:
+        # Any pair of other players × any role from the target category in the script
+        other_seats = [s for s in range(player_count) if s != info_seat]
+        n = len(other_seats)
+        pair_count = n * (n - 1) // 2
+        total = pair_count * all_count
+        # Librarian also gets "No Outsiders" as an option
+        if info_role == "librarian":
+            total += 1
+        return total
 
-    # Find other townsfolk in play (not the WW herself)
+    # Functioning: find actual targets
     targets = []
     for s, r in seats.items():
-        if s != ww_seat and r in townsfolk:
+        if s != info_seat and r in category_set:
             targets.append((s, r))
 
-    # For each target, count valid decoys (any seat except WW and target)
-    count = 0
-    for target_seat, target_role in targets:
-        for decoy in range(player_count):
-            if decoy != ww_seat and decoy != target_seat:
-                count += 1
-    return count
-
-
-def count_librarian_choices(seats, player_count):
-    """Count valid Librarian info choices."""
-    lib_seat = None
-    for s, r in seats.items():
-        if r == "librarian":
-            lib_seat = s
-            break
-    if lib_seat is None:
-        return 0
-
-    outsiders = {"butler", "drunk", "recluse", "saint"}
-    targets = [(s, r) for s, r in seats.items() if s != lib_seat and r in outsiders]
-
     if not targets:
-        return 1  # "No outsiders" is one valid output
-
-    count = 0
-    for target_seat, target_role in targets:
-        for decoy in range(player_count):
-            if decoy != lib_seat and decoy != target_seat:
-                count += 1
-    return count
-
-
-def count_investigator_choices(seats, player_count):
-    """Count valid Investigator info choices."""
-    inv_seat = None
-    for s, r in seats.items():
-        if r == "investigator":
-            inv_seat = s
-            break
-    if inv_seat is None:
-        return 0
-
-    minions = {"poisoner", "spy", "scarlet_woman", "baron"}
-    targets = [(s, r) for s, r in seats.items() if s != inv_seat and r in minions]
-
-    if not targets:
+        if info_role == "librarian":
+            return 1  # "No Outsiders"
         return 0
 
     count = 0
     for target_seat, target_role in targets:
         for decoy in range(player_count):
-            if decoy != inv_seat and decoy != target_seat:
+            if decoy != info_seat and decoy != target_seat:
                 count += 1
     return count
 
 
-def count_chef_choices(seats, player_count):
-    """Chef is fully determined — always 1 choice."""
-    chef_seat = None
-    for s, r in seats.items():
-        if r == "chef":
-            chef_seat = s
-            break
-    return 1 if chef_seat is not None else 0
+def count_chef_choices(seats, player_count, chef_seat, malfunctioning=False):
+    """Chef choices: 1 when functioning (determined), numPlayers+1 when malfunctioning."""
+    if malfunctioning:
+        return player_count + 1  # counts 0..numPlayers
+    return 1
 
 
-def count_empath_choices(seats, player_count):
-    """Empath is fully determined — always 1 choice."""
-    empath_seat = None
-    for s, r in seats.items():
-        if r == "empath":
-            empath_seat = s
-            break
-    return 1 if empath_seat is not None else 0
+def count_empath_choices(seats, player_count, empath_seat, malfunctioning=False):
+    """Empath choices: 1 when functioning (determined), 3 when malfunctioning."""
+    if malfunctioning:
+        return 3  # counts 0, 1, 2
+    return 1
+
+
+def compute_role_choices(seats, player_count, malfunctioning_seats=None):
+    """Compute per-role choice counts, returning {role_name: count}.
+
+    malfunctioning_seats: set of seats that are malfunctioning.
+    """
+    if malfunctioning_seats is None:
+        malfunctioning_seats = set()
+
+    per_role = {}
+
+    for seat, role in seats.items():
+        malf = seat in malfunctioning_seats
+
+        if role == "washerwoman":
+            c = count_pair_role_choices(seats, player_count, seat, role, TOWNSFOLK, malf)
+            if c > 0:
+                per_role["Washerwoman"] = c
+        elif role == "librarian":
+            c = count_pair_role_choices(seats, player_count, seat, role, OUTSIDERS, malf)
+            if c > 0:
+                per_role["Librarian"] = c
+        elif role == "investigator":
+            c = count_pair_role_choices(seats, player_count, seat, role, MINIONS, malf)
+            if c > 0:
+                per_role["Investigator"] = c
+        elif role == "chef":
+            c = count_chef_choices(seats, player_count, seat, malf)
+            if c > 0:
+                per_role["Chef"] = c
+        elif role == "empath":
+            c = count_empath_choices(seats, player_count, seat, malf)
+            if c > 0:
+                per_role["Empath"] = c
+
+    return per_role
 
 
 def asp_total_worlds(seats, player_count):
-    """Compute total night info worlds as product of per-role choices."""
-    ww = count_washerwoman_choices(seats, player_count)
-    lib = count_librarian_choices(seats, player_count)
-    inv = count_investigator_choices(seats, player_count)
-    chef = count_chef_choices(seats, player_count)
-    empath = count_empath_choices(seats, player_count)
+    """Compute total night info worlds.
 
-    # Only multiply non-zero values (roles in play)
-    total = 1
-    per_role = {}
-    for name, val in [("Washerwoman", ww), ("Librarian", lib), ("Investigator", inv),
-                       ("Chef", chef), ("Empath", empath)]:
-        if val > 0:
-            total *= val
-            per_role[name] = val
+    If Poisoner is in play: sum across branches (one per poisoner target).
+    Otherwise: simple product of per-role choices.
+    """
+    poisoner_seat = None
+    for s, r in seats.items():
+        if r == "poisoner":
+            poisoner_seat = s
+            break
 
-    return total, per_role
+    if poisoner_seat is None:
+        # No Poisoner — simple cross-product
+        per_role = compute_role_choices(seats, player_count)
+        total = 1
+        for v in per_role.values():
+            total *= v
+        return total, per_role
+
+    # Poisoner in play — sum across branches
+    total = 0
+    # For the per-role summary, count how many valid outputs exist across ALL branches
+    combined_per_role = {}
+
+    for target in range(player_count):
+        if target == poisoner_seat:
+            continue
+
+        malfunctioning = {target}
+        branch_per_role = compute_role_choices(seats, player_count, malfunctioning)
+
+        branch_total = 1
+        for v in branch_per_role.values():
+            branch_total *= v
+        total += branch_total
+
+    # For per-role reporting, we report the number of outputs that are valid
+    # in at least one branch. This matches the ZDD's per-role counting
+    # (require each variable and check if count > 0 across the full ZDD).
+    # For a malfunctioning role, all outputs are valid; for functioning, only truthful.
+    # The union across all branches means: an output is valid if it's valid in ANY branch.
+    # For pair roles: functioning outputs + all malfunctioning outputs = all outputs
+    #   (since if the poisoner targets that role, ALL outputs are valid).
+    # For count roles: functioning output + all counts = all counts.
+    # So if an info role exists, the number of "reachable" outputs = malfunctioning count
+    #   (because the poisoner CAN target them, making all outputs reachable).
+    for seat, role in seats.items():
+        if not is_info_role(role):
+            continue
+        malf_choices = compute_role_choices(seats, player_count, {seat})
+        zdd_name = role.replace("_", " ").title()
+        if zdd_name in malf_choices:
+            combined_per_role[zdd_name] = malf_choices[zdd_name]
+
+    # Add Poisoner target count
+    combined_per_role["Poisoner"] = player_count - 1
+
+    return total, combined_per_role
 
 
 # =============================================================================
@@ -208,9 +283,6 @@ for (const [name, config] of Object.entries(scenarios)) {
 
   const perRole = {};
   for (const [roleName, range] of result.roleVariableRanges) {
-    // Count worlds with this role's contribution
-    // For independent cross-product, the per-role choice count is
-    // the number of valid outputs (variables for exactly-one selection)
     let validOutputs = 0;
     for (let vid = range.start; vid < range.start + range.count; vid++) {
       const constrained = zdd.require(result.root, vid);
@@ -239,7 +311,6 @@ def run_zdd(scenarios):
     """Run botc-zdd- night info builder for all scenarios."""
     zdd_scenarios = {}
     for sc in scenarios:
-        # Convert to ZDD role names
         zdd_seats = {}
         for seat, role in sc["seats"].items():
             zdd_seats[str(seat)] = zdd_role_name(role)
@@ -292,14 +363,13 @@ def compare():
             all_pass = False
 
         # Per-role comparison
-        all_roles = sorted(set(list(asp_per_role.keys()) + [zdd_role_name(k) for k in asp_per_role.keys()]))
-        for role_name in asp_per_role:
-            zdd_name = zdd_role_name(role_name) if role_name.islower() else role_name
+        all_role_names = sorted(set(list(asp_per_role.keys()) + list(zdd_per_role.keys())))
+        for role_name in all_role_names:
             asp_val = asp_per_role.get(role_name, 0)
-            zdd_val = zdd_per_role.get(zdd_name, 0)
+            zdd_val = zdd_per_role.get(role_name, 0)
             match = asp_val == zdd_val
             rs = "PASS" if match else "FAIL"
-            print(f"    {zdd_name:>15}: ASP={asp_val:>4}  ZDD={zdd_val:>4}  [{rs}]")
+            print(f"    {role_name:>15}: ASP={asp_val:>4}  ZDD={zdd_val:>4}  [{rs}]")
             if not match:
                 all_pass = False
 
