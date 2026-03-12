@@ -1,92 +1,93 @@
 # botc-zdd- Integration Plan
 
-This document captures the multi-prompt plan for building the `botc-zdd-` library
-(a dependency of botc-asp) and reviewing its PRs to ensure they match our integration
-expectations.
+This document tracks the incremental development of the `botc-zdd-` library
+and its integration into botc-asp. Each "Prompt" maps to one or more PRs on
+botc-zdd- that we review before merging, then test integration with our ASP code.
 
-## Overview
+## Key Architectural Insight
 
-The botc-zdd- library provides ZDD-based (Zero-suppressed Decision Diagram) world tracking
-for Blood on the Clocktower game state. It encodes role distributions, seat assignments,
-and night information as ZDD phases, allowing efficient enumeration and constraint propagation.
-
-We (botc-asp) will eventually integrate this library to provide a web-based BotC solver
-alongside our existing ASP-based approach.
+The ZDD phases are **not** one giant cross-product of all possibilities. Each
+phase commits to concrete choices from the previous phase, then the ZDD
+represents uncertainty only about the current phase's decisions. This mirrors
+actual gameplay — there's one true game state, and the tool helps explore
+what's consistent with observations.
 
 ---
 
-## Prompt 1: Phase-Chain Architecture + Night 1 Info Roles (PRs #2, #3, #4)
+## Prompt 1: Night 1 Information Roles (all functioning)
 
-**Status: Merged**
+**Status: Merged (PRs #2, #3, #4)**
 
-Established the core architecture:
-- ZDD class with union, product, require, offset, count, enumerate operations
+Takes a concrete seat assignment. Builds a ZDD of valid ST information choices
+for Washerwoman, Librarian, Investigator, Chef, Empath. Chef and Empath are
+fully determined by the seating (single valid output). Washerwoman/Librarian/
+Investigator have ST choice (which pair to show), so the ZDD represents those
+choices.
+
+Established:
+- ZDD class with union, product, require, offset, count, enumerate
 - Phase chain: Distribution -> SeatAssignment -> NightInfo
 - Game class managing phase transitions
-- Night 1 info roles: Washerwoman, Librarian, Investigator, Chef, Empath
 - Variable encoding: each info output gets a unique variable ID
-- exactlyOne ZDD constraint for each info role's valid outputs
+- exactlyOne ZDD constraint per info role
 - Cross-product of independent info roles
 - Lookup helpers: findPairInfoVariable, findCountInfoVariable
 - Observation system: require-variable, exclude-variable
 
 ---
 
-## Prompt 2: Poisoner Target Selection and Malfunctioning Info Roles (PR #5)
+## Prompt 2: Poisoner + Drunk (malfunctioning info)
 
-**Status: Open (CI passing)**
+**Status: PR #5 open, CI passing**
 **Branch: claude/add-poisoner-malfunctioning-roles-bDI3I**
 
-### Requirements
-
-1. **Architecture fix**: Malfunctioning info roles must generate the SAME variables as
-   functioning ones, but allow ANY valid output (not just truthful). Previously they
-   returned emptyResult() with zero variables.
-
-2. **Poisoner target selection**: When Poisoner is in play, add N-1 target variables
-   (one per non-Poisoner seat) with exactlyOne constraint. Variables come first (lower IDs),
-   then info role variables follow. All in the same ZDD phase.
-
-3. **Branching structure**: The valid info outputs DEPEND on which seat is poisoned, so
-   this is NOT a simple cross-product. Build separate ZDD branches per poisoner target,
-   then union them together.
-
-4. **Drunk handling**: Respect `malfunctioningSeats` set (caller provides it). A seat in
-   this set is always malfunctioning regardless of poisoner target.
-
-5. **New types**: PoisonerTargetOutput, findPoisonerTargetVariable helper.
-
-6. **Tests**: Poisoner targeting each role type, branch counts, observation forcing
-   poisoner target, Drunk always-malfunctioning, combined Drunk+Poisoner.
-
-### What NOT to do
-- No Spy, Recluse, Fortune Teller
-- No demon kill or death
-- No distribution/seat assignment changes
-- No Game class API changes beyond malfunctioningSeats parameter
+The poisoner's target choice is part of the Night 1 phase — it happens before
+info roles act. This expands the Night 1 ZDD: for each poisoner target choice,
+the targeted info role (if any) gets unconstrained outputs while others stay
+truthful. Drunk is simpler — the Drunk's seat is known from the concrete
+assignment, so they're just always malfunctioning. This prompt revises the night
+phase builder from Prompt 1, adding poisoner target variables before info output
+variables.
 
 ---
 
-## Prompt 3: Fortune Teller + Undertaker (Future)
+## Prompt 3: Spy/Recluse registration + Fortune Teller red herring
 
-Night 1 and recurring night info roles. Fortune Teller has a "red herring" (a good
-player who registers as the Demon to the FT). Undertaker learns the role of the
-executed player on the previous day.
+**Status: Not started**
 
----
-
-## Prompt 4: Day Phase + Nominations + Execution (Future)
-
-Model the day phase: nominations, voting, execution. Track alive/dead state.
-Support the Slayer's day action.
+These modify what counts as "truthful" for info roles. Spy can appear as good to
+info roles, Recluse can appear as evil. Fortune Teller has a pre-designated red
+herring player. All three expand the set of valid ST info choices without changing
+the phase architecture.
 
 ---
 
-## Prompt 5: Demon Kill + Night Order (Future)
+## Prompt 4: Active night roles + death
 
-Model the Imp's night kill. Handle the full night order: Poisoner -> info roles ->
-Imp kill. Track death and its effect on subsequent night info (Empath's living
-neighbors change).
+**Status: Not started**
+
+Imp demon kill (not Night 1), Monk protection, Soldier immunity. These add
+variables to later night phases and introduce the concept of players dying between
+nights, which affects Empath neighbor calculations and game progression.
+
+---
+
+## Prompt 5: Integration readiness
+
+**Status: Not started**
+
+Clean API surface. Probably a high-level "shadow mode" function that takes the
+same inputs the botc-asp web app works with and produces comparable outputs.
+Verify browser bundleability. Maybe a small cross-validation script like we have
+for distributions.
+
+---
+
+## Integration Milestones
+
+- **Prompts 1-3**: Minimum for useful integration (info roles with full TB complexity)
+- **Prompt 4**: Enables multi-night games
+- **Prompt 5**: Bridge back to this repo
 
 ---
 
@@ -96,50 +97,47 @@ neighbors change).
 
 **Verdict: Approve with minor notes**
 
-The implementation correctly addresses all requirements from Prompt 2:
+The implementation correctly addresses all Prompt 2 requirements:
 
 **Architecture (correct):**
 - Malfunctioning roles now generate the same variable IDs as functioning ones
-- Uses a "maximal variable set" strategy: build with all seats malfunctioning to get
-  the superset of variables, then constrain per-branch
-- `buildAllInfoRolesConstrained` + `buildFunctioningRoleConstrained` filter truthful
-  variables from the maximal set
+- Uses a "maximal variable set" strategy: build with all seats malfunctioning to
+  get the superset of variables, then constrain per-branch
+- `buildAllInfoRolesConstrained` + `buildFunctioningRoleConstrained` filter
+  truthful variables from the maximal set
 
 **Poisoner variables (correct):**
-- N-1 target variables allocated at IDs 0..N-2
-- Info role variables start at ID N-1 (after poisoner vars)
-- exactlyOne constraint on poisoner targets (implicit via singleSet per branch + union)
+- N-1 target variables at IDs 0..N-2
+- Info role variables start after poisoner vars
+- exactlyOne on poisoner targets (implicit via singleSet per branch + union)
 
 **Branching (correct):**
 - Each poisoner target gets its own info-role ZDD
-- Per branch: target seat added to malfunctioningSeats -> that role unconstrained
+- Per branch: target seat added to malfunctioningSeats -> role unconstrained
 - Branches combined via union, not cross-product
 
 **Drunk/malfunctioningSeats (correct):**
 - `baseMalfunctioning` from config flows into every branch
-- A seat in baseMalfunctioning is always unconstrained, even when poisoner targets elsewhere
+- A seat in baseMalfunctioning is always unconstrained regardless of poisoner target
 
 **Variable consistency across branches (correct):**
 - All branches share the same variable IDs from the maximal result
-- The `pairOutputs`/`countOutputs` maps in the final result are from the maximal build (superset)
+- `pairOutputs`/`countOutputs` maps from the maximal build (superset)
 
 **Test coverage (comprehensive):**
-- All no-Poisoner tests updated to use Spy (avoids triggering Poisoner logic)
+- No-Poisoner tests updated to use Spy (avoids triggering Poisoner logic)
 - Per-branch count verification: 78 + 36 + 18 + 6 = 138
 - Observation forcing poisoner target (require count=0 -> must target Chef)
 - WW output only valid when malfunctioning -> forces poisoner on WW seat
 - Drunk always unconstrained regardless of poisoner target
 - Combined Drunk+Poisoner: 234 + 108 + 18 + 18 = 378
-- Game class integration tests with malfunctioningSeats pass-through
+- Game class integration with malfunctioningSeats pass-through
 - End-to-end pipeline with Poisoner
 
 **Minor notes (non-blocking):**
-1. The "No Outsiders" variable identification in `buildFunctioningRoleConstrained` (line 792)
-   relies on it being the only variable without a pairOutputs entry. This works because
-   `buildMalfunctioningPairRoleInfo` creates the "No Outsiders" var first (before pair vars)
-   and doesn't add it to pairOutputs. Fragile but correct for now.
-
-2. The Chef's maximal variable count is `numPlayers + 1` (counts 0..numPlayers), which is
-   the same whether functioning or malfunctioning. Good - no variable count mismatch.
-
-3. CI passes on this branch.
+1. "No Outsiders" variable identification in `buildFunctioningRoleConstrained`
+   relies on it being the only variable without a pairOutputs entry. Fragile
+   but correct for now.
+2. Chef maximal variable count is `numPlayers + 1` whether functioning or not.
+   No variable count mismatch.
+3. CI passes.
