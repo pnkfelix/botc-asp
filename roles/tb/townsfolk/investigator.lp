@@ -29,7 +29,7 @@ first_night_substep(investigator, 3, st_tells(inv_info)).
    not registers_as(P, minion, T).
 
 % Functioning: ST tells a role the minion-reference may register as (constrained to truthful options)
-{ st_tells_core(investigator, INV, info(First, Second, R), T) : may_register_as_role(PMinion, R, T) } = 1 :-
+{ st_tells_core(investigator, INV, info(First, Second, R), T) : may_register_as_role(PMinion, R, T), minion(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(investigator, RoleOrd),
     character_assignment_state_at_time(T, INV, investigator),
