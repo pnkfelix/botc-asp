@@ -29,7 +29,7 @@ first_night_substep(washerwoman, 3, st_tells(ww_info)).
    not registers_as(P, townsfolk, T).
 
 % Functioning: ST tells a role the townsfolk-reference may register as (constrained to truthful options)
-{ st_tells_core(washerwoman, WW, info(First, Second, R), T) : may_register_as_role(PTownsfolk, R, T) } = 1 :-
+{ st_tells_core(washerwoman, WW, info(First, Second, R), T) : may_register_as_role(PTownsfolk, R, T), townsfolk(R) } = 1 :-
     T = night(1, RoleOrd, 3),
     first_night_role_order(washerwoman, RoleOrd),
     character_assignment_state_at_time(T, WW, washerwoman),
