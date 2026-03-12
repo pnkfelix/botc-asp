@@ -114,13 +114,13 @@ def clingo_count_distributions(player_count: int, exclude_baron: bool = False) -
 
 ZDD_SCRIPT = """
 const { ZDD } = require('./dist/zdd.js');
-const { buildDistributionZDD, buildDistributionZDDWithBaron, TROUBLE_BREWING } = require('./dist/botc.js');
+const { buildDistributionZDD, buildDistributionZDDWithModifiers, TROUBLE_BREWING } = require('./dist/botc.js');
 
 const results = {};
 for (const pc of %PLAYER_COUNTS%) {
   const zdd = new ZDD();
   const noBaron = buildDistributionZDD(zdd, TROUBLE_BREWING, pc);
-  const withBaron = buildDistributionZDDWithBaron(zdd, TROUBLE_BREWING, pc);
+  const withBaron = buildDistributionZDDWithModifiers(zdd, TROUBLE_BREWING, pc);
 
   // Enumerate distributions for the no-baron case to compare sets
   const noBaronSets = zdd.enumerate(noBaron).map(vars =>
