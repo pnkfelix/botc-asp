@@ -13,15 +13,6 @@ the ZDD world count.
 - poi_target/1: which player the Poisoner targets (derived from poi_poisoned)
 - ft_red_herring/1: which player is the FT red herring (derived from ft_red_herring)
 
-**Known discrepancies** (documented, not bugs in the cross-validation):
-- ZDD Investigator: when Spy is the reference, findPairTargets offers all minion
-  role names (Baron, Poisoner, SW, Spy). But Spy lacks may_misregister_as(minion),
-  so the only valid name is "spy" (the true role). Overcounts by 4x.
-- ZDD Librarian: when the only outsider-registering player is the Spy, the ZDD
-  always treats Spy as an eligible reference. But Spy's outsider registration is
-  optional (a ST choice), so there should also be a "No Outsiders" branch for
-  when the Spy doesn't register as outsider. Undercounts by 1.
-
 Requirements:
 - Python clingo package: pip install clingo
 - botc-zdd- repo cloned and built: cd ../botc-zdd- && npx tsc
@@ -112,7 +103,6 @@ SCENARIOS = [
         "name": "7p Spy+info: WW,Lib,Inv,Chef,Empath,Spy,Imp",
         "seats": {0: "washerwoman", 1: "librarian", 2: "investigator", 3: "chef", 4: "empath", 5: "spy", 6: "imp"},
         "player_count": 7,
-        "known_discrepancy": "Two ZDD bugs: (1) Inv names any minion role for Spy, but Spy lacks may_misregister_as(minion) so only 'spy' is valid; (2) Lib missing 'No Outsiders' branch when Spy is the only outsider-registering player (registration is optional)",
     },
 ]
 
@@ -279,7 +269,6 @@ def compare():
         print("Running ASP-only mode (no cross-validation)")
 
     all_pass = True
-    discrepancy_count = 0
 
     for sc in SCENARIOS:
         name = sc["name"]
@@ -298,29 +287,15 @@ def compare():
             print(f"  Match: [{status}]")
 
             if not match:
-                if "known_discrepancy" in sc:
-                    discrepancy_count += 1
-                    print(f"  Known discrepancy: {sc['known_discrepancy']}")
-                else:
-                    all_pass = False
-                    print(f"  ** UNEXPECTED MISMATCH **")
+                all_pass = False
+                print(f"  ** UNEXPECTED MISMATCH **")
 
     print("\n" + "=" * 70)
     if all_pass:
-        if discrepancy_count > 0:
-            print(f"ALL CHECKS PASSED ({discrepancy_count} known discrepancies)")
-        else:
-            print("ALL CHECKS PASSED")
+        print("ALL CHECKS PASSED")
     else:
         print("UNEXPECTED MISMATCHES FOUND — investigate!")
     print("=" * 70)
-
-    if discrepancy_count > 0:
-        print("\nKnown discrepancies to fix (both ZDD-side):")
-        print("  1. ZDD Inv: Spy as reference offers all minion role names, but Spy")
-        print("     lacks may_misregister_as(minion); only 'spy' is valid (4x overcount)")
-        print("  2. ZDD Lib: when Spy is the only outsider-registering player, Spy's")
-        print("     outsider registration is optional; missing 'No Outsiders' branch")
 
     return all_pass
 
