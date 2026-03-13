@@ -2,6 +2,16 @@
 
 This file contains instructions for Claude Code when working on this repository.
 
+## Related Repositories
+
+This repo (`pnkfelix/botc-asp`) has a companion repo **`pnkfelix/botc-zdd-`** (TypeScript, ZDD-based BotC modeling). When the user references PRs, issues, or code in `botc-zdd-`, use that repo for GitHub API calls:
+
+```
+https://api.github.com/repos/pnkfelix/botc-zdd-/...
+```
+
+The `botc-zdd-` repo contains the ZDD game engine (TypeScript/Vitest) that models BotC mechanics using Zero-suppressed Decision Diagrams. Work on "Prompt 4", "Night 2 actions", "Monk/Imp/starpass", etc. refers to `botc-zdd-`.
+
 ## Environment Differences
 
 Claude Code runs in two environments with different capabilities:

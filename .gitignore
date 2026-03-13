@@ -9,5 +9,6 @@ web-ui/src/BuildInfo.js
 engine/__pycache__/
 engine-ts/node_modules/
 engine-ts/dist/
+cross-validation/oracle_counts.json
 *.pyc
 .DS_Store
