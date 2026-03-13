@@ -554,6 +554,16 @@ renderResult state = case state.result of
               [ HH.text $ "SATISFIABLE - Found " <> show totalCount <> " answer set(s)"
                   <> if totalCount > 1 then " (click to select)" else ""
               ]
+          -- ZDD shadow solver result
+          , case state.zddWorldCount of
+              Just wc -> HH.div
+                [ HP.style "margin-top: 6px; padding: 6px 10px; background: #e3f2fd; border-radius: 4px; font-size: 13px; color: #1565c0;" ]
+                [ HH.text $ "ZDD shadow: " <> show wc <> " world(s) for model 1 Night 1 info" ]
+              Nothing -> case state.zddError of
+                Just err -> HH.div
+                  [ HP.style "margin-top: 6px; padding: 6px 10px; background: #fff8e1; border-radius: 4px; font-size: 13px; color: #f57f17;" ]
+                  [ HH.text $ "ZDD shadow error: " <> err ]
+                Nothing -> HH.text ""
           -- Pagination controls (only show if more than one page)
           , if totalPages > 1
             then HH.div

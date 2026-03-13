@@ -26,6 +26,7 @@ import TextareaUtils as TU
 import TokenConstraints as TC
 import UrlParams as UP
 import Web.UIEvent.MouseEvent (toEvent)
+import Zdd as Zdd
 
 -- Re-export types and render function for backwards compatibility
 import Component.ClingoDemo.Types (Action(..), ResultDisplay(..), Slots, State, TimingEntry, UndoEntry, answerSetPageSize)
@@ -252,7 +253,29 @@ handleAction = case _ of
           Just entry -> snoc s.timingHistory entry
           Nothing -> s.timingHistory
       , nextRunIndex = s.nextRunIndex + 1
+      , zddWorldCount = Nothing  -- Clear previous ZDD result
+      , zddError = Nothing
       }
+
+    -- Run ZDD shadow solver on the first answer set (if satisfiable)
+    case display of
+      ResultSuccess witnesses -> case Array.head witnesses of
+        Just firstWitness -> do
+          -- Parse the first answer set to get game state
+          let atoms = AnswerSet.parseAnswerSet firstWitness
+          let gameState = AnswerSet.buildGameState atoms (AnswerSet.Night 1 0 0)
+          -- Extract seat assignments: convert 1-based chairs to 0-based seats
+          let seatAssignment = map (\p -> { seat: p.chair - 1, role: p.role }) gameState.players
+          -- Get script roles from the resolved program
+          let scriptRoles = Clingo.extractScriptRoles fullProgram
+          -- Run ZDD (synchronous, sub-millisecond)
+          zddResult <- liftEffect $ Zdd.runZddShadow scriptRoles (length seatAssignment) seatAssignment
+          H.modify_ \s -> s
+            { zddWorldCount = if zddResult.error == "" then Just zddResult.worldCount else Nothing
+            , zddError = if zddResult.error == "" then Nothing else Just zddResult.error
+            }
+        Nothing -> pure unit
+      _ -> pure unit
 
   CancelSolve -> do
     -- Restart the worker to cancel the current solve

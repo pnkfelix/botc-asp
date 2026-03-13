@@ -244,6 +244,8 @@ initialState =
   , isValidating: false         -- Not validating initially
   , actionConstraint: ""        -- Empty action constraint initially
   , selectedTimeContext: Nothing -- No time point context initially
+  , zddWorldCount: Nothing       -- No ZDD result initially
+  , zddError: Nothing            -- No ZDD error initially
   }
 
 -- | Get current file content from state

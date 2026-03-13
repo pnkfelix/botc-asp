@@ -86,6 +86,9 @@ type State =
   , actionConstraint :: String                    -- User-entered action constraint for incremental mode
   -- Time point context from grimoire (for incremental validation)
   , selectedTimeContext :: Maybe TimePointContext  -- What time/role is selected in the grimoire
+  -- ZDD shadow solver result
+  , zddWorldCount :: Maybe Int           -- World count from ZDD engine (Nothing = not run yet)
+  , zddError :: Maybe String             -- Error from ZDD engine (if any)
   }
 
 -- | How to display results
