@@ -125,23 +125,76 @@ Test coverage: 20 tests (17 specified + 3 integration).
 
 ---
 
-## Prompt 5: Integration readiness
+## Prompt 7: Ravenkeeper, Scarlet Woman, Saint, Slayer
 
-**Status: Not started**
+**Status: Merged (PR #12). CI passing.**
 
-Clean API surface. Probably a high-level "shadow mode" function that takes the
-same inputs the botc-asp web app works with and produces comparable outputs.
-Verify browser bundleability. Maybe a small cross-validation script like we have
-for distributions.
+Rounds out the TB roles that interact with the existing phase structure:
 
-Now that we have the full Night 1 → Day 1 → Night 2 pipeline with Undertaker,
-integration can demonstrate multi-phase gameplay. Potential scope:
+- **Ravenkeeper**: Death-triggered Night 2 info role. When killed by Imp, wakes
+  and chooses a player to learn their role. Integrated into night-action.ts
+  branch logic with maximal variable allocation (TOP when not fired).
+- **Scarlet Woman**: Demon succession in recordDay(). Imp executed with 5+ alive
+  → living SW becomes new Imp. Reversible on undo. Also: functioning SW has
+  mandatory starpass precedence over other minions.
+- **Saint**: Game-ending condition. Functioning Saint executed → evil wins. Check
+  in recordDay() using _malfunctioningSeats.
+- **Slayer**: ZDD-based day ability. recordDay() builds exactlyOne ZDD of legal
+  (target, outcome) pairs. Recluse gets both died/survived outcomes (ST choice).
+  Undo restores _slayerUsed flag.
 
-- Browser bundle verification (ZDD + game engine in WASM-free JS)
-- Shadow mode: run ZDD engine alongside ASP engine in the web UI, compare outputs
-- Night 2 cross-validation script (extend `validate_night_info.py` pattern to
-  cover Night 2 action scenarios)
-- API surface cleanup: ensure Game class methods have a clean, documented interface
+Test coverage: 23 tests. CI passes on all 4 commits.
+
+---
+
+## Prompt 8: Browser bundle + observation API
+
+**Status: Merged (PR #13). CI passing.**
+
+Prepares botc-zdd- for web UI integration with two deliverables:
+
+**Browser bundle:**
+- `npm run build:browser` → `dist/botc-zdd.esm.js` via esbuild
+- No Node-only APIs (no fs/path/process)
+- `test-browser.html` smoke test: 5-player game, WW observation, Chef query,
+  undo verification. Works with `npx serve .`
+
+**GameObserver class:**
+- Wraps Game with high-level observation methods that translate human-readable
+  observations into ZDD require/exclude operations
+- Night 1: observePairInfo, observeCountInfo, observeFortuneTellerInfo,
+  observeLibrarianNoOutsiders
+- Night 2: observeNightDeath, observeEmpathN2, observeFortuneTellerN2,
+  observeUndertakerRole, observeRavenkeeperInfo
+- Day: observeExecution, observeNoExecution, observeSlayerShot
+- Queries: worldCount(), possibleValues(role, nightNumber) with human-readable
+  value descriptions and per-value world counts
+- Undo: per-observation undo stack with rollback on inconsistent observations
+- Error handling: inconsistent observations throw without modifying state
+
+Test coverage: 10 tests. All pass.
+
+---
+
+## Prompt 5: Web UI integration (botc-asp side)
+
+**Status: Not started — NEXT**
+
+This is work on the botc-asp repo, not botc-zdd-. The ZDD library is now
+feature-complete with a browser ESM bundle and observation API. The remaining
+task is wiring it into the botc-asp web UI as a shadow solver alongside clingo.
+
+Scope:
+- Add botc-zdd ESM bundle to web-ui (vendor dist/botc-zdd.esm.js or npm link)
+- Create Zdd.purs + Zdd.js FFI module (parallel to Clingo.purs + Clingo.js)
+- Translate Grimoire state (seat assignments, reminder tokens) into GameObserver
+  calls
+- Display ZDD world count alongside clingo model count
+- Optional: engine selector (Clingo / ZDD / Both) in game config UI
+- Optional: possibleValues display for each info role
+
+This is the final integration step — after this, the web UI runs both solvers
+and users can compare results.
 
 ---
 
@@ -151,7 +204,9 @@ integration can demonstrate multi-phase gameplay. Potential scope:
 - **Prompt 3 specifically**: Enables switching cross-validation to the real ASP oracle — **DONE**
 - **Prompt 4**: Enables multi-night games — **DONE**
 - **Prompt 6**: Day phase + Undertaker, completing the Night 1 → Day 1 → Night 2 loop — **DONE**
-- **Prompt 5**: Bridge back to this repo — **NEXT**
+- **Prompt 7**: Remaining TB roles (Ravenkeeper, SW, Saint, Slayer) — **DONE**
+- **Prompt 8**: Browser bundle + observation API (botc-zdd- side complete) — **DONE**
+- **Prompt 5**: Web UI integration (botc-asp side) — **NEXT**
 
 ---
 
@@ -317,3 +372,59 @@ Adds Day phase support and Undertaker role (+896 -31 across 4 files):
 
 **Cross-validation:** All 11 Night 1 info scenarios and 12 distribution scenarios
 continue to pass. ZDD performance unchanged (sub-2ms, 5 MB heap).
+
+### PR #12 Review (2026-03-13)
+
+**Verdict: Approve — Prompt 7 (Ravenkeeper, SW, Saint, Slayer)**
+
+Adds four TB roles (+1,097 -20 across 4 files, 4 commits, 23 tests):
+
+**Ravenkeeper (night-action.ts):**
+- Death-triggered: `buildRavenkeeperForBranch` returns TOP when RK not killed
+- Functioning: union of {targetVar(t)} × {roleVar(trueRole(t))} per target
+- Malfunctioning: exactlyOne(targets) × exactlyOne(roles)
+- Maximal variable allocation, per-branch TOP when inactive
+
+**Scarlet Woman (game.ts):**
+- Promotion in recordDay(): checks RoleType.Demon + aliveCount >= 5
+- Undo reverses promotion by restoring "Scarlet Woman" role
+- Starpass precedence (night-action.ts): functioning SW is mandatory recipient
+
+**Saint (game.ts):**
+- recordDay() check: executedRole === "Saint" && !malfunctioning → evil wins
+- GameOverResult type on DayResult
+
+**Slayer (game.ts — refactored from imperative to ZDD):**
+- Day phase ZDD variables: one per legal (target, outcome) pair
+- Recluse: both died/survived outcomes (registersAs Demon check)
+- Undo restores _slayerUsed flag
+- recordDay() overloaded to accept slayerShot option
+
+### PR #13 Review (2026-03-13)
+
+**Verdict: Approve — Prompt 8 (Browser bundle + observation API)**
+
+Adds browser bundle and GameObserver (+1,084 -108 across 6 files):
+
+**Browser bundle:**
+- `build:browser` script: esbuild → dist/botc-zdd.esm.js
+- test-browser.html: 5-player smoke test with observation + undo
+
+**GameObserver (src/observer.ts, 527 lines):**
+- Wraps Game, translates observations to require/exclude via find*Variable helpers
+- Night 1: observePairInfo, observeCountInfo, observeFortuneTellerInfo,
+  observeLibrarianNoOutsiders
+- Night 2: observeEmpathN2, observeFortuneTellerN2, observeUndertakerRole,
+  observeRavenkeeperInfo (two requires: target + role)
+- Day: observeExecution, observeNoExecution, observeSlayerShot
+- possibleValues: iterates role variables, requires each temporarily, returns
+  human-readable {value, worldCount} entries
+- Undo: per-observation stack, rollback on inconsistent observations
+- Error handling: BOTTOM check → restore previous root → throw
+
+**Minor notes (non-blocking):**
+1. Ravenkeeper undo pushes two entries (target + role) — caller must undo twice
+2. observeNightDeath not on undo stack (state transition, not ZDD observation)
+3. undo() uses private member cast for root restoration
+4. 10 tests covering possibleValues sums, observation narrowing, conflicts,
+   undo, full pipeline, Night 2 integration
